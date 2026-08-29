@@ -52,8 +52,6 @@ function doPost(e) {
       result = handleSubmitVote(payload, userEmail);
     } else if (action === 'getLeaderboardData') {
       result = handleGetLeaderboardData(payload.seasonId);
-    } else if (action === 'advanceWeek') {
-      result = advanceLeagueWeek();
     } else {
       throw new Error('Invalid action requested.');
     }
