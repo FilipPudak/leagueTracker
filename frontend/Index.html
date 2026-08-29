@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Star Wars Unlimited League Voting</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0; padding: 12px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 16px; background-color: #0f172a; color: #f8fafc; display: flex; justify-content: center; min-height: 100vh;
+    }
+    .app-container {
+      width: 100%; max-width: 520px; background-color: #1e293b; border-radius: 16px; padding: 20px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); border: 1px solid #334155; height: fit-content;
+    }
+    .header { text-align: center; margin-bottom: 20px; border-bottom: 1px solid #334155; padding-bottom: 12px; }
+    .header h1 { font-size: 1.35rem; margin: 0 0 6px 0; color: #38bdf8; font-weight: 700; letter-spacing: 0.5px; }
+    .subtitle { font-size: 0.85rem; color: #94a3b8; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; margin-top: 6px; }
+    .badge-active { background-color: #059669; color: #ecfdf5; }
+    .badge-closed { background-color: #dc2626; color: #fef2f2; }
+    .nav-tabs { display: flex; gap: 8px; margin-bottom: 20px; background-color: #0f172a; padding: 4px; border-radius: 10px; }
+    .tab-btn { flex: 1; padding: 10px 0; border: none; background: transparent; color: #94a3b8; font-weight: 600; font-size: 0.9rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+    .tab-btn.active { background-color: #38bdf8; color: #0f172a; }
+    .view-panel { display: none; }
+    .view-panel.active { display: block; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: #cbd5e1; }
+    select { width: 100%; min-height: 48px; font-size: 16px; padding: 0 12px; background-color: #0f172a; border: 1px solid #475569; border-radius: 10px; color: #f8fafc; outline: none; }
+    select:focus { border-color: #38bdf8; }
+    .btn-submit { width: 100%; min-height: 50px; font-size: 1rem; font-weight: 700; color: #0f172a; background-color: #38bdf8; border: none; border-radius: 10px; cursor: pointer; margin-top: 10px; }
+    .btn-submit:disabled { background-color: #475569; color: #94a3b8; cursor: not-allowed; }
+    .card { background-color: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 16px; margin-bottom: 16px; text-align: center; }
+    .status-msg { padding: 12px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 16px; display: none; }
+    .status-success { background-color: #064e3b; color: #a7f3d0; border: 1px solid #059669; }
+    .status-error { background-color: #7f1d1d; color: #fecaca; border: 1px solid #dc2626; }
+    .loader { border: 3px solid #334155; border-top: 3px solid #38bdf8; border-radius: 50%; width: 28px; height: 28px; animation: spin 0.8s linear infinite; margin: 20px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* UNIFIED STATS LIST SYSTEM */
+    .stats-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+    .stats-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px; padding: 10px 14px; transition: background 0.2s ease;
+    }
+    .stats-row:hover { background: rgba(255, 255, 255, 0.06); }
+    .stats-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .rank-pill {
+      width: 28px; height: 28px; border-radius: 50%; display: flex;
+      align-items: center; justify-content: center; font-weight: 800;
+      font-size: 0.8rem; flex-shrink: 0;
+    }
+    .rank-1 .rank-pill { background: rgba(250, 204, 21, 0.15); color: #facc15; border: 1px solid #facc15; }
+    .rank-2 .rank-pill { background: rgba(226, 232, 240, 0.15); color: #e2e8f0; border: 1px solid #e2e8f0; }
+    .rank-3 .rank-pill { background: rgba(180, 83, 9, 0.15); color: #f59e0b; border: 1px solid #f59e0b; }
+    .stats-info { display: flex; flex-direction: column; min-width: 0; }
+    .stats-title { font-weight: 600; font-size: 0.9rem; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stats-subtitle { font-size: 0.75rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stats-score { font-weight: 700; font-size: 0.9rem; color: #38bdf8; white-space: nowrap; margin-left: 12px; }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <div class="header">
+      <h1 id="app-title">SWU League Voting</h1>
+      <div class="subtitle" id="app-subtitle">Loading season information...</div>
+      <div id="voting-badge" class="badge badge-active" style="display: none;">Voting Open</div>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('vote-view')">Vote</button>
+      <button class="tab-btn" onclick="switchTab('leaderboard-view')">Leaderboard</button>
+    </div>
+
+    <div id="status-box" class="status-msg"></div>
+    <div id="loading-spinner" class="loader"></div>
+
+    <!-- LINK PANEL -->
+    <div id="link-view" class="view-panel">
+      <div class="card">
+        <h3 style="margin-top:0;">Link Account</h3>
+        <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 0;">Select your registered player profile to continue.</p>
+      </div>
+      <div class="form-group">
+        <label for="link-player-select">Select Your Name</label>
+        <select id="link-player-select"><option value="">-- Choose Your Name --</option></select>
+      </div>
+      <button class="btn-submit" onclick="submitAccountLink()">Link Account</button>
+    </div>
+
+    <!-- VOTE PANEL -->
+    <div id="vote-view" class="view-panel">
+      <form id="vote-form" onsubmit="event.preventDefault(); submitVotes();">
+        <div class="card" style="text-align: left;">
+          <div style="font-size: 0.8rem; color: #94a3b8;">VOTING AS</div>
+          <div id="linked-player-name" style="font-weight: 700; color: #38bdf8;"></div>
+        </div>
+        <div class="form-group">
+          <label for="leader-1">Leader Played</label>
+          <select id="leader-1" required><option value="">-- Select Leader --</option></select>
+        </div>
+        <div class="form-group">
+          <label for="favorite-opponent">Favorite Opponent</label>
+          <select id="favorite-opponent" required><option value="">-- Select Favorite Opponent --</option></select>
+        </div>
+        <button type="submit" id="btn-vote-submit" class="btn-submit">Submit Votes</button>
+      </form>
+
+      <div id="already-voted-card" class="card" style="display: none;">
+        <h3 style="margin-top:0;">Votes Received!</h3>
+        <p style="font-size: 0.9rem; color: #a7f3d0; margin-bottom:0;">Your votes for this week are logged. Check back next week!</p>
+      </div>
+    </div>
+
+    <!-- LEADERBOARD PANEL -->
+    <div id="leaderboard-view" class="view-panel">
+      <div class="form-group">
+        <label for="season-filter">Select Season</label>
+        <select id="season-filter" onchange="loadLeaderboardData()"></select>
+      </div>
+
+      <div style="margin-top: 16px;">
+        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Most Played Leaders</h3>
+        <div id="most-played-container"></div>
+      </div>
+
+      <div style="margin-top: 20px;">
+        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Master Strategist (Diversity)</h3>
+        <div id="diversity-container"></div>
+      </div>
+
+      <div style="margin-top: 20px;">
+        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Loyalists (Leader Loyalty)</h3>
+        <div id="loyalty-container"></div>
+      </div>
+
+      <div id="opponent-leaderboard-section" style="margin-top: 20px;">
+        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Favorite Opponent Awards</h3>
+        <div id="opponent-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let appState = { linkedPlayer: null, settings: {}, seasons: [], leaderboardLoaded: false };
+
+    window.addEventListener('DOMContentLoaded', () => { fetchInitialAppData(); });
+
+    function showSpinner(show) { document.getElementById('loading-spinner').style.display = show ? 'block' : 'none'; }
+    function showStatus(msg, isSuccess) {
+      const box = document.getElementById('status-box');
+      box.textContent = msg;
+      box.className = `status-msg ${isSuccess ? 'status-success' : 'status-error'}`;
+      box.style.display = 'block';
+    }
+    function clearStatus() { document.getElementById('status-box').style.display = 'none'; }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
+
+      if (tabId === 'vote-view') {
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        if (appState.linkedPlayer) document.getElementById('vote-view').classList.add('active');
+        else document.getElementById('link-view').classList.add('active');
+      } else if (tabId === 'leaderboard-view') {
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('leaderboard-view').classList.add('active');
+        if (!appState.leaderboardLoaded) {
+          loadLeaderboardData();
+        }
+      }
+    }
+
+    function fetchInitialAppData() {
+      showSpinner(true);
+      clearStatus();
+      google.script.run
+        .withSuccessHandler((data) => { showSpinner(false); renderAppUI(data); })
+        .withFailureHandler((err) => { showSpinner(false); showStatus(err.message || 'Error connecting to server.', false); })
+        .getAppData();
+    }
+
+    function renderAppUI(data) {
+      appState.settings = data.settings || {};
+      appState.linkedPlayer = data.linkedPlayer || data.currentPlayer;
+      appState.seasons = data.seasons || [];
+
+      const seasonName = data.seasonName || `Season ${appState.settings.activeSeasonId}`;
+      document.getElementById('app-subtitle').textContent = `${seasonName} • Week ${data.week || 1}`;
+      
+      const badge = document.getElementById('voting-badge');
+      badge.style.display = 'inline-block';
+      if (data.votingOpen) {
+        badge.textContent = 'Voting Open'; badge.className = 'badge badge-active';
+      } else {
+        badge.textContent = 'Voting Closed'; badge.className = 'badge badge-closed';
+      }
+
+      const seasonFilter = document.getElementById('season-filter');
+      seasonFilter.innerHTML = '';
+      data.seasons.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id; opt.textContent = s.name;
+        if (String(s.id) === String(data.seasonId || appState.settings.activeSeasonId)) opt.selected = true;
+        seasonFilter.appendChild(opt);
+      });
+
+      if (!appState.linkedPlayer) {
+        document.getElementById('link-view').classList.add('active');
+        const select = document.getElementById('link-player-select');
+        select.innerHTML = '<option value="">-- Choose Your Name --</option>';
+        (data.unlinkedPlayers || []).forEach(p => {
+          select.appendChild(new Option(p.name, p.id));
+        });
+      } else {
+        document.getElementById('vote-view').classList.add('active');
+        document.getElementById('linked-player-name').textContent = appState.linkedPlayer.name;
+
+        if (data.alreadySubmitted || data.alreadyVoted) {
+          document.getElementById('vote-form').style.display = 'none';
+          document.getElementById('already-voted-card').style.display = 'block';
+        } else if (!data.votingOpen) {
+          document.getElementById('vote-form').style.display = 'none';
+          showStatus('Voting is currently closed for this week.', false);
+        } else {
+          populateVotingDropdowns(data.leaders, data.players, appState.linkedPlayer.id);
+        }
+      }
+    }
+
+    function populateVotingDropdowns(leaders, players, currentUserId) {
+      const l1 = document.getElementById('leader-1');
+      const opp = document.getElementById('favorite-opponent');
+
+      l1.innerHTML = '<option value="">-- Select Leader --</option>';
+      opp.innerHTML = '<option value="">-- Select Favorite Opponent --</option>';
+
+      (leaders || []).forEach(l => {
+        l1.appendChild(new Option(l.name, l.id));
+      });
+
+      (players || []).forEach(p => {
+        if (String(p.id) !== String(currentUserId)) opp.appendChild(new Option(p.name, p.id));
+      });
+    }
+
+    function submitAccountLink() {
+      const playerId = document.getElementById('link-player-select').value;
+      if (!playerId) { showStatus('Please select your player name.', false); return; }
+      showSpinner(true); clearStatus();
+
+      google.script.run
+        .withSuccessHandler((res) => {
+          showSpinner(false);
+          appState.linkedPlayer = res.linkedPlayer || res.player;
+          document.getElementById('link-view').classList.remove('active');
+          document.getElementById('vote-view').classList.add('active');
+          document.getElementById('linked-player-name').textContent = appState.linkedPlayer.name;
+          if (res.alreadyVoted) {
+            document.getElementById('vote-form').style.display = 'none';
+            document.getElementById('already-voted-card').style.display = 'block';
+          } else {
+            populateVotingDropdowns(res.leaders, res.players, appState.linkedPlayer.id);
+          }
+          showStatus('Account linked successfully!', true);
+        })
+        .withFailureHandler((err) => { showSpinner(false); showStatus(err.message || 'Failed to link account.', false); })
+        .linkGoogleAccount(playerId);
+    }
+
+    function submitVotes() {
+      const l1 = document.getElementById('leader-1').value;
+      const opp = document.getElementById('favorite-opponent').value;
+
+      if (!l1 || !opp) { showStatus('Please select your Leader and Favorite Opponent.', false); return; }
+      showSpinner(true); clearStatus();
+
+      google.script.run
+        .withSuccessHandler(() => {
+          showSpinner(false);
+          document.getElementById('vote-form').style.display = 'none';
+          document.getElementById('already-voted-card').style.display = 'block';
+          clearStatus();
+        })
+        .withFailureHandler((err) => { showSpinner(false); showStatus(err.message || 'Vote submission failed.', false); })
+        .submitVote(l1, null, opp);
+    }
+
+    // Starfighter Callsign Obfuscation Helper
+    function getStarWarsCodename(index) {
+      const callsigns = [
+        'Gold Leader',
+        'Green Leader',
+        'Red Leader',
+        'Blade Eleven',
+        'Rogue One',
+        'Phoenix Leader'
+      ];
+      return callsigns[index] || `Vanguard-${index + 1}`;
+    }
+
+    function loadLeaderboardData() {
+      const selectedSeasonId = document.getElementById('season-filter').value;
+      showSpinner(true);
+
+      google.script.run
+        .withSuccessHandler((res) => {
+          showSpinner(false);
+          appState.leaderboardLoaded = true;
+
+          // 1. Most Played Leaders
+          renderStatsList('most-played-container', res.mostPlayed || res.leaderLeaderboard || [], {
+            getTitle: (item) => item.leaderName || item.name,
+            getScore: (item) => `${item.count || item.votes} Plays`
+          });
+
+          // 2. Diversity Award
+          renderStatsList('diversity-container', res.diversity || [], {
+            getTitle: (item) => item.playerName,
+            getScore: (item) => `${item.differentLeaders} Leaders`
+          });
+
+          // 3. Loyalty Stat
+          renderStatsList('loyalty-container', res.loyalty || [], {
+            getTitle: (item) => item.playerName,
+            getSubtitle: (item) => `Main: ${item.leader}`,
+            getScore: (item) => `${item.nights} Nights`
+          });
+
+          // 4. Favorite Opponents (Always shown; Obfuscated during active seasons, real names revealed when season ends)
+          renderStatsList('opponent-container', res.opponentLeaderboard || [], {
+            getTitle: (item, index) => res.isActiveSeason ? getStarWarsCodename(index) : (item.name || item.playerName),
+            getSubtitle: (item, index) => res.isActiveSeason ? (index === 0 ? 'Flight Leader' : 'Wingman Status') : null,
+            getScore: (item) => `${item.votes} Votes`
+          });
+        })
+        .withFailureHandler((err) => { showSpinner(false); showStatus(err.message || 'Failed to load leaderboard.', false); })
+        .getLeaderboardData(selectedSeasonId);
+    }
+
+    function renderStatsList(containerId, items, config) {
+      const container = document.getElementById(containerId);
+      if (!items || items.length === 0) {
+        container.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:12px; font-size: 0.85rem;">No statistics recorded.</div>';
+        return;
+      }
+
+      // Filter or take top items to display
+      const top3 = items.slice(0, 3);
+      let html = '<div class="stats-list">';
+
+      top3.forEach((item, i) => {
+        const rankNumber = item.displayRank !== undefined ? item.displayRank : (i + 1);
+
+        const title = config.getTitle(item, i);
+        const subtitle = config.getSubtitle ? config.getSubtitle(item, i) : null;
+        const score = config.getScore(item);
+
+        html += `
+          <div class="stats-row rank-${rankNumber}">
+            <div class="stats-left">
+              <div class="rank-pill">#${rankNumber}</div>
+              <div class="stats-info">
+                <span class="stats-title">${title}</span>
+                ${subtitle ? `<span class="stats-subtitle">${subtitle}</span>` : ''}
+              </div>
+            </div>
+            <div class="stats-score">${score}</div>
+          </div>`;
+      });
+
+      html += '</div>';
+      container.innerHTML = html;
+    }
+  </script>
+</body>
+</html>

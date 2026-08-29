@@ -1,0 +1,5 @@
+# Local environment / secrets - DO NOT COMMIT
+.env
+
+# Apps Script project config (may contain scriptId)
+.clasp.json
