@@ -714,8 +714,25 @@ function syncPlayersFromWebsite() {
   if (!votingOpen || !activeSeasonId) return;
 
   const url = process.env.SCRAPE_URL || 'https://stockholm.sw-unlimited.com/';
-  const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-  const html = response.getContentText();
+
+  let html;
+  try {
+    const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+
+    // Treat non-200 responses (down, maintenance, moved, etc.) as "no sync" so we
+    // never act on an error page.
+    const code = response.getResponseCode();
+    if (code !== 200) {
+      console.error(`[SyncPlayers] Site returned HTTP ${code}; skipping player sync.`);
+      return;
+    }
+
+    html = response.getContentText();
+  } catch (err) {
+    console.error('[SyncPlayers] Failed to reach player site; skipping sync: ' + err);
+    // Safe fallthrough: leave the existing roster untouched rather than crashing.
+    return;
+  }
 
   const regex = /<a\s+href="\/player\/([^"]+)">([^<]+)<\/a>/gi;
   let match;
@@ -729,7 +746,10 @@ function syncPlayersFromWebsite() {
     }
   }
 
-  if (scrapedPlayers.size === 0) return;
+  if (scrapedPlayers.size === 0) {
+    console.error('[SyncPlayers] Site reachable but no players parsed; skipping sync.');
+    return;
+  }
 
   const ss = getSpreadsheet();
   const playerSheet = ss.getSheetByName(SHEETS.PLAYERS);
