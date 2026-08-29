@@ -52,14 +52,15 @@ function doPost(e) {
     // Reject any request that doesn't carry our shared secret. This prevents
     // third parties who discover the public URL from calling the API directly.
     if (String(payload.apiSecret) !== String(API_SECRET)) {
+      console.warn(`[API] Unauthorized attempt: action=${action || '?'} userEmail=${userEmail || 'unset'}`);
       return createJsonResponse({ success: false, error: 'Unauthorized.' });
     }
 
     let result = {};
 
-    if (action === 'getAppData' || action === 'getInitialData') {
+    if (action === 'getAppData') {
       result = handleGetAppData(userEmail);
-    } else if (action === 'linkGoogleAccount' || action === 'linkAccount') {
+    } else if (action === 'linkGoogleAccount') {
       result = handleLinkGoogleAccount(payload.playerId, userEmail);
     } else if (action === 'submitVote') {
       result = handleSubmitVote(payload, userEmail);

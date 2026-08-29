@@ -48,9 +48,7 @@ function callApi(action, payloadData = {}) {
 }
 
 /* Wrapper methods for google.script.run */
-function getInitialData() { return callApi('getInitialData'); }
 function getAppData() { return callApi('getAppData'); }
-function linkAccount(playerId) { return callApi('linkAccount', { playerId: playerId }); }
 function linkGoogleAccount(playerId) { return callApi('linkGoogleAccount', { playerId: playerId }); }
 function submitVote(leader1Id, leader2Id, opponentId) {
   if (typeof leader1Id === 'object') {
