@@ -7,6 +7,9 @@
 // Published Script 1 Executable URL (injected from .env / process.env)
 const API_URL = process.env.API_URL;
 
+// Shared secret required by the backend. Stays server-side (never sent to the browser).
+const API_SECRET = process.env.API_SECRET;
+
 function doGet() {
   return HtmlService
     .createTemplateFromFile('Index')
@@ -25,7 +28,7 @@ function callApi(action, payloadData = {}) {
     throw new Error('Could not identify your Google email. Make sure you are signed into Chrome/Google.');
   }
 
-  const payload = Object.assign({ action: action, userEmail: email }, payloadData);
+  const payload = Object.assign({ action: action, userEmail: email, apiSecret: API_SECRET }, payloadData);
 
   const options = {
     method: 'post',

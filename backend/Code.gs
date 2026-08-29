@@ -8,6 +8,10 @@
 
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 
+// Secret shared with the frontend proxy (Script 2). Every request must present it
+// so that only our own web app can talk to this backend. Never exposed to browsers.
+const API_SECRET = process.env.API_SECRET;
+
 const SHEETS = {
   SETTINGS: 'Settings',
   PLAYERS: 'Players',
@@ -41,6 +45,12 @@ function doPost(e) {
     const userEmail = String(payload.userEmail || '').toLowerCase().trim();
 
     if (!userEmail) throw new Error('User identity missing.');
+
+    // Reject any request that doesn't carry our shared secret. This prevents
+    // third parties who discover the public URL from calling the API directly.
+    if (String(payload.apiSecret) !== String(API_SECRET)) {
+      return createJsonResponse({ success: false, error: 'Unauthorized.' });
+    }
 
     let result = {};
 
