@@ -342,6 +342,15 @@
         .getLeaderboardData(selectedSeasonId);
     }
 
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function renderStatsList(containerId, items, config) {
       const container = document.getElementById(containerId);
       if (!items || items.length === 0) {
@@ -361,15 +370,15 @@
         const score = config.getScore(item);
 
         html += `
-          <div class="stats-row rank-${rankNumber}">
+          <div class="stats-row rank-${escapeHtml(rankNumber)}">
             <div class="stats-left">
-              <div class="rank-pill">#${rankNumber}</div>
+              <div class="rank-pill">#${escapeHtml(rankNumber)}</div>
               <div class="stats-info">
-                <span class="stats-title">${title}</span>
-                ${subtitle ? `<span class="stats-subtitle">${subtitle}</span>` : ''}
+                <span class="stats-title">${escapeHtml(title)}</span>
+                ${subtitle ? `<span class="stats-subtitle">${escapeHtml(subtitle)}</span>` : ''}
               </div>
             </div>
-            <div class="stats-score">${score}</div>
+            <div class="stats-score">${escapeHtml(score)}</div>
           </div>`;
       });
 
