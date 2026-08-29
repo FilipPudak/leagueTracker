@@ -27,6 +27,9 @@ const SHEETS = {
 };
 
 function getSpreadsheet() {
+  if (!SPREADSHEET_ID) {
+    throw new Error('Configuration error: SPREADSHEET_ID is missing. Check your .env / deployment environment.');
+  }
   return SpreadsheetApp.openById(SPREADSHEET_ID);
 }
 
