@@ -431,9 +431,9 @@ function handleSubmitVote(payload, email) {
   try {
     // 1. Record Leader Votes
     const lvSheet = ss.getSheetByName(SHEETS.LEADER_VOTES);
-    if (lvSheet) {
+    if (lvSheet && leader1Id) {
       leaderVoteRow = lvSheet.getLastRow() + 1;
-      if (leader1Id) lvSheet.appendRow([timestamp, seasonId, week, player.id, leader1Id, 1]);
+      lvSheet.getRange(leaderVoteRow, 1, 1, 6).setValues([[timestamp, seasonId, week, player.id, leader1Id, 1]]);
     }
 
     // 2. Record Opponent Vote
@@ -441,7 +441,7 @@ function handleSubmitVote(payload, email) {
       const ovSheet = ss.getSheetByName(SHEETS.OPPONENT_VOTES);
       if (ovSheet) {
         opponentVoteRow = ovSheet.getLastRow() + 1;
-        ovSheet.appendRow([timestamp, seasonId, week, opponentId, player.id]);
+        ovSheet.getRange(opponentVoteRow, 1, 1, 5).setValues([[timestamp, seasonId, week, opponentId, player.id]]);
       }
     }
 
@@ -449,13 +449,13 @@ function handleSubmitVote(payload, email) {
     const slSheet = ss.getSheetByName(SHEETS.SUBMISSION_LOG);
     if (slSheet) {
       submissionLogRow = slSheet.getLastRow() + 1;
-      slSheet.appendRow([timestamp, seasonId, week, player.id]);
+      slSheet.getRange(submissionLogRow, 1, 1, 4).setValues([[timestamp, seasonId, week, player.id]]);
     }
 
     return { success: true, recorded: true, message: 'Votes successfully recorded!' };
 
   } catch (err) {
-    // Rollback entries on failure
+    // Rollback entries on failure, deleting the exact rows we inserted
     if (submissionLogRow) try { ss.getSheetByName(SHEETS.SUBMISSION_LOG).deleteRow(submissionLogRow); } catch (e) {}
     if (opponentVoteRow) try { ss.getSheetByName(SHEETS.OPPONENT_VOTES).deleteRow(opponentVoteRow); } catch (e) {}
     if (leaderVoteRow) try { ss.getSheetByName(SHEETS.LEADER_VOTES).deleteRow(leaderVoteRow); } catch (e) {}
