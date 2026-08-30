@@ -13,7 +13,7 @@ This repo contains two separate Apps Script projects:
 
 Each project has its own `appsscript.json` manifest:
 
-- `backend/appsscript.json` — `executeAs: USER_DEPLOYING`, `access: ANYONE` (called server-to-server only, guarded by the `API_SECRET`).
+- `backend/appsscript.json` — `executeAs: USER_DEPLOYING`, `access: ANYONE_ANONYMOUS` ("Anyone"). It is called **server-to-server** from the frontend's `UrlFetchApp`, which carries no Google user token. If it required a signed-in Google account, Google would return HTTP 401 on every call. It is instead protected by the `API_SECRET` check in `doPost`.
 - `frontend/appsscript.json` — `executeAs: USER_ACCESSING`, `access: ANYONE` (requires a signed-in Google account to use, so anonymous callers are blocked at the boundary). In Apps Script, `ANYONE` means "anyone with a Google account".
 
 ## Configuration (secrets)
@@ -76,7 +76,7 @@ The backend persists everything to a single Google Sheets document (`SPREADSHEET
 
 ## Security model
 
-- **API_SECRET** — the backend rejects any `doPost` that lacks the shared secret, blocking unknown callers who discover the public backend URL.
+- **API_SECRET** — the backend is deployed as `ANYONE_ANONYMOUS` because it is called server-to-server from the frontend and therefore cannot require signed-in users (that would 401). The `API_SECRET` check in `doPost` is what actually rejects unknown callers, making anonymous accessibility safe.
 - **Google identity for voting** — votes and account links are bound to the player whose Google email (`Session.getActiveUser().getEmail()`) is linked. A user can only act as their own linked player; anonymous callers are blocked both by the frontend guard and by the `ANYONE` access level (signed-in Google account required).
 - **Admin lifecycle** — week advancement (`advanceLeagueWeek`) is not exposed via the public API; it runs only via a time-driven trigger or manual invocation.
 

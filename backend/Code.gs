@@ -1,8 +1,8 @@
 /**
  * ============================================================================
  * SCRIPT 1: BACKEND & DATABASE ENGINE
- * Executes as: ME
- * Access: ANYONE
+ * Executes as: ME (USER_DEPLOYING)
+ * Access: ANYONE_ANONYMOUS (anonymous OK; protected by API_SECRET)
  * ============================================================================
  */
 
