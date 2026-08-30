@@ -4,11 +4,17 @@
  * Access: ANYONE WITH GOOGLE ACCOUNT
  ****************************************************/
 
-// Published Script 1 Executable URL (injected from .env / process.env)
-const API_URL = process.env.API_URL;
+// Config loaded from Apps Script Script Properties at runtime (not committed).
+function getConfig(key, fallback) {
+  const val = PropertiesService.getScriptProperties().getProperty(key);
+  return val || fallback;
+}
+
+// Published Script 1 Executable URL
+const API_URL = getConfig('API_URL');
 
 // Shared secret required by the backend. Stays server-side (never sent to the browser).
-const API_SECRET = process.env.API_SECRET;
+const API_SECRET = getConfig('API_SECRET', '');
 
 function doGet() {
   return HtmlService

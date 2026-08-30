@@ -6,11 +6,19 @@
  * ============================================================================
  */
 
-const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
+// Config loaded from Apps Script Script Properties at runtime.
+// Set these properties in the Apps Script editor (Project Settings -> Script Properties)
+// or via the utilities below. They are NOT committed to the repo.
+function getConfig(key, fallback) {
+  const val = PropertiesService.getScriptProperties().getProperty(key);
+  return val || fallback;
+}
+
+const SPREADSHEET_ID = getConfig('SPREADSHEET_ID');
 
 // Secret shared with the frontend proxy (Script 2). Every request must present it
 // so that only our own web app can talk to this backend. Never exposed to browsers.
-const API_SECRET = process.env.API_SECRET;
+const API_SECRET = getConfig('API_SECRET', '');
 
 const SHEETS = {
   SETTINGS: 'Settings',
@@ -725,7 +733,7 @@ function syncPlayersFromWebsite() {
 
   if (!votingOpen || !activeSeasonId) return;
 
-  const url = process.env.SCRAPE_URL || 'https://stockholm.sw-unlimited.com/';
+  const url = getConfig('SCRAPE_URL') || 'https://stockholm.sw-unlimited.com/';
 
   let html;
   try {
