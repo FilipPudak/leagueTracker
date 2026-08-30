@@ -44,7 +44,14 @@ function callApi(action, payloadData = {}) {
   };
 
   const response = UrlFetchApp.fetch(API_URL, options);
-  const result = JSON.parse(response.getContentText());
+  const text = response.getContentText();
+  let result;
+  try {
+    result = JSON.parse(text);
+  } catch (err) {
+    throw new Error('Backend returned a non-JSON response (HTTP ' + response.getResponseCode() +
+      '). Check that API_URL points at a valid deployed /exec URL and that the backend Script Properties are set.');
+  }
 
   if (!result.success) {
     throw new Error(result.error || 'Server error.');
