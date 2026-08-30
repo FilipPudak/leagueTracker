@@ -14,7 +14,7 @@ This repo contains two separate Apps Script projects:
 Each project has its own `appsscript.json` manifest:
 
 - `backend/appsscript.json` — `executeAs: USER_DEPLOYING`, `access: ANYONE` (called server-to-server only, guarded by the `API_SECRET`).
-- `frontend/appsscript.json` — `executeAs: USER_ACCESSING`, `access: ANYONE_WITH_GOOGLE` (forces a Google sign-in before the UI loads, so anonymous callers are blocked at the boundary).
+- `frontend/appsscript.json` — `executeAs: USER_ACCESSING`, `access: ANYONE` (requires a signed-in Google account to use, so anonymous callers are blocked at the boundary). In Apps Script, `ANYONE` means "anyone with a Google account".
 
 ## Configuration (secrets)
 
@@ -71,6 +71,6 @@ See <https://github.com/google/clasp> for full docs.
 ## Security model
 
 - **API_SECRET** — the backend rejects any `doPost` that lacks the shared secret, blocking unknown callers who discover the public backend URL.
-- **Google identity for voting** — votes and account links are bound to the player whose Google email (`Session.getActiveUser().getEmail()`) is linked. A user can only act as their own linked player; anonymous callers are blocked both by the frontend guard and by the `ANYONE_WITH_GOOGLE` access level.
+- **Google identity for voting** — votes and account links are bound to the player whose Google email (`Session.getActiveUser().getEmail()`) is linked. A user can only act as their own linked player; anonymous callers are blocked both by the frontend guard and by the `ANYONE` access level (signed-in Google account required).
 - **Admin lifecycle** — week advancement (`advanceLeagueWeek`) is not exposed via the public API; it runs only via a time-driven trigger or manual invocation.
 
