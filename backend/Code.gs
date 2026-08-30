@@ -313,6 +313,8 @@ function isVotingOpen(settings) {
 function handleGetAppData(userEmail) {
   const settings = getSettings();
   const activeSeasonId = String(settings.ACTIVE_SEASON_ID || '');
+  const linkedPlayerAtLoad = findPlayerByGoogleEmail(userEmail);
+  console.info(`[AppData] userEmail=${userEmail} linked=${Boolean(linkedPlayerAtLoad)}`);
   const currentWeek = parseWeek(settings.CURRENT_WEEK);
   const votingOpen = isVotingOpen(settings);
 
@@ -360,6 +362,7 @@ function handleLinkGoogleAccount(playerId, email) {
   if (!playerId || !email) {
     throw new Error('Missing Player Selection or User Email.');
   }
+  console.info(`[Link] attempt email=${email} playerId=${playerId}`);
 
   const ss = getSpreadsheet();
   const sheet = ss.getSheetByName(SHEETS.PLAYERS);
@@ -367,13 +370,18 @@ function handleLinkGoogleAccount(playerId, email) {
 
   const existing = findPlayerByGoogleEmail(email);
   if (existing) {
-    if (existing.id === String(playerId)) return { player: existing, linkedPlayer: existing };
+    if (existing.id === String(playerId)) {
+      console.info(`[Link] already-linked email=${email} playerId=${playerId}`);
+      return { player: existing, linkedPlayer: existing };
+    }
+    console.warn(`[Link] REJECTED email-taking email=${email} attemptedPlayerId=${playerId} takenBy=${existing.id} (${existing.name})`);
     throw new Error('Google account already linked to ' + existing.name);
   }
 
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]) === String(playerId)) {
       if (String(rows[i][3] || '').trim()) {
+        console.warn(`[Link] REJECTED player-taken playerId=${playerId} existingEmail=${String(rows[i][3]).toLowerCase().trim()}`);
         throw new Error('This player is already linked to another account.');
       }
       sheet.getRange(i + 1, 4).setValue(email.toLowerCase().trim());
@@ -385,6 +393,7 @@ function handleLinkGoogleAccount(playerId, email) {
         email: email.toLowerCase().trim(),
         active: String(rows[i][4] || 'TRUE').toUpperCase() === 'TRUE'
       };
+      console.info(`[Link] LINKED email=${email} playerId=${playerId}`);
 
       const settings = getSettings();
       const activeSeasonId = String(settings.ACTIVE_SEASON_ID || '');
@@ -413,6 +422,7 @@ function handleSubmitVote(payload, email) {
 
   const player = findPlayerByGoogleEmail(email);
   if (!player || (player.active !== undefined && !player.active)) {
+    console.warn(`[Vote] REJECTED unknown/inactive email=${email} playerId=${player ? player.id : 'none'}`);
     throw new Error('Identity unlinked or inactive. Please link your player account.');
   }
 
@@ -420,6 +430,7 @@ function handleSubmitVote(payload, email) {
   const week = parseWeek(settings.CURRENT_WEEK);
 
   if (hasSubmittedThisWeek(player.id, seasonId, week)) {
+    console.warn(`[Vote] DUPLICATE email=${email} playerId=${player.id} season=${seasonId} week=${week}`);
     throw new Error('You have already submitted votes for this week.');
   }
 
@@ -427,6 +438,8 @@ function handleSubmitVote(payload, email) {
   const voteData = payload.voteData || payload;
   const leader1Id = voteData.leader1Id || voteData.leaderId || voteData.leader;
   const opponentId = voteData.opponentId || voteData.favoriteOpponentId || voteData.opponent;
+
+  console.info(`[Vote] attempt email=${email} playerId=${player.id} season=${seasonId} week=${week} leader=${leader1Id || 'none'} opponent=${opponentId || 'none'}`);
 
   if (opponentId && String(opponentId) === String(player.id)) {
     throw new Error('You cannot vote for yourself as favorite opponent.');
@@ -461,6 +474,7 @@ function handleSubmitVote(payload, email) {
       slSheet.getRange(submissionLogRow, 1, 1, 4).setValues([[timestamp, seasonId, week, player.id]]);
     }
 
+    console.info(`[Vote] RECORDED email=${email} playerId=${player.id} season=${seasonId} week=${week} leader=${leader1Id || 'none'} opponent=${opponentId || 'none'}`);
     return { success: true, recorded: true, message: 'Votes successfully recorded!' };
 
   } catch (err) {

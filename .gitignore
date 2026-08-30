@@ -3,3 +3,6 @@
 
 # Apps Script project config (may contain scriptId)
 .clasp.json
+
+# Private design notes (Phase 2 and beyond) - keep out of the public repo
+docs/phase2-*
