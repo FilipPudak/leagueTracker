@@ -250,7 +250,7 @@
   </div>
 
   <script>
-    let appState = { linkedPlayer: null, settings: {}, seasons: [], leaderboardLoaded: false };
+    let appState = { linkedPlayer: null, settings: {}, seasons: [], leaderboardCache: {} };
 
     window.addEventListener('DOMContentLoaded', () => { fetchInitialAppData(); });
 
@@ -274,9 +274,7 @@
       } else if (tabId === 'leaderboard-view') {
         document.querySelectorAll('.tab-btn')[1].classList.add('active');
         document.getElementById('leaderboard-view').classList.add('active');
-        if (!appState.leaderboardLoaded) {
-          loadLeaderboardData();
-        }
+        loadLeaderboardData();
       }
     }
 
@@ -404,6 +402,7 @@
           document.getElementById('vote-form').style.display = 'none';
           document.getElementById('already-voted-card').style.display = 'block';
           clearStatus();
+          appState.leaderboardCache = {};
         })
         .withFailureHandler((err) => { showSpinner(false); showStatus(err.message || 'Vote submission failed.', false); })
         .submitVote(l1, null, opp);
@@ -424,41 +423,50 @@
 
     function loadLeaderboardData() {
       const selectedSeasonId = document.getElementById('season-filter').value;
-      showSpinner(true);
 
+      const cached = appState.leaderboardCache[selectedSeasonId];
+      if (cached) {
+        renderLeaderboard(cached);
+        return;
+      }
+
+      showSpinner(true);
       google.script.run
         .withSuccessHandler((res) => {
           showSpinner(false);
-          appState.leaderboardLoaded = true;
-
-          // 1. Most Played Leaders
-          renderStatsList('most-played-container', res.mostPlayed || res.leaderLeaderboard || [], {
-            getTitle: (item) => item.leaderName || item.name,
-            getScore: (item) => `${item.count || item.votes} Plays`
-          });
-
-          // 2. Diversity Award
-          renderStatsList('diversity-container', res.diversity || [], {
-            getTitle: (item) => item.playerName,
-            getScore: (item) => `${item.differentLeaders} Leaders`
-          });
-
-          // 3. Loyalty Stat
-          renderStatsList('loyalty-container', res.loyalty || [], {
-            getTitle: (item) => item.playerName,
-            getSubtitle: (item) => `Main: ${item.leader}`,
-            getScore: (item) => `${item.nights} Nights`
-          });
-
-          // 4. Favorite Opponents (Always shown; Obfuscated during active seasons, real names revealed when season ends)
-          renderStatsList('opponent-container', res.opponentLeaderboard || [], {
-            getTitle: (item, index) => res.isActiveSeason ? getStarWarsCodename(index) : (item.name || item.playerName),
-            getSubtitle: (item, index) => res.isActiveSeason ? (index === 0 ? 'Flight Leader' : 'Wingman Status') : null,
-            getScore: (item) => `${item.votes} Votes`
-          });
+          appState.leaderboardCache[selectedSeasonId] = res;
+          renderLeaderboard(res);
         })
         .withFailureHandler((err) => { showSpinner(false); showStatus(err.message || 'Failed to load leaderboard.', false); })
         .getLeaderboardData(selectedSeasonId);
+    }
+
+    function renderLeaderboard(res) {
+      // 1. Most Played Leaders
+      renderStatsList('most-played-container', res.mostPlayed || res.leaderLeaderboard || [], {
+        getTitle: (item) => item.leaderName || item.name,
+        getScore: (item) => `${item.count || item.votes} Plays`
+      });
+
+      // 2. Diversity Award
+      renderStatsList('diversity-container', res.diversity || [], {
+        getTitle: (item) => item.playerName,
+        getScore: (item) => `${item.differentLeaders} Leaders`
+      });
+
+      // 3. Loyalty Stat
+      renderStatsList('loyalty-container', res.loyalty || [], {
+        getTitle: (item) => item.playerName,
+        getSubtitle: (item) => `Main: ${item.leader}`,
+        getScore: (item) => `${item.nights} Nights`
+      });
+
+      // 4. Favorite Opponents (Always shown; Obfuscated during active seasons, real names revealed when season ends)
+      renderStatsList('opponent-container', res.opponentLeaderboard || [], {
+        getTitle: (item, index) => res.isActiveSeason ? getStarWarsCodename(index) : (item.name || item.playerName),
+        getSubtitle: (item, index) => res.isActiveSeason ? (index === 0 ? 'Flight Leader' : 'Wingman Status') : null,
+        getScore: (item) => `${item.votes} Votes`
+      });
     }
 
     function escapeHtml(value) {

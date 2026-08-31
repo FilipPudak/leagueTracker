@@ -49,8 +49,9 @@ function callApi(action, payloadData = {}) {
   try {
     result = JSON.parse(text);
   } catch (err) {
-    throw new Error('Backend returned a non-JSON response (HTTP ' + response.getResponseCode() +
+    console.error('Backend returned a non-JSON response (HTTP ' + response.getResponseCode() +
       '). Check that API_URL points at a valid deployed /exec URL and that the backend Script Properties are set.');
+    throw new Error('The server returned an unexpected response. Please try again.');
   }
 
   if (!result.success) {

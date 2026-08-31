@@ -44,15 +44,18 @@ function getSpreadsheet() {
 /**
  * Web App Endpoint: Receives proxy API requests from Script 2.
  */
+function userError(msg) { const e = new Error(msg); e.userMessage = msg; throw e; }
+
 function doPost(e) {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) {
     return createJsonResponse({ success: false, error: 'Database is busy. Please try again.' });
   }
 
+  let action = '';
   try {
     const payload = JSON.parse(e.postData.contents);
-    const action = payload.action;
+    action = payload.action;
     const userEmail = String(payload.userEmail || '').toLowerCase().trim();
 
     if (!userEmail) throw new Error('User identity missing.');
@@ -82,7 +85,12 @@ function doPost(e) {
 
   } catch (err) {
     console.error('API Error:', err);
-    return createJsonResponse({ success: false, error: err.message || err.toString() });
+    var gen = { getAppData: "Couldn't load your league data. Please try again.",
+                linkGoogleAccount: "We couldn't link your account. Please try again.",
+                submitVote: "We couldn't submit your vote. Please try again.",
+                getLeaderboardData: "Couldn't load the leaderboard. Please try again."
+              }[action] || 'Something went wrong. Please try again.';
+    return createJsonResponse({ success: false, error: err.userMessage || gen });
   } finally {
     lock.releaseLock();
   }
@@ -360,7 +368,7 @@ function handleGetAppData(userEmail) {
 
 function handleLinkGoogleAccount(playerId, email) {
   if (!playerId || !email) {
-    throw new Error('Missing Player Selection or User Email.');
+    userError('Missing Player Selection or User Email.');
   }
   console.info(`[Link] attempt email=${email} playerId=${playerId}`);
 
@@ -375,14 +383,14 @@ function handleLinkGoogleAccount(playerId, email) {
       return { player: existing, linkedPlayer: existing };
     }
     console.warn(`[Link] REJECTED email-taking email=${email} attemptedPlayerId=${playerId} takenBy=${existing.id} (${existing.name})`);
-    throw new Error('Google account already linked to ' + existing.name);
+    userError('Google account already linked to ' + existing.name);
   }
 
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]) === String(playerId)) {
       if (String(rows[i][3] || '').trim()) {
         console.warn(`[Link] REJECTED player-taken playerId=${playerId} existingEmail=${String(rows[i][3]).toLowerCase().trim()}`);
-        throw new Error('This player is already linked to another account.');
+        userError('This player is already linked to another account.');
       }
       sheet.getRange(i + 1, 4).setValue(email.toLowerCase().trim());
 
@@ -417,13 +425,13 @@ function handleSubmitVote(payload, email) {
   const settings = getSettings();
 
   if (!isVotingOpen(settings)) {
-    throw new Error('Voting is currently closed for this week.');
+    userError('Voting is currently closed for this week.');
   }
 
   const player = findPlayerByGoogleEmail(email);
   if (!player || (player.active !== undefined && !player.active)) {
     console.warn(`[Vote] REJECTED unknown/inactive email=${email} playerId=${player ? player.id : 'none'}`);
-    throw new Error('Identity unlinked or inactive. Please link your player account.');
+    userError('Identity unlinked or inactive. Please link your player account.');
   }
 
   const seasonId = String(settings.ACTIVE_SEASON_ID || '');
@@ -431,7 +439,7 @@ function handleSubmitVote(payload, email) {
 
   if (hasSubmittedThisWeek(player.id, seasonId, week)) {
     console.warn(`[Vote] DUPLICATE email=${email} playerId=${player.id} season=${seasonId} week=${week}`);
-    throw new Error('You have already submitted votes for this week.');
+    userError('You have already submitted votes for this week.');
   }
 
   // Normalize vote input formats across UI variants
@@ -442,7 +450,7 @@ function handleSubmitVote(payload, email) {
   console.info(`[Vote] attempt email=${email} playerId=${player.id} season=${seasonId} week=${week} leader=${leader1Id || 'none'} opponent=${opponentId || 'none'}`);
 
   if (opponentId && String(opponentId) === String(player.id)) {
-    throw new Error('You cannot vote for yourself as favorite opponent.');
+    userError("You can't select yourself as your favorite opponent.");
   }
 
   const ss = getSpreadsheet();
