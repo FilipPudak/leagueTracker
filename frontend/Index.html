@@ -178,6 +178,9 @@
     </div>
 
     <div id="status-box" class="status-msg"></div>
+    <div id="retry-load" style="display:none; text-align:center; margin-bottom:16px;">
+      <button class="btn-submit" style="width:auto; padding:0 24px; margin-top:0;" onclick="fetchInitialAppData(true)">Retry</button>
+    </div>
     <div id="loading-spinner" class="loader"></div>
 
     <!-- LINK PANEL -->
@@ -277,13 +280,27 @@
       }
     }
 
-    function fetchInitialAppData() {
+    function fetchInitialAppData(retry = true) {
       showSpinner(true);
       clearStatus();
       google.script.run
         .withSuccessHandler((data) => { showSpinner(false); renderAppUI(data); })
-        .withFailureHandler((err) => { showSpinner(false); showStatus(err.message || 'Error connecting to server.', false); })
+        .withFailureHandler((err) => {
+          showSpinner(false);
+          // Apps Script web apps intermittently fail on cold start; retry once automatically.
+          if (retry) {
+            setTimeout(() => fetchInitialAppData(false), 800);
+            return;
+          }
+          showStatus(err.message || 'Error connecting to server.', false);
+          showRetryState();
+        })
         .getAppData();
+    }
+
+    function showRetryState() {
+      const retryBtn = document.getElementById('retry-load');
+      if (retryBtn) retryBtn.style.display = 'block';
     }
 
     function renderAppUI(data) {

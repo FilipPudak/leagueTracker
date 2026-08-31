@@ -16,6 +16,18 @@ Each project has its own `appsscript.json` manifest:
 - `backend/appsscript.json` — `executeAs: USER_DEPLOYING`, `access: ANYONE_ANONYMOUS` ("Anyone"). It is called **server-to-server** from the frontend's `UrlFetchApp`, which carries no Google user token. If it required a signed-in Google account, Google would return HTTP 401 on every call. It is instead protected by the `API_SECRET` check in `doPost`.
 - `frontend/appsscript.json` — `executeAs: USER_ACCESSING`, `access: ANYONE` (requires a signed-in Google account to use, so anonymous callers are blocked at the boundary). In Apps Script, `ANYONE` means "anyone with a Google account".
 
+## Performance & caching
+
+To keep the web app snappy, the backend caches slow, slowly-changing reads (the full
+season list and the per-season player/leader rosters) in Apps Script `CacheService`
+for 5 minutes. Settings, the current week, voting state, and all vote submissions are
+**not** cached, so correctness-sensitive data is always read fresh.
+
+The frontend also shows a short spinner on load, auto-retries the initial
+`getAppData` call once (Apps Script web apps intermittently fail on cold start), and
+offers a Retry button if the call still fails. Errors are surfaced in the UI so a
+failure never leaves a blank screen.
+
 ## Configuration (secrets)
 
 Sensitive values are **not** committed to the repo. They are read at runtime from **Apps Script Script Properties** (`.env` is only used by clasp's local `process.env` support). The following keys are read by `getConfig()` in `backend/Code.gs` and `frontend/Code.gs`:
