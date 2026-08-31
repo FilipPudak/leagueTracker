@@ -47,21 +47,17 @@ function basicTables() {
       ['S2', 'l3', 'TRUE']
     ],
     LeaderVotes: [
-      // timestamp, seasonId, week, playerId, leaderId, count
-      ['TS', 'SEASON_ID', 'WEEK', 'PLAYER_ID', 'LEADER_ID', 'COUNT'],
-      ['2026-01-01', 'S1', 2, 'p1', 'l1', 1],
-      ['2026-01-01', 'S1', 2, 'p2', 'l2', 1],
-      ['2026-01-01', 'S1', 2, 'p1', 'l2', 1]
+      // timestamp, seasonId, week, playerId, leaderId
+      ['TS', 'SEASON_ID', 'WEEK', 'PLAYER_ID', 'LEADER_ID'],
+      ['2026-01-01', 'S1', 2, 'p1', 'l1'],
+      ['2026-01-01', 'S1', 2, 'p2', 'l2'],
+      ['2026-01-01', 'S1', 2, 'p1', 'l2']
     ],
     OpponentVotes: [
-      // timestamp, seasonId, week, opponentId, voterId
-      ['TS', 'SEASON_ID', 'WEEK', 'OPPONENT_ID', 'VOTER_ID'],
-      ['2026-01-01', 'S1', 2, 'p2', 'p1'],
-      ['2026-01-01', 'S1', 2, 'p1', 'p2']
-    ],
-    SubmissionLog: [
-      ['ASIN', 'SEASON_ID', 'WEEK', 'PLAYER_ID'],
-      ['1', 'S1', 2, 'p1']
+      // timestamp, seasonId, week, opponentId (tally only, de-identified)
+      ['TS', 'SEASON_ID', 'WEEK', 'OPPONENT_ID'],
+      ['2026-01-01', 'S1', 2, 'p2'],
+      ['2026-01-01', 'S1', 2, 'p1']
     ],
     SeasonSummary: [
       ['DATE', 'SEASON_ID', 'WEEK', 'TOP_LEADER', 'LEADER_COUNT', 'TOP_OPPONENT', 'OPPONENT_COUNT']

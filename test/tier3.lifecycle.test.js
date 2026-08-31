@@ -39,10 +39,10 @@ describe('calculateSeasonAwards', () => {
     // Build a fixture where p3 is clearly the favorite opponent in one season.
     const tables = basicTables();
     tables.OpponentVotes = [
-      ['TS', 'SEASON_ID', 'WEEK', 'OPPONENT_ID', 'VOTER_ID'],
-      ['2026-01-01', 'S1', 2, 'p3', 'p1'],
-      ['2026-01-01', 'S1', 2, 'p3', 'p2'],
-      ['2026-01-01', 'S1', 2, 'p2', 'p3']
+      ['TS', 'SEASON_ID', 'WEEK', 'OPPONENT_ID'],
+      ['2026-01-01', 'S1', 2, 'p3'],
+      ['2026-01-01', 'S1', 2, 'p3'],
+      ['2026-01-01', 'S1', 2, 'p2']
     ];
     const env = resetSheets(tables);
 
@@ -59,7 +59,7 @@ describe('calculateSeasonAwards', () => {
 
   test('writes nothing when there are no opponent votes', () => {
     const tables = basicTables();
-    tables.OpponentVotes = [['TS', 'SEASON_ID', 'WEEK', 'OPPONENT_ID', 'VOTER_ID']];
+    tables.OpponentVotes = [['TS', 'SEASON_ID', 'WEEK', 'OPPONENT_ID']];
     const env = resetSheets(tables);
     calculateSeasonAwards('S1');
     assert.equal(env.sheets.Awards.rows.length, 1); // header only
@@ -106,9 +106,9 @@ describe('advanceLeagueWeek', () => {
     ];
     // Give S2 week 10 an opponent winner so an award is produced.
     tables.OpponentVotes = [
-      ['TS', 'SEASON_ID', 'WEEK', 'OPPONENT_ID', 'VOTER_ID'],
-      ['2026-01-01', 'S2', 10, 'p3', 'p1'],
-      ['2026-01-01', 'S2', 10, 'p3', 'p2']
+      ['TS', 'SEASON_ID', 'WEEK', 'OPPONENT_ID'],
+      ['2026-01-01', 'S2', 10, 'p3'],
+      ['2026-01-01', 'S2', 10, 'p3']
     ];
     const env = resetSheets(tables);
 

@@ -66,17 +66,14 @@ describe('data retrieval helpers', () => {
     assert.equal(findPlayerByGoogleEmail(''), null);
   });
 
-  test('hasSubmittedThisWeek respects season and week (via SubmissionLog)', () => {
-    // alert() is not used; SubmissionLog has p1 submitted S1 week 2.
+  test('hasSubmittedThisWeek respects season and week (via LeaderVotes)', () => {
     assert.equal(hasSubmittedThisWeek('p1', 'S1', 'Week 2'), true);
     assert.equal(hasSubmittedThisWeek('p1', 'S1', 'Week 3'), false);
     assert.equal(hasSubmittedThisWeek('p1', 'S2', 'Week 2'), false);
   });
 
-  test('hasSubmittedThisWeek falls back to LeaderVotes when SubmissionLog is empty', () => {
-    // p1 has a LeaderVote in S1 week 2 but SubmissionLog row is for p1 too,
-    // so force the fallback by looking at a player with no SubmissionLog row but a vote.
-    // p2 has a LeaderVote in S1 week 2 and no SubmissionLog row -> fallback path.
+  test('hasSubmittedThisWeek detects a player with a leader vote', () => {
+    // p2 has a LeaderVote in S1 week 2 and no other week/submission data.
     assert.equal(hasSubmittedThisWeek('p2', 'S1', 'Week 2'), true);
     assert.equal(hasSubmittedThisWeek('p2', 'S2', 'Week 2'), false);
   });
@@ -110,8 +107,8 @@ describe('handleGetAppData', () => {
   });
 
   test('a player who already submitted this week is flagged', () => {
-    // Temporarily add a submission log for p1 in S2 week 3.
-    env.sheets.SubmissionLog.appendRow(['9', 'S2', 3, 'p1']);
+    // Add a LeaderVote row for p1 in S2 week 3 to flag them as submitted.
+    env.sheets.LeaderVotes.appendRow(['2026-01-01', 'S2', 3, 'p1', 'l1']);
     const data = handleGetAppData('alice@x.com');
     assert.equal(data.alreadySubmitted, true);
     assert.equal(data.hasVoted, true);
@@ -173,7 +170,7 @@ describe('handleSubmitVote', () => {
     env = resetSheets(freshTables());
   });
 
-  test('records a leader + opponent + submission log row', () => {
+  test('records a leader + opponent row (tally only, no voter attribution)', () => {
     const res = handleSubmitVote(
       { leaderId: 'l1', opponentId: 'p3' },
       'alice@x.com'
@@ -182,15 +179,13 @@ describe('handleSubmitVote', () => {
     const lvLast = env.sheets.LeaderVotes.rows[env.sheets.LeaderVotes.rows.length - 1];
     assert.equal(lvLast[1], 'S2');
     assert.equal(lvLast[2], 3);
-    assert.equal(lvLast[3], 'p1');
-    assert.equal(lvLast[4], 'l1');
+    assert.equal(lvLast[3], 'p1'); // voter playerId (leaderboard + dedup)
+    assert.equal(lvLast[4], 'l1'); // leader
+    assert.equal(lvLast.length, 5); // timestamp, seasonId, week, playerId, leaderId
 
     const ovLast = env.sheets.OpponentVotes.rows[env.sheets.OpponentVotes.rows.length - 1];
     assert.equal(ovLast[3], 'p3'); // opponent
-    assert.equal(ovLast[4], 'p1'); // voter
-
-    const slLast = env.sheets.SubmissionLog.rows[env.sheets.SubmissionLog.rows.length - 1];
-    assert.equal(slLast[3], 'p1');
+    assert.equal(ovLast.length, 4); // timestamp, seasonId, week, opponentId (no voter)
   });
 
   test('accepts alternate vote field names (voteData / favoriteOpponentId)', () => {
@@ -225,7 +220,7 @@ describe('handleSubmitVote', () => {
   });
 
   test('rejects a duplicate submission for the same week', () => {
-    env.sheets.SubmissionLog.appendRow(['9', 'S2', 3, 'p1']);
+    env.sheets.LeaderVotes.appendRow(['2026-01-01', 'S2', 3, 'p1', 'l1']);
     let msg;
     try {
       handleSubmitVote({ leaderId: 'l1' }, 'alice@x.com');
@@ -316,7 +311,7 @@ describe('doPost dispatch & security', () => {
 
   test('maps business errors to per-action friendly messages', () => {
     // Force a userError in submitVote (duplicate) and check the friendly message.
-    env.sheets.SubmissionLog.appendRow(['9', 'S2', 3, 'p1']);
+    env.sheets.LeaderVotes.appendRow(['2026-01-01', 'S2', 3, 'p1', 'l1']);
     const res = doPostJson({
       action: 'submitVote',
       userEmail: 'alice@x.com',

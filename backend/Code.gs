@@ -29,7 +29,6 @@ const SHEETS = {
   SEASON_LEADERS: 'SeasonLeaders',
   LEADER_VOTES: 'LeaderVotes',
   OPPONENT_VOTES: 'OpponentVotes',
-  SUBMISSION_LOG: 'SubmissionLog',
   SEASON_SUMMARY: 'SeasonSummary',
   AWARDS: 'Awards'
 };
@@ -275,18 +274,6 @@ function hasSubmittedThisWeek(playerId, seasonId, weekVal) {
   const ss = getSpreadsheet();
   const weekNum = parseWeek(weekVal);
 
-  // Check SubmissionLog first if available
-  const slSheet = ss.getSheetByName(SHEETS.SUBMISSION_LOG);
-  if (slSheet && slSheet.getLastRow() > 1) {
-    const submitted = slSheet.getDataRange().getValues().slice(1).some(r =>
-      String(r[1]) === String(seasonId) &&
-      parseWeek(r[2]) === weekNum &&
-      String(r[3]) === String(playerId)
-    );
-    if (submitted) return true;
-  }
-
-  // Fallback to LeaderVotes check
   const lvSheet = ss.getSheetByName(SHEETS.LEADER_VOTES);
   if (!lvSheet || lvSheet.getLastRow() <= 1) return false;
 
@@ -455,30 +442,23 @@ function handleSubmitVote(payload, email) {
   const ss = getSpreadsheet();
   const timestamp = new Date();
 
-  let leaderVoteRow = null, opponentVoteRow = null, submissionLogRow = null;
+  let leaderVoteRow = null, opponentVoteRow = null;
 
   try {
     // 1. Record Leader Votes
     const lvSheet = ss.getSheetByName(SHEETS.LEADER_VOTES);
     if (lvSheet && leader1Id) {
       leaderVoteRow = lvSheet.getLastRow() + 1;
-      lvSheet.getRange(leaderVoteRow, 1, 1, 6).setValues([[timestamp, seasonId, week, player.id, leader1Id, 1]]);
+      lvSheet.getRange(leaderVoteRow, 1, 1, 5).setValues([[timestamp, seasonId, week, player.id, leader1Id]]);
     }
 
-    // 2. Record Opponent Vote
+    // 2. Record Opponent Vote (de-identified: tally only, no voter attribution)
     if (opponentId) {
       const ovSheet = ss.getSheetByName(SHEETS.OPPONENT_VOTES);
       if (ovSheet) {
         opponentVoteRow = ovSheet.getLastRow() + 1;
-        ovSheet.getRange(opponentVoteRow, 1, 1, 5).setValues([[timestamp, seasonId, week, opponentId, player.id]]);
+        ovSheet.getRange(opponentVoteRow, 1, 1, 4).setValues([[timestamp, seasonId, week, opponentId]]);
       }
-    }
-
-    // 3. Record Submission Log
-    const slSheet = ss.getSheetByName(SHEETS.SUBMISSION_LOG);
-    if (slSheet) {
-      submissionLogRow = slSheet.getLastRow() + 1;
-      slSheet.getRange(submissionLogRow, 1, 1, 4).setValues([[timestamp, seasonId, week, player.id]]);
     }
 
     console.info(`[Vote] RECORDED email=${email} playerId=${player.id} season=${seasonId} week=${week} leader=${leader1Id || 'none'} opponent=${opponentId || 'none'}`);
@@ -486,7 +466,6 @@ function handleSubmitVote(payload, email) {
 
   } catch (err) {
     // Rollback entries on failure, deleting the exact rows we inserted
-    if (submissionLogRow) try { ss.getSheetByName(SHEETS.SUBMISSION_LOG).deleteRow(submissionLogRow); } catch (e) {}
     if (opponentVoteRow) try { ss.getSheetByName(SHEETS.OPPONENT_VOTES).deleteRow(opponentVoteRow); } catch (e) {}
     if (leaderVoteRow) try { ss.getSheetByName(SHEETS.LEADER_VOTES).deleteRow(leaderVoteRow); } catch (e) {}
     throw err;
