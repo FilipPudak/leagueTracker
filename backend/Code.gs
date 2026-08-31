@@ -321,12 +321,11 @@ function isVotingOpen(settings) {
 function handleGetAppData(userEmail) {
   const settings = getSettings();
   const activeSeasonId = String(settings.ACTIVE_SEASON_ID || '');
-  const linkedPlayerAtLoad = findPlayerByGoogleEmail(userEmail);
-  console.info(`[AppData] userEmail=${userEmail} linked=${Boolean(linkedPlayerAtLoad)}`);
+  const linkedPlayer = findPlayerByGoogleEmail(userEmail);
+  console.info(`[AppData] userEmail=${userEmail} linked=${Boolean(linkedPlayer)}`);
   const currentWeek = parseWeek(settings.CURRENT_WEEK);
   const votingOpen = isVotingOpen(settings);
 
-  const linkedPlayer = findPlayerByGoogleEmail(userEmail);
   const allSeasons = getAllSeasons();
 
   const data = {
