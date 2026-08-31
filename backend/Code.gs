@@ -42,23 +42,6 @@ function getSpreadsheet() {
 }
 
 /**
- * Caches a JSON-serializable value in Apps Script's shared CacheService for a short
- * TTL. Used for slow, slowly-changing reads (season rosters, season lists) to make
- * repeated app startups snappier. Correctness-sensitive reads (votes, settings) are
- * NOT cached.
- */
-function cached(key, ttlSeconds, producer) {
-  const cache = CacheService.getScriptCache();
-  const hit = cache.get(key);
-  if (hit != null) {
-    try { return JSON.parse(hit); } catch (e) { /* fall through on corrupt cache */ }
-  }
-  const value = producer();
-  try { cache.put(key, JSON.stringify(value), ttlSeconds); } catch (e) { /* cache optional */ }
-  return value;
-}
-
-/**
  * Web App Endpoint: Receives proxy API requests from Script 2.
  */
 function doPost(e) {
@@ -150,18 +133,16 @@ function parseWeek(val) {
  * ============================================================================ */
 
 function getAllSeasons() {
-  return cached('seasons', 300, function () {
-    const ss = getSpreadsheet();
-    const sheet = ss.getSheetByName(SHEETS.SEASONS);
-    if (!sheet || sheet.getLastRow() <= 1) return [];
+  const ss = getSpreadsheet();
+  const sheet = ss.getSheetByName(SHEETS.SEASONS);
+  if (!sheet || sheet.getLastRow() <= 1) return [];
 
-    return sheet.getDataRange().getValues().slice(1)
-      .filter(r => r[0] !== undefined && r[0] !== '')
-      .map(r => ({
-        id: String(r[0]),
-        name: String(r[1] || `Season ${r[0]}`)
-      }));
-  });
+  return sheet.getDataRange().getValues().slice(1)
+    .filter(r => r[0] !== undefined && r[0] !== '')
+    .map(r => ({
+      id: String(r[0]),
+      name: String(r[1] || `Season ${r[0]}`)
+    }));
 }
 
 function getSeasonName(seasonId) {
@@ -175,48 +156,45 @@ function getSeasonName(seasonId) {
 }
 
 function getSeasonPlayers(seasonId) {
-  // Roster is stable within a season; cache briefly so repeated startups are snappy.
-  return cached('seasonPlayers:' + String(seasonId), 300, function () {
-    const ss = getSpreadsheet();
-    const masterPlayers = {};
+  const ss = getSpreadsheet();
+  const masterPlayers = {};
 
-    const playerSheet = ss.getSheetByName(SHEETS.PLAYERS);
-    if (playerSheet && playerSheet.getLastRow() > 1) {
-      playerSheet.getDataRange().getValues().slice(1).forEach(r => {
-        if (r[0] && String(r[4] || 'TRUE').toUpperCase() === 'TRUE') {
-          masterPlayers[String(r[0])] = {
-            id: String(r[0]),
-            name: String(r[1]),
-            meleeName: String(r[2] || ''),
-            email: String(r[3] || '').toLowerCase()
-          };
-        }
-      });
-    }
-
-    const spSheet = ss.getSheetByName(SHEETS.SEASON_PLAYERS);
-    if (!spSheet || spSheet.getLastRow() <= 1) {
-      return Object.values(masterPlayers).sort((a, b) => a.name.localeCompare(b.name));
-    }
-
-    const seasonPlayerIds = new Set();
-    spSheet.getDataRange().getValues().slice(1).forEach(r => {
-      if (String(r[0]) === String(seasonId) && String(r[2] || 'TRUE').toUpperCase() === 'TRUE') {
-        seasonPlayerIds.add(String(r[1]));
+  const playerSheet = ss.getSheetByName(SHEETS.PLAYERS);
+  if (playerSheet && playerSheet.getLastRow() > 1) {
+    playerSheet.getDataRange().getValues().slice(1).forEach(r => {
+      if (r[0] && String(r[4] || 'TRUE').toUpperCase() === 'TRUE') {
+        masterPlayers[String(r[0])] = {
+          id: String(r[0]),
+          name: String(r[1]),
+          meleeName: String(r[2] || ''),
+          email: String(r[3] || '').toLowerCase()
+        };
       }
     });
+  }
 
-    if (seasonPlayerIds.size === 0) {
-      return Object.values(masterPlayers).sort((a, b) => a.name.localeCompare(b.name));
+  const spSheet = ss.getSheetByName(SHEETS.SEASON_PLAYERS);
+  if (!spSheet || spSheet.getLastRow() <= 1) {
+    return Object.values(masterPlayers).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const seasonPlayerIds = new Set();
+  spSheet.getDataRange().getValues().slice(1).forEach(r => {
+    if (String(r[0]) === String(seasonId) && String(r[2] || 'TRUE').toUpperCase() === 'TRUE') {
+      seasonPlayerIds.add(String(r[1]));
     }
-
-    const roster = [];
-    seasonPlayerIds.forEach(id => {
-      if (masterPlayers[id]) roster.push(masterPlayers[id]);
-    });
-
-    return roster.sort((a, b) => a.name.localeCompare(b.name));
   });
+
+  if (seasonPlayerIds.size === 0) {
+    return Object.values(masterPlayers).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const roster = [];
+  seasonPlayerIds.forEach(id => {
+    if (masterPlayers[id]) roster.push(masterPlayers[id]);
+  });
+
+  return roster.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function getUnlinkedPlayers(seasonId) {
@@ -225,46 +203,43 @@ function getUnlinkedPlayers(seasonId) {
 }
 
 function getSeasonLeaders(seasonId) {
-  // Leader roster is stable within a season; cache briefly for snappier startups.
-  return cached('seasonLeaders:' + String(seasonId), 300, function () {
-    const ss = getSpreadsheet();
-    const leaderSheet = ss.getSheetByName(SHEETS.LEADERS);
-    const seasonLeadersSheet = ss.getSheetByName(SHEETS.SEASON_LEADERS);
+  const ss = getSpreadsheet();
+  const leaderSheet = ss.getSheetByName(SHEETS.LEADERS);
+  const seasonLeadersSheet = ss.getSheetByName(SHEETS.SEASON_LEADERS);
 
-    const masterLeaders = {};
-    if (leaderSheet && leaderSheet.getLastRow() > 1) {
-      leaderSheet.getDataRange().getValues().slice(1).forEach(r => {
-        if (r[0]) {
-          masterLeaders[String(r[0])] = {
-            id: String(r[0]),
-            name: `${r[1]} - ${r[2] || ''}`.trim()
-          };
-        }
-      });
-    }
-
-    if (!seasonLeadersSheet || seasonLeadersSheet.getLastRow() <= 1) {
-      return Object.values(masterLeaders).sort((a, b) => a.name.localeCompare(b.name));
-    }
-
-    const activeLeaderIds = new Set();
-    seasonLeadersSheet.getDataRange().getValues().slice(1).forEach(r => {
-      if (String(r[0]) === String(seasonId) && String(r[2] || 'TRUE').toUpperCase() === 'TRUE') {
-        activeLeaderIds.add(String(r[1]));
+  const masterLeaders = {};
+  if (leaderSheet && leaderSheet.getLastRow() > 1) {
+    leaderSheet.getDataRange().getValues().slice(1).forEach(r => {
+      if (r[0]) {
+        masterLeaders[String(r[0])] = {
+          id: String(r[0]),
+          name: `${r[1]} - ${r[2] || ''}`.trim()
+        };
       }
     });
+  }
 
-    if (activeLeaderIds.size === 0) {
-      return Object.values(masterLeaders).sort((a, b) => a.name.localeCompare(b.name));
+  if (!seasonLeadersSheet || seasonLeadersSheet.getLastRow() <= 1) {
+    return Object.values(masterLeaders).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const activeLeaderIds = new Set();
+  seasonLeadersSheet.getDataRange().getValues().slice(1).forEach(r => {
+    if (String(r[0]) === String(seasonId) && String(r[2] || 'TRUE').toUpperCase() === 'TRUE') {
+      activeLeaderIds.add(String(r[1]));
     }
-
-    const roster = [];
-    activeLeaderIds.forEach(id => {
-      if (masterLeaders[id]) roster.push(masterLeaders[id]);
-    });
-
-    return roster.sort((a, b) => a.name.localeCompare(b.name));
   });
+
+  if (activeLeaderIds.size === 0) {
+    return Object.values(masterLeaders).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const roster = [];
+  activeLeaderIds.forEach(id => {
+    if (masterLeaders[id]) roster.push(masterLeaders[id]);
+  });
+
+  return roster.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function findPlayerByGoogleEmail(email) {

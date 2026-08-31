@@ -35,4 +35,4 @@ runs as `USER_ACCESSING` with `ANYONE` access (signed-in Google account required
 - [Deployment & configuration](docs/DEPLOYMENT.md) — secrets, Script Properties, clasp deploy/republish.
 - [Database (spreadsheet structure)](docs/DATABASE.md) — tabs and columns.
 - [Security model](docs/SECURITY.md) — how voting integrity is enforced and its accepted limitation.
-- [Performance & caching](docs/PERFORMANCE.md) — startup caching and load reliability.
+- [Load reliability](docs/PERFORMANCE.md) — cold-start retries, spinner, lazy-loaded leaderboard.
