@@ -25,11 +25,8 @@ const SHEETS = {
   PLAYERS: 'Players',
   LEADERS: 'Leaders',
   SEASONS: 'Seasons',
-  SEASON_PLAYERS: 'SeasonPlayers',
-  SEASON_LEADERS: 'SeasonLeaders',
   LEADER_VOTES: 'LeaderVotes',
   OPPONENT_VOTES: 'OpponentVotes',
-  SEASON_SUMMARY: 'SeasonSummary',
   AWARDS: 'Awards'
 };
 
@@ -162,7 +159,7 @@ function getSeasonName(seasonId) {
   return cleanNum ? `Season ${cleanNum}` : `Season ${seasonId}`;
 }
 
-function getSeasonPlayers(seasonId) {
+function getSeasonPlayers() {
   const ss = getSpreadsheet();
   const masterPlayers = {};
 
@@ -180,44 +177,22 @@ function getSeasonPlayers(seasonId) {
     });
   }
 
-  const spSheet = ss.getSheetByName(SHEETS.SEASON_PLAYERS);
-  if (!spSheet || spSheet.getLastRow() <= 1) {
-    return Object.values(masterPlayers).sort((a, b) => a.name.localeCompare(b.name));
-  }
-
-  const seasonPlayerIds = new Set();
-  spSheet.getDataRange().getValues().slice(1).forEach(r => {
-    if (String(r[0]) === String(seasonId) && String(r[2] || 'TRUE').toUpperCase() === 'TRUE') {
-      seasonPlayerIds.add(String(r[1]));
-    }
-  });
-
-  if (seasonPlayerIds.size === 0) {
-    return Object.values(masterPlayers).sort((a, b) => a.name.localeCompare(b.name));
-  }
-
-  const roster = [];
-  seasonPlayerIds.forEach(id => {
-    if (masterPlayers[id]) roster.push(masterPlayers[id]);
-  });
-
-  return roster.sort((a, b) => a.name.localeCompare(b.name));
+  return Object.values(masterPlayers).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function getUnlinkedPlayers(seasonId) {
-  const players = getSeasonPlayers(seasonId);
+function getUnlinkedPlayers() {
+  const players = getSeasonPlayers();
   return players.filter(p => !p.email);
 }
 
-function getSeasonLeaders(seasonId) {
+function getSeasonLeaders() {
   const ss = getSpreadsheet();
-  const leaderSheet = ss.getSheetByName(SHEETS.LEADERS);
-  const seasonLeadersSheet = ss.getSheetByName(SHEETS.SEASON_LEADERS);
-
   const masterLeaders = {};
+
+  const leaderSheet = ss.getSheetByName(SHEETS.LEADERS);
   if (leaderSheet && leaderSheet.getLastRow() > 1) {
     leaderSheet.getDataRange().getValues().slice(1).forEach(r => {
-      if (r[0]) {
+      if (r[0] && String(r[3] || 'TRUE').toUpperCase() === 'TRUE') {
         masterLeaders[String(r[0])] = {
           id: String(r[0]),
           name: `${r[1]} - ${r[2] || ''}`.trim()
@@ -226,27 +201,7 @@ function getSeasonLeaders(seasonId) {
     });
   }
 
-  if (!seasonLeadersSheet || seasonLeadersSheet.getLastRow() <= 1) {
-    return Object.values(masterLeaders).sort((a, b) => a.name.localeCompare(b.name));
-  }
-
-  const activeLeaderIds = new Set();
-  seasonLeadersSheet.getDataRange().getValues().slice(1).forEach(r => {
-    if (String(r[0]) === String(seasonId) && String(r[2] || 'TRUE').toUpperCase() === 'TRUE') {
-      activeLeaderIds.add(String(r[1]));
-    }
-  });
-
-  if (activeLeaderIds.size === 0) {
-    return Object.values(masterLeaders).sort((a, b) => a.name.localeCompare(b.name));
-  }
-
-  const roster = [];
-  activeLeaderIds.forEach(id => {
-    if (masterLeaders[id]) roster.push(masterLeaders[id]);
-  });
-
-  return roster.sort((a, b) => a.name.localeCompare(b.name));
+  return Object.values(masterLeaders).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function findPlayerByGoogleEmail(email) {
@@ -339,14 +294,14 @@ function handleGetAppData(userEmail) {
   };
 
   if (linkedPlayer) {
-    data.players = getSeasonPlayers(activeSeasonId);
-    data.leaders = getSeasonLeaders(activeSeasonId);
+    data.players = getSeasonPlayers();
+    data.leaders = getSeasonLeaders();
     const submitted = hasSubmittedThisWeek(linkedPlayer.id, activeSeasonId, currentWeek);
     data.alreadySubmitted = submitted;
     data.alreadyVoted = submitted;
     data.hasVoted = submitted;
   } else {
-    data.unlinkedPlayers = getUnlinkedPlayers(activeSeasonId);
+    data.unlinkedPlayers = getUnlinkedPlayers();
   }
 
   return data;
@@ -397,8 +352,8 @@ function handleLinkGoogleAccount(playerId, email) {
         success: true,
         player: playerObj,
         linkedPlayer: playerObj,
-        players: getSeasonPlayers(activeSeasonId),
-        leaders: getSeasonLeaders(activeSeasonId),
+        players: getSeasonPlayers(),
+        leaders: getSeasonLeaders(),
         alreadyVoted: hasSubmittedThisWeek(playerObj.id, activeSeasonId, currentWeek)
       };
     }
@@ -597,8 +552,6 @@ function advanceLeagueWeek() {
     const seasonId = String(settings.ACTIVE_SEASON_ID || '');
     const currentWeekNum = parseWeek(settings.CURRENT_WEEK);
 
-    compileWeekSummary(seasonId, currentWeekNum);
-
     if (currentWeekNum >= 11) {
       updateSetting(settingsSheet, 'VOTING_OPEN', 'FALSE');
       updateSetting(settingsSheet, 'CURRENT_WEEK', 'Season Ended');
@@ -620,45 +573,6 @@ function advanceLeagueWeek() {
   } finally {
     lock.releaseLock();
   }
-}
-
-function compileWeekSummary(seasonId, weekNum) {
-  const ss = getSpreadsheet();
-  const summarySheet = ss.getSheetByName(SHEETS.SEASON_SUMMARY);
-  if (!summarySheet) return;
-
-  const lvRows = ss.getSheetByName(SHEETS.LEADER_VOTES).getDataRange().getValues().slice(1);
-  const ovRows = ss.getSheetByName(SHEETS.OPPONENT_VOTES) ? 
-    ss.getSheetByName(SHEETS.OPPONENT_VOTES).getDataRange().getValues().slice(1) : [];
-
-  const leaderCounts = {};
-  lvRows.forEach(r => {
-    if (String(r[1]) === String(seasonId) && parseWeek(r[2]) === weekNum) {
-      const lId = String(r[4]);
-      leaderCounts[lId] = (leaderCounts[lId] || 0) + 1;
-    }
-  });
-
-  const opponentCounts = {};
-  ovRows.forEach(r => {
-    if (String(r[1]) === String(seasonId) && parseWeek(r[2]) === weekNum) {
-      const pId = String(r[3]);
-      opponentCounts[pId] = (opponentCounts[pId] || 0) + 1;
-    }
-  });
-
-  const topLeaderId = Object.keys(leaderCounts).sort((a,b) => leaderCounts[b] - leaderCounts[a])[0] || 'None';
-  const topOpponentId = Object.keys(opponentCounts).sort((a,b) => opponentCounts[b] - opponentCounts[a])[0] || 'None';
-
-  summarySheet.appendRow([
-    new Date(),
-    seasonId,
-    `Week ${weekNum}`,
-    topLeaderId,
-    leaderCounts[topLeaderId] || 0,
-    topOpponentId,
-    opponentCounts[topOpponentId] || 0
-  ]);
 }
 
 function calculateSeasonAwards(seasonId) {
@@ -784,7 +698,6 @@ function syncPlayersFromWebsite() {
   }
 
   let nextIdNumber = rows.length;
-  const activeScrapedPlayerIds = new Set();
 
   scrapedPlayers.forEach((playerData, key) => {
     if (existingMeleeMap.has(key)) {
@@ -793,26 +706,10 @@ function syncPlayersFromWebsite() {
       if (playerData.name && currentDisplayName !== playerData.name) {
         playerSheet.getRange(record.rowIndex, 2).setValue(playerData.name);
       }
-      activeScrapedPlayerIds.add(record.playerId);
     } else {
       const newId = 'P' + String(nextIdNumber).padStart(3, '0');
       playerSheet.appendRow([newId, playerData.name, playerData.meleeName, '', 'TRUE']);
-      activeScrapedPlayerIds.add(newId);
       nextIdNumber++;
     }
   });
-
-  const seasonPlayerSheet = ss.getSheetByName(SHEETS.SEASON_PLAYERS);
-  if (seasonPlayerSheet) {
-    const spRows = seasonPlayerSheet.getDataRange().getValues();
-    const existingSeasonLinks = new Set();
-    for (let i = 1; i < spRows.length; i++) {
-      if (String(spRows[i][0]) === activeSeasonId) existingSeasonLinks.add(String(spRows[i][1]));
-    }
-    activeScrapedPlayerIds.forEach(pId => {
-      if (!existingSeasonLinks.has(pId)) {
-        seasonPlayerSheet.appendRow([activeSeasonId, pId, 'TRUE']);
-      }
-    });
-  }
 }

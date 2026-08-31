@@ -55,7 +55,7 @@ Runs are organized in three tiers:
 |------|------|----------------|
 | 1 — Pure logic | `test/tier1.pure.test.js` | Lock-free helpers: `parseWeek`, `isVotingOpen`, `assignStandardRanks`, `userError`. |
 | 2 — Data & handlers | `test/tier2.handlers.test.js` | Sheet-backed readers and the `doPost` request handlers (`getSettings`, `getAllSeasons`, … `handleLinkGoogleAccount`, `handleSubmitVote`, `handleGetLeaderboardData`, dispatch/security). |
-| 3 — Lifecycle & awards | `test/tier3.lifecycle.test.js` | `advanceLeagueWeek`, `compileWeekSummary`, `calculateSeasonAwards`, `startNewSeason`, `syncPlayersFromWebsite`. |
+| 3 — Lifecycle & awards | `test/tier3.lifecycle.test.js` | `advanceLeagueWeek`, `calculateSeasonAwards`, `startNewSeason`, `syncPlayersFromWebsite`. |
 
 Test harness: `test/mockSheets.js` (GAS mocks + `loadBackend`/`resetSheets` helpers) and
 `test/fixtures.js` (the canonical fixture dataset). New tests follow the existing pattern:

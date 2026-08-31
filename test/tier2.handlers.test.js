@@ -38,19 +38,18 @@ describe('data retrieval helpers', () => {
     assert.equal(getSeasonName(''), 'Unknown Season');
   });
 
-  test('getSeasonPlayers returns only players active in the given season', () => {
-    const players = getSeasonPlayers('S2');
+  test('getSeasonPlayers returns all active master players', () => {
+    const players = getSeasonPlayers();
     const ids = players.map((p) => p.id).sort();
     assert.deepEqual(ids, ['p1', 'p2', 'p3', 'p4']);
-    // p5 is inactive in Players -> excluded even if listed.
+    // p5 is inactive in Players -> excluded.
     assert.ok(!ids.includes('p5'));
-    // S1 only has p1 and p2.
-    const s1 = getSeasonPlayers('S1').map((p) => p.id).sort();
-    assert.deepEqual(s1, ['p1', 'p2']);
+    // No per-season narrowing anymore: any season sees the same active roster.
+    assert.deepEqual(getSeasonPlayers().map((p) => p.id).sort(), ['p1', 'p2', 'p3', 'p4']);
   });
 
   test('getUnlinkedPlayers returns only players without a linked email', () => {
-    const unlinked = getUnlinkedPlayers('S2').map((p) => p.id).sort();
+    const unlinked = getUnlinkedPlayers().map((p) => p.id).sort();
     assert.deepEqual(unlinked, ['p3', 'p4']);
   });
 
@@ -255,7 +254,7 @@ describe('handleGetLeaderboardData', () => {
 
     // S1 leader votes: l1 once (p1), l2 twice (p2, p1). So l2 tops with 2 votes.
     const topLeader = res.leaderLeaderboard[0];
-    assert.equal(topLeader.name, 'Han - Solo');
+    assert.equal(topLeader.name, 'Han Solo - R');
     assert.equal(topLeader.votes, 2);
     assert.equal(topLeader.displayRank, 1);
 

@@ -5,35 +5,6 @@ const { basicTables } = require('./fixtures.js');
 
 loadBackend();
 
-describe('compileWeekSummary', () => {
-  let env;
-  beforeEach(() => {
-    env = resetSheets(basicTables());
-  });
-
-  test('appends a summary row with the top leader of that week', () => {
-    // S1 week 2: l1 x1, l2 x2 -> top leader l2 (Han - Solo is the name, but the
-    // summary stores the leader ID + count).
-    compileWeekSummary('S1', 2);
-    const rows = env.sheets.SeasonSummary.rows;
-    const last = rows[rows.length - 1];
-    assert.equal(rows.length, 2); // header + one summary
-    assert.equal(last[1], 'S1');
-    assert.equal(last[2], 'Week 2');
-    assert.equal(last[3], 'l2');
-    assert.equal(last[4], 2);
-  });
-
-  test('records None / 0 when a week has no votes', () => {
-    // S2 week 3 has no votes in the fixture.
-    compileWeekSummary('S2', 3);
-    const rows = env.sheets.SeasonSummary.rows;
-    const last = rows[rows.length - 1];
-    assert.equal(last[3], 'None');
-    assert.equal(last[4], 0);
-  });
-});
-
 describe('calculateSeasonAwards', () => {
   test('writes the Favorite Opponent award for the most-voted player', () => {
     // Build a fixture where p3 is clearly the favorite opponent in one season.
@@ -75,8 +46,6 @@ describe('advanceLeagueWeek', () => {
     const settings = getSettings();
     assert.equal(settings.CURRENT_WEEK, 'Week 4');
     assert.equal(settings.VOTING_OPEN, 'TRUE');
-    // A summary row was compiled for the completed week.
-    assert.equal(env.sheets.SeasonSummary.rows.length, 2);
   });
 
   test('does nothing when voting is closed', () => {
@@ -93,7 +62,6 @@ describe('advanceLeagueWeek', () => {
     // unchanged
     const settings = getSettings();
     assert.equal(settings.CURRENT_WEEK, 'Week 3');
-    assert.equal(env.sheets.SeasonSummary.rows.length, 1);
   });
 
   test('closes the season at week 11 and calculates awards', () => {
@@ -160,7 +128,7 @@ describe('startNewSeason', () => {
 });
 
 describe('syncPlayersFromWebsite', () => {
-  test('adds new players, updates names, and links them to the active season', () => {
+  test('adds new players and updates existing player names', () => {
     const env = resetSheets(basicTables(), {
       props: { SCRAPE_URL: 'https://example.test/' },
       urlFixtures: {
@@ -180,11 +148,6 @@ describe('syncPlayersFromWebsite', () => {
     assert.ok(added, 'expected a new player row');
     assert.equal(added[2], 'MNew');
     assert.equal(added[4], 'TRUE');
-    // The new player was linked to the active season (S2).
-    const sp = env.sheets.SeasonPlayers.rows.find(
-      (r) => r[0] === 'S2' && r[1] === added[0]
-    );
-    assert.ok(sp, 'expected new player linked to S2');
   });
 
   test('skips silently when the site is unreachable', () => {

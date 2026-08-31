@@ -25,26 +25,12 @@ function basicTables() {
       ['p4', 'Dan', 'MDan', '', 'TRUE'],
       ['p5', 'Inactive', 'MInactive', 'old@x.com', 'FALSE']
     ],
-    SeasonPlayers: [
-      ['SEASON_ID', 'PLAYER_ID', 'ACTIVE'],
-      ['S2', 'p1', 'TRUE'],
-      ['S2', 'p2', 'TRUE'],
-      ['S2', 'p3', 'TRUE'],
-      ['S2', 'p4', 'TRUE'],
-      ['S1', 'p1', 'TRUE'],
-      ['S1', 'p2', 'TRUE']
-    ],
     Leaders: [
-      ['ID', 'FIRST', 'LAST'],
-      ['l1', 'Leia', 'Organa'],
-      ['l2', 'Han', 'Solo'],
-      ['l3', 'Jyn', 'Erso']
-    ],
-    SeasonLeaders: [
-      ['SEASON_ID', 'LEADER_ID', 'ACTIVE'],
-      ['S2', 'l1', 'TRUE'],
-      ['S2', 'l2', 'TRUE'],
-      ['S2', 'l3', 'TRUE']
+      ['ID', 'NAME', 'SET', 'ACTIVE'],
+      ['l1', 'Leia Organa', 'L', 'TRUE'],
+      ['l2', 'Han Solo', 'R', 'TRUE'],
+      ['l3', 'Jyn Erso', 'R', 'TRUE'],
+      ['l4', 'Old Leader', 'X', 'FALSE']
     ],
     LeaderVotes: [
       // timestamp, seasonId, week, playerId, leaderId
@@ -58,9 +44,6 @@ function basicTables() {
       ['TS', 'SEASON_ID', 'WEEK', 'OPPONENT_ID'],
       ['2026-01-01', 'S1', 2, 'p2'],
       ['2026-01-01', 'S1', 2, 'p1']
-    ],
-    SeasonSummary: [
-      ['DATE', 'SEASON_ID', 'WEEK', 'TOP_LEADER', 'LEADER_COUNT', 'TOP_OPPONENT', 'OPPONENT_COUNT']
     ],
     Awards: [
       ['SEASON_ID', 'AWARD', 'PLAYER_ID', 'NAME', 'NOTE', 'DATE']
