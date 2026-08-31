@@ -263,17 +263,20 @@
     }
     function clearStatus() { document.getElementById('status-box').style.display = 'none'; }
 
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    // Highlight the given view panel and the matching tab button together.
+    function setActiveView(viewId, tabIndex) {
       document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(viewId).classList.add('active');
+      document.querySelectorAll('.tab-btn')[tabIndex].classList.add('active');
+    }
 
+    function switchTab(tabId) {
       if (tabId === 'vote-view') {
-        document.querySelectorAll('.tab-btn')[0].classList.add('active');
-        if (appState.linkedPlayer) document.getElementById('vote-view').classList.add('active');
-        else document.getElementById('link-view').classList.add('active');
+        if (appState.linkedPlayer) setActiveView('vote-view', 0);
+        else setActiveView('link-view', 0);
       } else if (tabId === 'leaderboard-view') {
-        document.querySelectorAll('.tab-btn')[1].classList.add('active');
-        document.getElementById('leaderboard-view').classList.add('active');
+        setActiveView('leaderboard-view', 1);
         loadLeaderboardData();
       }
     }
@@ -327,14 +330,14 @@
       });
 
       if (!appState.linkedPlayer) {
-        document.getElementById('link-view').classList.add('active');
+        setActiveView('link-view', 0);
         const select = document.getElementById('link-player-select');
         select.innerHTML = '<option value="">-- Choose Your Name --</option>';
         (data.unlinkedPlayers || []).forEach(p => {
           select.appendChild(new Option(p.name, p.id));
         });
       } else {
-        document.getElementById('vote-view').classList.add('active');
+        setActiveView('vote-view', 0);
         document.getElementById('linked-player-name').textContent = appState.linkedPlayer.name;
 
         if (data.alreadySubmitted || data.alreadyVoted) {
@@ -374,8 +377,7 @@
         .withSuccessHandler((res) => {
           showSpinner(false);
           appState.linkedPlayer = res.linkedPlayer || res.player;
-          document.getElementById('link-view').classList.remove('active');
-          document.getElementById('vote-view').classList.add('active');
+          setActiveView('vote-view', 0);
           document.getElementById('linked-player-name').textContent = appState.linkedPlayer.name;
           if (res.alreadyVoted) {
             document.getElementById('vote-form').style.display = 'none';
