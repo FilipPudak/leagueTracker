@@ -410,19 +410,6 @@
         .submitVote(l1, null, opp);
     }
 
-    // Starfighter Callsign Obfuscation Helper
-    function getStarWarsCodename(index) {
-      const callsigns = [
-        'Gold Leader',
-        'Green Leader',
-        'Red Leader',
-        'Blade Eleven',
-        'Rogue One',
-        'Phoenix Leader'
-      ];
-      return callsigns[index] || `Vanguard-${index + 1}`;
-    }
-
     function loadLeaderboardData() {
       const selectedSeasonId = document.getElementById('season-filter').value;
 
@@ -463,10 +450,10 @@
         getScore: (item) => `${item.nights} Nights`
       });
 
-      // 4. Favorite Opponents (Always shown; Obfuscated during active seasons, real names revealed when season ends)
+      // 4. Favorite Opponents (real names only after the season ends; the backend
+      //    supplies codenames while the active season is ongoing).
       renderStatsList('opponent-container', res.opponentLeaderboard || [], {
-        getTitle: (item, index) => res.isActiveSeason ? getStarWarsCodename(index) : (item.name || item.playerName),
-        getSubtitle: (item, index) => res.isActiveSeason ? (index === 0 ? 'Flight Leader' : 'Wingman Status') : null,
+        getTitle: (item) => item.name || item.playerName,
         getScore: (item) => `${item.votes} Votes`
       });
     }

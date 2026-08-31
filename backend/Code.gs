@@ -505,6 +505,23 @@ function handleGetLeaderboardData(requestedSeasonId) {
     votes: opponentCounts[pId]
   })).sort((a, b) => b.votes - a.votes);
 
+  // Obfuscate the favorite-opponent identities while the season is still the
+  // active one, so real names never leave the server until the season ends.
+  // Codenames are assigned by rank, mirroring the old frontend display.
+  if (isCurrentActiveSeason) {
+    const callsigns = [
+      'Gold Leader',
+      'Green Leader',
+      'Red Leader',
+      'Blade Eleven',
+      'Rogue One',
+      'Phoenix Leader'
+    ];
+    opponentLeaderboard.forEach((entry, index) => {
+      entry.name = callsigns[index] || `Vanguard-${index + 1}`;
+    });
+  }
+
   const rankedMostPlayed = assignStandardRanks(leaderLeaderboard, 'votes');
   const rankedDiversity = assignStandardRanks(diversity, 'differentLeaders');
   const rankedLoyalty = assignStandardRanks(loyalty, 'nights');

@@ -262,6 +262,9 @@ describe('handleGetLeaderboardData', () => {
     assert.equal(res.opponentLeaderboard.length, 2);
     assert.equal(res.opponentLeaderboard[0].votes, 1);
     assert.equal(res.opponentLeaderboard[1].votes, 1);
+    // Ended season: real names are revealed (not obfuscated).
+    const oppNames = res.opponentLeaderboard.map((o) => o.name).sort();
+    assert.deepEqual(oppNames, ['Alice', 'Bob']);
 
     // Diversity: p1 played {l1,l2}, p2 {l2} -> p1 has 2 different leaders.
     const div = res.diversity.filter((d) => d.playerName === 'Alice')[0];
@@ -273,9 +276,16 @@ describe('handleGetLeaderboardData', () => {
   });
 
   test('defaults to the active season when none is requested', () => {
+    // Give the active season S2 some opponent votes to verify obfuscation.
+    env.sheets.OpponentVotes.appendRow(['2026-01-01', 'S2', 3, 'p3']);
+    env.sheets.OpponentVotes.appendRow(['2026-01-01', 'S2', 3, 'p3']);
     const res = handleGetLeaderboardData(undefined);
     assert.equal(res.seasonId, 'S2');
     assert.equal(res.isActiveSeason, true);
+    // Active season favorite opponents are obfuscated with codenames, not real names.
+    assert.equal(res.opponentLeaderboard.length, 1);
+    assert.equal(res.opponentLeaderboard[0].name, 'Gold Leader');
+    assert.equal(res.opponentLeaderboard[0].votes, 2);
   });
 });
 
