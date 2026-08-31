@@ -36,3 +36,28 @@ runs as `USER_ACCESSING` with `ANYONE` access (signed-in Google account required
 - [Database (spreadsheet structure)](docs/DATABASE.md) — tabs and columns.
 - [Security model](docs/SECURITY.md) — how voting integrity is enforced and its accepted limitation.
 - [Load reliability](docs/PERFORMANCE.md) — cold-start retries, spinner, lazy-loaded leaderboard.
+
+## Tests
+
+The repo has an offline test suite that runs the apps-script code **without a deployment**.
+It uses an in-memory mock of the GAS globals (`SpreadsheetApp`, `PropertiesService`,
+`ContentService`, `LockService`, `UrlFetchApp`) layered on top of fixture data, so it needs
+no `.env`, no network, and no credentials. Tests are run with Node's built-in runner (`zero
+dependencies`):
+
+```sh
+npm test          # node --test "test/*.test.js"
+```
+
+Runs are organized in three tiers:
+
+| Tier | File | What it covers |
+|------|------|----------------|
+| 1 — Pure logic | `test/tier1.pure.test.js` | Lock-free helpers: `parseWeek`, `isVotingOpen`, `assignStandardRanks`, `userError`. |
+| 2 — Data & handlers | `test/tier2.handlers.test.js` | Sheet-backed readers and the `doPost` request handlers (`getSettings`, `getAllSeasons`, … `handleLinkGoogleAccount`, `handleSubmitVote`, `handleGetLeaderboardData`, dispatch/security). |
+| 3 — Lifecycle & awards | `test/tier3.lifecycle.test.js` | `advanceLeagueWeek`, `compileWeekSummary`, `calculateSeasonAwards`, `startNewSeason`, `syncPlayersFromWebsite`. |
+
+Test harness: `test/mockSheets.js` (GAS mocks + `loadBackend`/`resetSheets` helpers) and
+`test/fixtures.js` (the canonical fixture dataset). New tests follow the existing pattern:
+call `resetSheets(...)` in `beforeEach` for isolation, then assert against the returned
+in-memory sheet objects.
