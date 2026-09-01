@@ -172,7 +172,7 @@
       <div id="voting-badge" class="badge badge-active" style="display: none;">Voting Open</div>
     </div>
 
-    <div class="nav-tabs">
+    <div class="nav-tabs" style="display:none;">
       <button class="tab-btn active" onclick="switchTab('vote-view')">Vote</button>
       <button class="tab-btn" onclick="switchTab('leaderboard-view')">Leaderboard</button>
       <button class="tab-btn" onclick="switchTab('myseason-view')">My Stats</button>
@@ -269,7 +269,7 @@
   </div>
 
   <script>
-    let appState = { loaded: false, linkedPlayer: null, settings: {}, seasons: [], leaderboardCache: {} };
+    let appState = { linkedPlayer: null, settings: {}, seasons: [], leaderboardCache: {} };
 
     window.addEventListener('DOMContentLoaded', () => { fetchInitialAppData(); });
 
@@ -291,10 +291,6 @@
     }
 
     function switchTab(tabId) {
-      // Ignore tab clicks until initial app data has loaded (we don't yet know
-      // whether the user is linked, so we can't decide routing correctly).
-      if (!appState.loaded) return;
-
       if (tabId === 'vote-view') {
         if (appState.linkedPlayer) setActiveView('vote-view', 0);
         else setActiveView('link-view', 0);
@@ -315,7 +311,12 @@
       showSpinner(true);
       clearStatus();
       google.script.run
-        .withSuccessHandler((data) => { showSpinner(false); renderAppUI(data); })
+        .withSuccessHandler((data) => {
+          showSpinner(false);
+          // Reveal the nav tabs only once initial data has loaded successfully.
+          document.querySelector('.nav-tabs').style.display = 'flex';
+          renderAppUI(data);
+        })
         .withFailureHandler((err) => {
           showSpinner(false);
           // Apps Script web apps intermittently fail on cold start; retry once automatically.
@@ -338,7 +339,6 @@
       appState.settings = data.settings || {};
       appState.linkedPlayer = data.linkedPlayer || data.currentPlayer;
       appState.seasons = data.seasons || [];
-      appState.loaded = true;
 
       const seasonName = data.seasonName || `Season ${appState.settings.activeSeasonId}`;
       document.getElementById('app-subtitle').textContent = `${seasonName} • Week ${data.week || 1}`;
