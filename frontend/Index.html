@@ -520,7 +520,8 @@
 
       renderStatsList('myseason-leaders-container', res.leaders || [], {
         getTitle: (item) => item.name,
-        getScore: (item) => `${item.plays} Plays`
+        getScore: (item) => `${item.plays} Plays`,
+        limit: Infinity
       });
     }
 
@@ -540,11 +541,13 @@
         return;
       }
 
-      // Filter or take top items to display
-      const top3 = items.slice(0, 3);
+      // Limit how many rows are shown. Defaults to top 3 (leaderboard style);
+      // pass `limit` to show more (e.g. all rows in My Stats).
+      const limit = config.limit !== undefined ? config.limit : 3;
+      const shown = items.slice(0, limit);
       let html = '<div class="stats-list">';
 
-      top3.forEach((item, i) => {
+      shown.forEach((item, i) => {
         const rankNumber = item.displayRank !== undefined ? item.displayRank : (i + 1);
 
         const title = config.getTitle(item, i);
