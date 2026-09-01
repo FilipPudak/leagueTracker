@@ -6,33 +6,62 @@ const { basicTables } = require('./fixtures.js');
 loadBackend();
 
 describe('calculateSeasonAwards', () => {
-  test('writes the Favorite Opponent award for the most-voted player', () => {
-    // Build a fixture where p3 is clearly the favorite opponent in one season.
+  test('writes keyed award rows (seasonId, award, playerId)', () => {
+    // Base fixture S1 data:
+    //   OpponentVotes: p2 got 1, p1 got 1  -> Favorite Opponent tie (p1, p2)
+    //   LeaderVotes: p1 plays l1 & l2 (2 distinct), p2 plays l2 (1 distinct)
+    //     Diversity (most distinct) -> p1
+    //     Loyalty (most single-leader nights): p1 best=1, p2 best=1 -> tie -> both
+    const env = resetSheets(basicTables());
+
+    calculateSeasonAwards('S1');
+    const rows = env.sheets.Awards.rows;
+    assert.equal(rows.length, 6); // header + 5 award rows
+    const normalized = rows.slice(1).map((r) => [r[0], r[1], r[2]]);
+
+    // Favorite Opponent -> p1 and p2 (tie)
+    assert.deepEqual(
+      normalized.filter((r) => r[1] === 'Favorite Opponent').sort(),
+      [
+        ['S1', 'Favorite Opponent', 'p1'],
+        ['S1', 'Favorite Opponent', 'p2']
+      ]
+    );
+    // Diversity -> p1
+    assert.deepEqual(
+      normalized.filter((r) => r[1] === 'Diversity'),
+      [['S1', 'Diversity', 'p1']]
+    );
+    // Loyalty -> p1 and p2 (tie)
+    assert.deepEqual(
+      normalized.filter((r) => r[1] === 'Loyalty').sort(),
+      [
+        ['S1', 'Loyalty', 'p1'],
+        ['S1', 'Loyalty', 'p2']
+      ]
+    );
+  });
+
+  test('records all tied winners for an award', () => {
     const tables = basicTables();
+    // Make favorite opponent a tie between p3 and p2.
     tables.OpponentVotes = [
       ['TS', 'SEASON_ID', 'WEEK', 'OPPONENT_ID'],
-      ['2026-01-01', 'S1', 2, 'p3'],
       ['2026-01-01', 'S1', 2, 'p3'],
       ['2026-01-01', 'S1', 2, 'p2']
     ];
     const env = resetSheets(tables);
-
     calculateSeasonAwards('S1');
-    const rows = env.sheets.Awards.rows;
-    assert.equal(rows.length, 2); // header + one award
-    const award = rows[1];
-    assert.equal(award[0], 'S1');
-    assert.equal(award[1], 'Favorite Opponent');
-    assert.equal(award[2], 'p3');
-    assert.equal(award[3], 'Cara');
-    assert.equal(award[4], '2 votes');
+    const fav = env.sheets.Awards.rows.slice(1).filter((r) => r[1] === 'Favorite Opponent');
+    assert.deepEqual(fav.map((r) => r[2]).sort(), ['p2', 'p3']);
   });
 
-  test('writes nothing when there are no opponent votes', () => {
+  test('writes nothing when a season has no votes at all', () => {
     const tables = basicTables();
+    tables.LeaderVotes = [['TS', 'SEASON_ID', 'WEEK', 'PLAYER_ID', 'LEADER_ID']];
     tables.OpponentVotes = [['TS', 'SEASON_ID', 'WEEK', 'OPPONENT_ID']];
     const env = resetSheets(tables);
-    calculateSeasonAwards('S1');
+    calculateSeasonAwards('S2'); // S2 has no vote rows
     assert.equal(env.sheets.Awards.rows.length, 1); // header only
   });
 });

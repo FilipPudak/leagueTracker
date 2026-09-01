@@ -73,6 +73,8 @@ function doPost(e) {
       result = handleSubmitVote(payload, userEmail);
     } else if (action === 'getLeaderboardData') {
       result = handleGetLeaderboardData(payload.seasonId);
+    } else if (action === 'getMySeasonStats') {
+      result = handleGetMySeasonStats(payload.seasonId, userEmail);
     } else {
       throw new Error('Invalid action requested.');
     }
@@ -84,7 +86,8 @@ function doPost(e) {
     var gen = { getAppData: "Couldn't load your league data. Please try again.",
                 linkGoogleAccount: "We couldn't link your account. Please try again.",
                 submitVote: "We couldn't submit your vote. Please try again.",
-                getLeaderboardData: "Couldn't load the leaderboard. Please try again."
+                getLeaderboardData: "Couldn't load the leaderboard. Please try again.",
+                getMySeasonStats: "Couldn't load your stats. Please try again."
               }[action] || 'Something went wrong. Please try again.';
     return createJsonResponse({ success: false, error: err.userMessage || gen });
   } finally {
@@ -539,6 +542,59 @@ function handleGetLeaderboardData(requestedSeasonId) {
   };
 }
 
+function handleGetMySeasonStats(requestedSeasonId, userEmail) {
+  const linkedPlayer = findPlayerByGoogleEmail(userEmail);
+  if (!linkedPlayer) {
+    userError('Link your account first.');
+  }
+
+  const settings = getSettings();
+  const activeSeasonId = String(settings.ACTIVE_SEASON_ID || '');
+  const seasonId = requestedSeasonId ? String(requestedSeasonId) : activeSeasonId;
+  const isCurrentActiveSeason = (String(seasonId) === activeSeasonId);
+  const ss = getSpreadsheet();
+
+  // Awards won this season (from the Awards record written at season close).
+  const awardsWon = [];
+  const awardsSheet = ss.getSheetByName(SHEETS.AWARDS);
+  if (awardsSheet && awardsSheet.getLastRow() > 1) {
+    awardsSheet.getDataRange().getValues().slice(1).forEach(r => {
+      if (String(r[0]) === seasonId && String(r[2]) === String(linkedPlayer.id)) {
+        awardsWon.push(String(r[1]));
+      }
+    });
+  }
+
+  // Leaders played this season, computed on demand from raw LeaderVotes rows.
+  const leaderNames = {};
+  getSeasonLeaders().forEach(l => { leaderNames[l.id] = l.name; });
+
+  const counts = {};
+  const lvSheet = ss.getSheetByName(SHEETS.LEADER_VOTES);
+  if (lvSheet && lvSheet.getLastRow() > 1) {
+    lvSheet.getDataRange().getValues().slice(1).forEach(r => {
+      if (String(r[1]) === seasonId && String(r[3]) === String(linkedPlayer.id)) {
+        const lId = String(r[4]);
+        if (lId) counts[lId] = (counts[lId] || 0) + 1;
+      }
+    });
+  }
+
+  const leaders = Object.keys(counts).map(lId => ({
+    id: lId,
+    name: leaderNames[lId] || lId,
+    plays: counts[lId]
+  })).sort((a, b) => b.plays - a.plays);
+
+  return {
+    success: true,
+    seasonId: seasonId,
+    isActiveSeason: isCurrentActiveSeason,
+    awardsWon: awardsWon,
+    leaders: leaders
+  };
+}
+
 function assignStandardRanks(sortedList, scoreKey) {
   let currentRank = 1;
   return sortedList.map((item, index, array) => {
@@ -597,35 +653,73 @@ function calculateSeasonAwards(seasonId) {
   const awardsSheet = ss.getSheetByName(SHEETS.AWARDS);
   if (!awardsSheet) return;
 
-  const ovRows = ss.getSheetByName(SHEETS.OPPONENT_VOTES) ? 
+  const ovRows = ss.getSheetByName(SHEETS.OPPONENT_VOTES) ?
     ss.getSheetByName(SHEETS.OPPONENT_VOTES).getDataRange().getValues().slice(1) : [];
-  const players = ss.getSheetByName(SHEETS.PLAYERS).getDataRange().getValues().slice(1);
+  const lvRows = ss.getSheetByName(SHEETS.LEADER_VOTES) ?
+    ss.getSheetByName(SHEETS.LEADER_VOTES).getDataRange().getValues().slice(1) : [];
 
-  const playerMap = {};
-  players.forEach(p => { if (p[0]) playerMap[String(p[0])] = String(p[1]); });
+  const rows = [];
+  const pushWinners = (award, counts) => {
+    // `counts` maps playerId -> score. Record every player tied for the top score.
+    const entries = Object.keys(counts);
+    if (entries.length === 0) return;
+    let max = -Infinity;
+    entries.forEach(k => { if (counts[k] > max) max = counts[k]; });
+    if (max <= 0) return;
+    entries
+      .filter(k => counts[k] === max)
+      .forEach(k => rows.push([String(seasonId), award, String(k)]));
+  };
 
-  const opponentVoteCounts = {};
+  // Favorite Opponent: player with the most favorite-opponent votes (OpponentVotes col 3 => oppId).
+  const favCounts = {};
   ovRows.forEach(r => {
     if (String(r[1]) === String(seasonId)) {
       const oppId = String(r[3]);
-      if (oppId) opponentVoteCounts[oppId] = (opponentVoteCounts[oppId] || 0) + 1;
+      if (oppId) favCounts[oppId] = (favCounts[oppId] || 0) + 1;
     }
   });
+  pushWinners('Favorite Opponent', favCounts);
 
-  const sortedOpponents = Object.keys(opponentVoteCounts).sort((a,b) => opponentVoteCounts[b] - opponentVoteCounts[a]);
-  const favoriteOpponentId = sortedOpponents[0] || '';
-  const favoriteOpponentName = playerMap[favoriteOpponentId] || favoriteOpponentId;
-  const favVotes = opponentVoteCounts[favoriteOpponentId] || 0;
+  // Diversity: player with the most distinct leaders played.
+  const distinctLeaders = {};
+  lvRows.forEach(r => {
+    if (String(r[1]) !== String(seasonId)) return;
+    const pId = String(r[3]);
+    const lId = String(r[4]);
+    if (!pId || !lId) return;
+    if (!distinctLeaders[pId]) distinctLeaders[pId] = new Set();
+    distinctLeaders[pId].add(lId);
+  });
+  const diversityCounts = {};
+  Object.keys(distinctLeaders).forEach(pId => {
+    diversityCounts[pId] = distinctLeaders[pId].size;
+  });
+  pushWinners('Diversity', diversityCounts);
 
-  if (favoriteOpponentId) {
-    awardsSheet.appendRow([
-      seasonId,
-      'Favorite Opponent',
-      favoriteOpponentId,
-      favoriteOpponentName,
-      `${favVotes} votes`,
-      new Date()
-    ]);
+  // Loyalty: player who played a single leader on the most nights.
+  const loyaltyByPlayer = {};
+  lvRows.forEach(r => {
+    if (String(r[1]) !== String(seasonId)) return;
+    const pId = String(r[3]);
+    const lId = String(r[4]);
+    if (!pId || !lId) return;
+    if (!loyaltyByPlayer[pId]) loyaltyByPlayer[pId] = {};
+    loyaltyByPlayer[pId][lId] = (loyaltyByPlayer[pId][lId] || 0) + 1;
+  });
+  const loyaltyCounts = {};
+  Object.keys(loyaltyByPlayer).forEach(pId => {
+    let best = 0;
+    Object.keys(loyaltyByPlayer[pId]).forEach(lId => {
+      if (loyaltyByPlayer[pId][lId] > best) best = loyaltyByPlayer[pId][lId];
+    });
+    loyaltyCounts[pId] = best;
+  });
+  pushWinners('Loyalty', loyaltyCounts);
+
+  if (rows.length > 0) {
+    awardsSheet.getRange(awardsSheet.getLastRow() + 1, 1, rows.length, 3)
+      .setValues(rows);
   }
 }
 

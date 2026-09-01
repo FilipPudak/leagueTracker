@@ -46,7 +46,8 @@ function basicTables() {
       ['2026-01-01', 'S1', 2, 'p1']
     ],
     Awards: [
-      ['SEASON_ID', 'AWARD', 'PLAYER_ID', 'NAME', 'NOTE', 'DATE']
+      // seasonId, award, playerId (keyed record written at season close)
+      ['SEASON_ID', 'AWARD', 'PLAYER_ID']
     ]
   };
 }

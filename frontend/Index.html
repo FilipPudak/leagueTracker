@@ -175,6 +175,7 @@
     <div class="nav-tabs">
       <button class="tab-btn active" onclick="switchTab('vote-view')">Vote</button>
       <button class="tab-btn" onclick="switchTab('leaderboard-view')">Leaderboard</button>
+      <button class="tab-btn" onclick="switchTab('myseason-view')">My Stats</button>
     </div>
 
     <div id="status-box" class="status-msg"></div>
@@ -247,6 +248,24 @@
         <div id="opponent-container"></div>
       </div>
     </div>
+
+    <!-- MY STATS PANEL -->
+    <div id="myseason-view" class="view-panel">
+      <div class="form-group">
+        <label for="myseason-season-filter">Select Season</label>
+        <select id="myseason-season-filter" onchange="loadMySeasonStats()"></select>
+      </div>
+
+      <div id="myseason-awards-section" style="margin-top: 16px; display: none;">
+        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Awards Won</h3>
+        <div id="myseason-awards-container"></div>
+      </div>
+
+      <div style="margin-top: 16px;">
+        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Leaders Played</h3>
+        <div id="myseason-leaders-container"></div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -278,6 +297,13 @@
       } else if (tabId === 'leaderboard-view') {
         setActiveView('leaderboard-view', 1);
         loadLeaderboardData();
+      } else if (tabId === 'myseason-view') {
+        if (appState.linkedPlayer) {
+          setActiveView('myseason-view', 2);
+          loadMySeasonStats();
+        } else {
+          setActiveView('link-view', 2);
+        }
       }
     }
 
@@ -321,12 +347,15 @@
       }
 
       const seasonFilter = document.getElementById('season-filter');
+      const mySeasonFilter = document.getElementById('myseason-season-filter');
       seasonFilter.innerHTML = '';
+      mySeasonFilter.innerHTML = '';
       data.seasons.forEach(s => {
         const opt = document.createElement('option');
         opt.value = s.id; opt.textContent = s.name;
         if (String(s.id) === String(data.seasonId || appState.settings.activeSeasonId)) opt.selected = true;
         seasonFilter.appendChild(opt);
+        mySeasonFilter.appendChild(opt.cloneNode(true));
       });
 
       if (!appState.linkedPlayer) {
@@ -455,6 +484,43 @@
       renderStatsList('opponent-container', res.opponentLeaderboard || [], {
         getTitle: (item) => item.name || item.playerName,
         getScore: (item) => `${item.votes} Votes`
+      });
+    }
+
+    function loadMySeasonStats() {
+      if (!appState.linkedPlayer) return;
+      const selectedSeasonId = document.getElementById('myseason-season-filter').value;
+      showSpinner(true);
+      google.script.run
+        .withSuccessHandler((res) => {
+          showSpinner(false);
+          renderMySeasonStats(res);
+        })
+        .withFailureHandler((err) => { showSpinner(false); showStatus(err.message || 'Failed to load your stats.', false); })
+        .getMySeasonStats(selectedSeasonId);
+    }
+
+    function renderMySeasonStats(res) {
+      const awardsContainer = document.getElementById('myseason-awards-container');
+      const awardsSection = document.getElementById('myseason-awards-section');
+      const awards = res.awardsWon || [];
+
+      if (awards.length > 0) {
+        awardsContainer.innerHTML = awards
+          .map(a => `<div class="card" style="padding:10px 12px; margin-bottom:8px;">
+                       <span style="font-weight:700; color:#fbbf24;">Award:</span>
+                       <span style="font-weight:700; color:#f8fafc;">${escapeHtml(a)}</span>
+                     </div>`)
+          .join('');
+        awardsSection.style.display = 'block';
+      } else {
+        awardsContainer.innerHTML = '';
+        awardsSection.style.display = 'none';
+      }
+
+      renderStatsList('myseason-leaders-container', res.leaders || [], {
+        getTitle: (item) => item.name,
+        getScore: (item) => `${item.plays} Plays`
       });
     }
 

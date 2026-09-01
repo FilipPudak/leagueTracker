@@ -289,6 +289,59 @@ describe('handleGetLeaderboardData', () => {
   });
 });
 
+describe('handleGetMySeasonStats', () => {
+  let env;
+  beforeEach(() => {
+    env = resetSheets(freshTables());
+  });
+
+  test('resolves the linked player and returns leaders played for a season', () => {
+    // p1 (Alice) links alice@x.com. S1 leader votes: p1 played l1 once, l2 once.
+    const res = handleGetMySeasonStats('S1', 'alice@x.com');
+    assert.equal(res.success, true);
+    assert.equal(res.seasonId, 'S1');
+    assert.equal(res.isActiveSeason, false);
+    // Two leaders, one play each.
+    assert.equal(res.leaders.length, 2);
+    const byId = {};
+    res.leaders.forEach((l) => { byId[l.id] = l.plays; });
+    assert.equal(byId['l1'], 1);
+    assert.equal(byId['l2'], 1);
+    // Names resolved from Leaders as `name - set`.
+    const names = res.leaders.map((l) => l.name).sort();
+    assert.deepEqual(names, ['Han Solo - R', 'Leia Organa - L']);
+  });
+
+  test('returns awards won from the Awards record', () => {
+    env.sheets.Awards.appendRow(['S1', 'Favorite Opponent', 'p1']);
+    env.sheets.Awards.appendRow(['S1', 'Loyalty', 'p1']);
+    const res = handleGetMySeasonStats('S1', 'alice@x.com');
+    assert.deepEqual(res.awardsWon.sort(), ['Favorite Opponent', 'Loyalty']);
+  });
+
+  test('filters awards to the selected season and player', () => {
+    env.sheets.Awards.appendRow(['S1', 'Loyalty', 'p1']);
+    env.sheets.Awards.appendRow(['S1', 'Loyalty', 'p2']); // different player
+    env.sheets.Awards.appendRow(['S2', 'Diversity', 'p1']); // different season
+    const res = handleGetMySeasonStats('S1', 'alice@x.com');
+    assert.deepEqual(res.awardsWon, ['Loyalty']);
+  });
+
+  test('defaults to the active season (no awards yet for the current season)', () => {
+    const res = handleGetMySeasonStats(undefined, 'alice@x.com');
+    assert.equal(res.seasonId, 'S2');
+    assert.equal(res.isActiveSeason, true);
+    // No awards written for the current season yet.
+    assert.deepEqual(res.awardsWon, []);
+    // No leader plays for p1 in S2 -> empty board.
+    assert.deepEqual(res.leaders, []);
+  });
+
+  test('throws when the user is not linked', () => {
+    assert.throws(() => handleGetMySeasonStats('S1', 'unknown@x.com'), /Link your account first/);
+  });
+});
+
 describe('doPost dispatch & security', () => {
   let env;
   beforeEach(() => {
