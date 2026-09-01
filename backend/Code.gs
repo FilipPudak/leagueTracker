@@ -146,10 +146,17 @@ function getAllSeasons() {
 
   return sheet.getDataRange().getValues().slice(1)
     .filter(r => r[0] !== undefined && r[0] !== '')
-    .map(r => ({
-      id: String(r[0]),
-      name: String(r[1] || `Season ${r[0]}`)
-    }));
+    .map(r => {
+      const id = String(r[0]);
+      const num = parseInt(id.replace(/\D/g, ''), 10);
+      return {
+        id: id,
+        name: String(r[1] || `Season ${id}`),
+        sortNum: isNaN(num) ? 0 : num
+      };
+    })
+    .sort((a, b) => b.sortNum - a.sortNum)
+    .map(({ id, name }) => ({ id, name }));
 }
 
 function getSeasonName(seasonId) {

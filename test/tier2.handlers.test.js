@@ -25,11 +25,25 @@ describe('data retrieval helpers', () => {
     assert.equal(s.VOTING_OPEN, 'TRUE');
   });
 
-  test('getAllSeasons returns id/name pairs for every season', () => {
+  test('getAllSeasons returns id/name pairs, newest first', () => {
     const seasons = getAllSeasons();
     assert.equal(seasons.length, 2);
-    assert.deepEqual(seasons[0], { id: 'S1', name: 'Season 1' });
-    assert.deepEqual(seasons[1], { id: 'S2', name: 'Season 2' });
+    assert.deepEqual(seasons[0], { id: 'S2', name: 'Season 2' });
+    assert.deepEqual(seasons[1], { id: 'S1', name: 'Season 1' });
+  });
+
+  test('getAllSeasons sorts numerically, not by sheet row order', () => {
+    const tables = basicTables();
+    // Deliberately out of chronological sheet order.
+    tables.Seasons = [
+      ['ID', 'NAME'],
+      ['S3', 'Season 3'],
+      ['S1', 'Season 1'],
+      ['S2', 'Season 2']
+    ];
+    resetSheets(tables);
+    const seasons = getAllSeasons().map((s) => s.id);
+    assert.deepEqual(seasons, ['S3', 'S2', 'S1']);
   });
 
   test('getSeasonName resolves a known season id (and falls back)', () => {
