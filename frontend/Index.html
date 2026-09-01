@@ -238,17 +238,12 @@
       </div>
 
       <div style="margin-top: 20px;">
-        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Master Strategist (Diversity)</h3>
+        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Schemer</h3>
         <div id="diversity-container"></div>
       </div>
 
-      <div style="margin-top: 20px;">
-        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Loyalists (Leader Loyalty)</h3>
-        <div id="loyalty-container"></div>
-      </div>
-
       <div id="opponent-leaderboard-section" style="margin-top: 20px;">
-        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Favorite Opponent Awards</h3>
+        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Ambassador</h3>
         <div id="opponent-container"></div>
       </div>
     </div>
@@ -475,20 +470,13 @@
         getScore: (item) => `${item.count || item.votes} Plays`
       });
 
-      // 2. Diversity Award
+      // 2. Galactic Schemer (leader diversity)
       renderStatsList('diversity-container', res.diversity || [], {
         getTitle: (item) => item.playerName,
         getScore: (item) => `${item.differentLeaders} Leaders`
       });
 
-      // 3. Loyalty Stat
-      renderStatsList('loyalty-container', res.loyalty || [], {
-        getTitle: (item) => item.playerName,
-        getSubtitle: (item) => `Main: ${item.leader}`,
-        getScore: (item) => `${item.nights} Nights`
-      });
-
-      // 4. Favorite Opponents (real names only after the season ends; the backend
+      // 3. Galactic Ambassador (real names only after the season ends; the backend
       //    supplies codenames while the active season is ongoing).
       renderStatsList('opponent-container', res.opponentLeaderboard || [], {
         getTitle: (item) => item.name || item.playerName,

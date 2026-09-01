@@ -260,7 +260,7 @@ describe('handleGetLeaderboardData', () => {
     env = resetSheets(freshTables());
   });
 
-  test('builds leader/opponent/diversity/loyalty boards for a season', () => {
+  test('builds leader/opponent/diversity boards for a season', () => {
     const res = handleGetLeaderboardData('S1');
     assert.equal(res.success, true);
     assert.equal(res.seasonId, 'S1');
@@ -280,13 +280,12 @@ describe('handleGetLeaderboardData', () => {
     const oppNames = res.opponentLeaderboard.map((o) => o.name).sort();
     assert.deepEqual(oppNames, ['Alice', 'Bob']);
 
-    // Diversity: p1 played {l1,l2}, p2 {l2} -> p1 has 2 different leaders.
+    // Diversity (Galactic Schemer basis): p1 played {l1,l2}, p2 {l2} -> p1 has 2 different leaders.
     const div = res.diversity.filter((d) => d.playerName === 'Alice')[0];
     assert.equal(div.differentLeaders, 2);
 
-    // Loyalty: p2 played l2 once, p1's top is l2 once too -> tie at 1 night.
-    const loyal = res.loyalty.filter((l) => l.playerName === 'Alice')[0];
-    assert.equal(loyal.nights, 1);
+    // Loyalty was removed from the response.
+    assert.equal(res.loyalty, undefined);
   });
 
   test('defaults to the active season when none is requested', () => {
@@ -327,18 +326,18 @@ describe('handleGetMySeasonStats', () => {
   });
 
   test('returns awards won from the Awards record', () => {
-    env.sheets.Awards.appendRow(['S1', 'Favorite Opponent', 'p1']);
-    env.sheets.Awards.appendRow(['S1', 'Loyalty', 'p1']);
+    env.sheets.Awards.appendRow(['S1', 'Galactic Ambassador', 'p1']);
+    env.sheets.Awards.appendRow(['S1', 'Galactic Schemer', 'p1']);
     const res = handleGetMySeasonStats('S1', 'alice@x.com');
-    assert.deepEqual(res.awardsWon.sort(), ['Favorite Opponent', 'Loyalty']);
+    assert.deepEqual(res.awardsWon.sort(), ['Galactic Ambassador', 'Galactic Schemer']);
   });
 
   test('filters awards to the selected season and player', () => {
-    env.sheets.Awards.appendRow(['S1', 'Loyalty', 'p1']);
-    env.sheets.Awards.appendRow(['S1', 'Loyalty', 'p2']); // different player
-    env.sheets.Awards.appendRow(['S2', 'Diversity', 'p1']); // different season
+    env.sheets.Awards.appendRow(['S1', 'Galactic Schemer', 'p1']);
+    env.sheets.Awards.appendRow(['S1', 'Galactic Schemer', 'p2']); // different player
+    env.sheets.Awards.appendRow(['S2', 'Galactic Ambassador', 'p1']); // different season
     const res = handleGetMySeasonStats('S1', 'alice@x.com');
-    assert.deepEqual(res.awardsWon, ['Loyalty']);
+    assert.deepEqual(res.awardsWon, ['Galactic Schemer']);
   });
 
   test('defaults to the active season (no awards yet for the current season)', () => {

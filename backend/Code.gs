@@ -135,6 +135,18 @@ function parseWeek(val) {
   return m ? Number(m[0]) : 1;
 }
 
+// SEASON_LENGTH is a manual configuration in the Settings sheet (key/value),
+// telling the code how many rounds a season runs. Unlike CURRENT_WEEK /
+// ACTIVE_SEASON_ID it is never written by the code — it is a fixed parameter.
+// It is required, so we fail loudly rather than guessing if it is missing.
+function getSeasonLength() {
+  const val = Number(getSettings().SEASON_LENGTH);
+  if (!Number.isInteger(val) || val <= 0) {
+    throw new Error('SEASON_LENGTH is not set in Settings.');
+  }
+  return val;
+}
+
 /* ============================================================================
  * DATA RETRIEVAL HELPERS
  * ============================================================================ */
@@ -480,22 +492,13 @@ function handleGetLeaderboardData(requestedSeasonId) {
   })).sort((a, b) => b.votes - a.votes);
 
   const diversity = [];
-  const loyalty = [];
 
   Object.keys(stats).forEach(id => {
     const s = stats[id];
-    let topLeaderId = '', maxCount = 0;
-    const sorted = Object.keys(s.leaderCounts).sort((a, b) => s.leaderCounts[b] - s.leaderCounts[a]);
-    if (sorted.length > 0) {
-      topLeaderId = sorted[0];
-      maxCount = s.leaderCounts[topLeaderId];
-    }
     if (s.leadersPlayed.size > 0) diversity.push({ playerName: s.playerName, differentLeaders: s.leadersPlayed.size });
-    if (maxCount > 0) loyalty.push({ playerName: s.playerName, leader: leaderMap[topLeaderId] || '', nights: maxCount });
   });
 
   diversity.sort((a, b) => b.differentLeaders - a.differentLeaders || a.playerName.localeCompare(b.playerName));
-  loyalty.sort((a, b) => b.nights - a.nights || a.playerName.localeCompare(b.playerName));
 
   // Opponent Counts
   const opponentVotes = ss.getSheetByName(SHEETS.OPPONENT_VOTES) ? 
@@ -534,7 +537,6 @@ function handleGetLeaderboardData(requestedSeasonId) {
 
   const rankedMostPlayed = assignStandardRanks(leaderLeaderboard, 'votes');
   const rankedDiversity = assignStandardRanks(diversity, 'differentLeaders');
-  const rankedLoyalty = assignStandardRanks(loyalty, 'nights');
   const rankedOpponents = assignStandardRanks(opponentLeaderboard, 'votes');
 
   return {
@@ -544,8 +546,7 @@ function handleGetLeaderboardData(requestedSeasonId) {
     isActiveSeason: isCurrentActiveSeason,
     leaderLeaderboard: rankedMostPlayed,
     opponentLeaderboard: rankedOpponents,
-    diversity: rankedDiversity,
-    loyalty: rankedLoyalty
+    diversity: rankedDiversity
   };
 }
 
@@ -631,12 +632,13 @@ function advanceLeagueWeek() {
 
     const seasonId = String(settings.ACTIVE_SEASON_ID || '');
     const currentWeekNum = parseWeek(settings.CURRENT_WEEK);
+    const seasonLength = getSeasonLength();
 
-    if (currentWeekNum >= 11) {
+    if (currentWeekNum >= seasonLength) {
       updateSetting(settingsSheet, 'VOTING_OPEN', 'FALSE');
       updateSetting(settingsSheet, 'CURRENT_WEEK', 'Season Ended');
       calculateSeasonAwards(seasonId);
-      return { success: true, message: 'Season 11 completed, voting closed, awards calculated.' };
+      return { success: true, message: `Season ${seasonLength} completed, voting closed, awards calculated.` };
     }
 
     const nextWeekNum = currentWeekNum + 1;
@@ -660,6 +662,9 @@ function calculateSeasonAwards(seasonId) {
   const awardsSheet = ss.getSheetByName(SHEETS.AWARDS);
   if (!awardsSheet) return;
 
+  const seasonNumber = parseInt(String(seasonId).replace(/\D/g, ''), 10) || null;
+  const seasonLength = getSeasonLength();
+
   const ovRows = ss.getSheetByName(SHEETS.OPPONENT_VOTES) ?
     ss.getSheetByName(SHEETS.OPPONENT_VOTES).getDataRange().getValues().slice(1) : [];
   const lvRows = ss.getSheetByName(SHEETS.LEADER_VOTES) ?
@@ -678,7 +683,7 @@ function calculateSeasonAwards(seasonId) {
       .forEach(k => rows.push([String(seasonId), award, String(k)]));
   };
 
-  // Favorite Opponent: player with the most favorite-opponent votes (OpponentVotes col 3 => oppId).
+  // Galactic Ambassador: player with the most favorite-opponent votes (OpponentVotes col 3 => oppId).
   const favCounts = {};
   ovRows.forEach(r => {
     if (String(r[1]) === String(seasonId)) {
@@ -686,9 +691,9 @@ function calculateSeasonAwards(seasonId) {
       if (oppId) favCounts[oppId] = (favCounts[oppId] || 0) + 1;
     }
   });
-  pushWinners('Favorite Opponent', favCounts);
+  pushWinners('Galactic Ambassador', favCounts);
 
-  // Diversity: player with the most distinct leaders played.
+  // Galactic Schemer: player with the most distinct leaders played.
   const distinctLeaders = {};
   lvRows.forEach(r => {
     if (String(r[1]) !== String(seasonId)) return;
@@ -698,36 +703,135 @@ function calculateSeasonAwards(seasonId) {
     if (!distinctLeaders[pId]) distinctLeaders[pId] = new Set();
     distinctLeaders[pId].add(lId);
   });
-  const diversityCounts = {};
+  const schemerCounts = {};
   Object.keys(distinctLeaders).forEach(pId => {
-    diversityCounts[pId] = distinctLeaders[pId].size;
+    schemerCounts[pId] = distinctLeaders[pId].size;
   });
-  pushWinners('Diversity', diversityCounts);
+  pushWinners('Galactic Schemer', schemerCounts);
 
-  // Loyalty: player who played a single leader on the most nights.
-  const loyaltyByPlayer = {};
-  lvRows.forEach(r => {
-    if (String(r[1]) !== String(seasonId)) return;
-    const pId = String(r[3]);
-    const lId = String(r[4]);
-    if (!pId || !lId) return;
-    if (!loyaltyByPlayer[pId]) loyaltyByPlayer[pId] = {};
-    loyaltyByPlayer[pId][lId] = (loyaltyByPlayer[pId][lId] || 0) + 1;
+  // Bounty Hunter: no data source. Prepopulate an empty row for manual
+  // completion (the winner's playerId is entered by hand after this runs).
+  rows.push([String(seasonId), 'Bounty Hunter', '']);
+
+  // The site-based awards need to map the external standings' playerUsername /
+  // playerName back to our Player ids. Players are matched primarily by melee
+  // name (Players col C), falling back to their display name (col B).
+  const playerIdByMelee = {};
+  const playerIdByName = {};
+  const playerRows = ss.getSheetByName(SHEETS.PLAYERS) ?
+    ss.getSheetByName(SHEETS.PLAYERS).getDataRange().getValues().slice(1) : [];
+  playerRows.forEach(r => {
+    const id = String(r[0]);
+    if (r[2]) playerIdByMelee[String(r[2]).trim().toLowerCase()] = id;
+    if (r[1]) playerIdByName[String(r[1]).trim().toLowerCase()] = id;
   });
-  const loyaltyCounts = {};
-  Object.keys(loyaltyByPlayer).forEach(pId => {
-    let best = 0;
-    Object.keys(loyaltyByPlayer[pId]).forEach(lId => {
-      if (loyaltyByPlayer[pId][lId] > best) best = loyaltyByPlayer[pId][lId];
-    });
-    loyaltyCounts[pId] = best;
-  });
-  pushWinners('Loyalty', loyaltyCounts);
+  const resolvePlayerId = (entry) => {
+    const byMelee = playerIdByMelee[String(entry.username || '').trim().toLowerCase()];
+    if (byMelee) return byMelee;
+    return playerIdByName[String(entry.name || '').trim().toLowerCase()] || null;
+  };
+
+  // Round-based standings can fail if the site is unreachable; in that case the
+  // affected awards are skipped rather than failing the whole close.
+  if (seasonNumber && isFinite(seasonNumber)) {
+    const finalRound = seasonLength;
+    const midRound = Math.floor(seasonLength / 2);
+    const finalStandings = fetchSeasonStandings(seasonNumber, finalRound);
+
+    // Galactic Ruler: best final placing (all players tied for rank 1).
+    if (finalStandings && finalStandings.length) {
+      const topRank = Math.min(...finalStandings.map(s => s.rank));
+      if (topRank !== Infinity) {
+        finalStandings
+          .filter(s => s.rank === topRank && topRank > 0)
+          .forEach(s => {
+            const id = resolvePlayerId(s);
+            if (id) rows.push([String(seasonId), 'Galactic Ruler', id]);
+          });
+      }
+    }
+
+    // A New Hope: most places climbed between the midpoint round and the final
+    // round, counting only players present in both standings.
+    const midStandings = fetchSeasonStandings(seasonNumber, midRound);
+    if (finalStandings && midStandings && finalStandings.length && midStandings.length) {
+      const midRank = {};
+      midStandings.forEach(s => { midRank[String(s.username || s.name)] = s.rank; });
+
+      const climbs = finalStandings
+        .filter(s => s.username && midRank[String(s.username)] !== undefined)
+        .map(s => ({ entry: s, climbed: midRank[String(s.username)] - s.rank }));
+
+      if (climbs.length) {
+        const best = Math.max(...climbs.map(c => c.climbed));
+        if (best > 0) {
+          climbs
+            .filter(c => c.climbed === best)
+            .forEach(c => {
+              const id = resolvePlayerId(c.entry);
+              if (id) rows.push([String(seasonId), 'A New Hope', id]);
+            });
+        }
+      }
+    }
+  }
 
   if (rows.length > 0) {
     awardsSheet.getRange(awardsSheet.getLastRow() + 1, 1, rows.length, 3)
       .setValues(rows);
   }
+}
+
+// Fetches a season's standings for a given round from the SWU league site and
+// returns [{ username, name, rank, points }, ...], or null if the site is
+// unreachable / parse fails (safe fallthrough).
+function fetchSeasonStandings(seasonNumber, roundNumber) {
+  const base = getConfig('SCRAPE_URL') || 'https://stockholm.sw-unlimited.com/';
+  const url = `${base}season/${seasonNumber}/round/${roundNumber}`;
+
+  let html;
+  try {
+    const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (response.getResponseCode() !== 200) return null;
+    html = response.getContentText();
+  } catch (err) {
+    console.error(`[Awards] Failed to fetch standings ${url}: ${err}`);
+    return null;
+  }
+  if (!html) return null;
+
+  // The page embeds a SvelteKit data payload containing a "standings" array.
+  // Entries are JS object literals with UNQUOTED keys (e.g. {id:13192,rank:1}),
+  // so they are not valid JSON. We extract each object and read fields by regex.
+  const arrayMatch = html.match(/standings:\[([\s\S]*?)\],seasonWinCounts/);
+  if (!arrayMatch) return null;
+
+  const standings = [];
+  // Match each curly-braced object literal inside the standings array.
+  const objRe = /\{([^{}]*)\}/g;
+  let objMatch;
+  while ((objMatch = objRe.exec(arrayMatch[1])) !== null) {
+    const block = objMatch[1];
+    const grab = (key) => {
+      const m = block.match(new RegExp(key + ':([^,]*)'));
+      if (!m) return '';
+      return m[1].trim().replace(/^"|"$/g, '');
+    };
+    const user = grab('playerUsername');
+    if (!user) continue;
+    standings.push({
+      username: user,
+      name: grab('playerName'),
+      rank: Number(grab('rank')),
+      points: Number(grab('points'))
+    });
+  }
+
+  if (standings.length === 0) {
+    console.error(`[Awards] Failed to parse standings ${url}`);
+    return null;
+  }
+  return standings;
 }
 
 function startNewSeason() {

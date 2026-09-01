@@ -10,7 +10,8 @@ function basicTables() {
       ['KEY', 'VALUE'],
       ['ACTIVE_SEASON_ID', 'S2'],
       ['CURRENT_WEEK', 'Week 3'],
-      ['VOTING_OPEN', 'TRUE']
+      ['VOTING_OPEN', 'TRUE'],
+      ['SEASON_LENGTH', '11']
     ],
     Seasons: [
       ['ID', 'NAME'],
