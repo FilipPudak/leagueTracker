@@ -71,3 +71,4 @@ function submitVote(leader1Id, leader2Id, opponentId) {
   return callApi('submitVote', { leader1Id: leader1Id, leader2Id: leader2Id, opponentId: opponentId });
 }
 function getLeaderboardData(seasonId) { return callApi('getLeaderboardData', { seasonId: seasonId }); }
+function getMySeasonStats(seasonId) { return callApi('getMySeasonStats', { seasonId: seasonId }); }
