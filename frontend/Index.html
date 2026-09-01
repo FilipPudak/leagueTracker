@@ -269,7 +269,7 @@
   </div>
 
   <script>
-    let appState = { linkedPlayer: null, settings: {}, seasons: [], leaderboardCache: {} };
+    let appState = { loaded: false, linkedPlayer: null, settings: {}, seasons: [], leaderboardCache: {} };
 
     window.addEventListener('DOMContentLoaded', () => { fetchInitialAppData(); });
 
@@ -291,6 +291,10 @@
     }
 
     function switchTab(tabId) {
+      // Ignore tab clicks until initial app data has loaded (we don't yet know
+      // whether the user is linked, so we can't decide routing correctly).
+      if (!appState.loaded) return;
+
       if (tabId === 'vote-view') {
         if (appState.linkedPlayer) setActiveView('vote-view', 0);
         else setActiveView('link-view', 0);
@@ -334,6 +338,7 @@
       appState.settings = data.settings || {};
       appState.linkedPlayer = data.linkedPlayer || data.currentPlayer;
       appState.seasons = data.seasons || [];
+      appState.loaded = true;
 
       const seasonName = data.seasonName || `Season ${appState.settings.activeSeasonId}`;
       document.getElementById('app-subtitle').textContent = `${seasonName} • Week ${data.week || 1}`;
