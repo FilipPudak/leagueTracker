@@ -340,6 +340,19 @@ describe('handleGetMySeasonStats', () => {
     assert.deepEqual(res.awardsWon, ['Galactic Schemer']);
   });
 
+  test('Bounty Hunter appears once its placeholder playerId is filled in manually', () => {
+    // The placeholder is written with an empty playerId at close (never matches);
+    // once the user fills it in, the linked player sees it as an award won.
+    env.sheets.Awards.appendRow(['S1', 'Bounty Hunter', '']);
+    const before = handleGetMySeasonStats('S1', 'alice@x.com');
+    assert.deepEqual(before.awardsWon, []);
+
+    const rows = env.sheets.Awards.rows;
+    rows[rows.length - 1][2] = 'p1';
+    const after = handleGetMySeasonStats('S1', 'alice@x.com');
+    assert.deepEqual(after.awardsWon, ['Bounty Hunter']);
+  });
+
   test('defaults to the active season (no awards yet for the current season)', () => {
     const res = handleGetMySeasonStats(undefined, 'alice@x.com');
     assert.equal(res.seasonId, 'S2');

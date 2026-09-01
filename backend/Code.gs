@@ -479,10 +479,9 @@ function handleGetLeaderboardData(requestedSeasonId) {
     leaderCounts[lId] = (leaderCounts[lId] || 0) + 1;
 
     if (!stats[pId]) {
-      stats[pId] = { playerName: playerMap[pId] || `Unknown (${pId})`, leadersPlayed: new Set(), leaderCounts: {} };
+      stats[pId] = { playerName: playerMap[pId] || `Unknown (${pId})`, leadersPlayed: new Set() };
     }
     stats[pId].leadersPlayed.add(lId);
-    stats[pId].leaderCounts[lId] = (stats[pId].leaderCounts[lId] || 0) + 1;
   });
 
   const leaderLeaderboard = Object.keys(leaderCounts).map(lId => ({
@@ -665,6 +664,16 @@ function calculateSeasonAwards(seasonId) {
   const seasonNumber = parseInt(String(seasonId).replace(/\D/g, ''), 10) || null;
   const seasonLength = getSeasonLength();
 
+  // Idempotency: each award is recorded at most once per season. Re-running the
+  // close (e.g. a retry after the site was unreachable) must not duplicate
+  // already-written awards, but must still be able to fill in awards that were
+  // skipped previously (like the site-based ones).
+  const alreadyWritten = new Set();
+  const existingAwardRows = awardsSheet.getDataRange().getValues().slice(1);
+  existingAwardRows.forEach(r => {
+    if (String(r[0]) === String(seasonId) && r[1]) alreadyWritten.add(String(r[1]));
+  });
+
   const ovRows = ss.getSheetByName(SHEETS.OPPONENT_VOTES) ?
     ss.getSheetByName(SHEETS.OPPONENT_VOTES).getDataRange().getValues().slice(1) : [];
   const lvRows = ss.getSheetByName(SHEETS.LEADER_VOTES) ?
@@ -673,6 +682,7 @@ function calculateSeasonAwards(seasonId) {
   const rows = [];
   const pushWinners = (award, counts) => {
     // `counts` maps playerId -> score. Record every player tied for the top score.
+    if (alreadyWritten.has(award)) return;
     const entries = Object.keys(counts);
     if (entries.length === 0) return;
     let max = -Infinity;
@@ -711,7 +721,9 @@ function calculateSeasonAwards(seasonId) {
 
   // Bounty Hunter: no data source. Prepopulate an empty row for manual
   // completion (the winner's playerId is entered by hand after this runs).
-  rows.push([String(seasonId), 'Bounty Hunter', '']);
+  if (!alreadyWritten.has('Bounty Hunter')) {
+    rows.push([String(seasonId), 'Bounty Hunter', '']);
+  }
 
   // The site-based awards need to map the external standings' playerUsername /
   // playerName back to our Player ids. Players are matched primarily by melee
@@ -732,14 +744,19 @@ function calculateSeasonAwards(seasonId) {
   };
 
   // Round-based standings can fail if the site is unreachable; in that case the
-  // affected awards are skipped rather than failing the whole close.
+  // affected awards are skipped rather than failing the whole close. If an award
+  // is already recorded for this season it is never rewritten; a previously
+  // skipped award can still be filled in on a later run.
   if (seasonNumber && isFinite(seasonNumber)) {
-    const finalRound = seasonLength;
-    const midRound = Math.floor(seasonLength / 2);
-    const finalStandings = fetchSeasonStandings(seasonNumber, finalRound);
+    const needRuler = !alreadyWritten.has('Galactic Ruler');
+    const needHope = !alreadyWritten.has('A New Hope');
 
-    // Galactic Ruler: best final placing (all players tied for rank 1).
-    if (finalStandings && finalStandings.length) {
+    const finalStandings = (needRuler || needHope)
+      ? fetchSeasonStandings(seasonNumber, seasonLength)
+      : null;
+
+    if (needRuler && finalStandings && finalStandings.length) {
+      // Galactic Ruler: best final placing (all players tied for rank 1).
       const topRank = Math.min(...finalStandings.map(s => s.rank));
       if (topRank !== Infinity) {
         finalStandings
@@ -751,26 +768,28 @@ function calculateSeasonAwards(seasonId) {
       }
     }
 
-    // A New Hope: most places climbed between the midpoint round and the final
-    // round, counting only players present in both standings.
-    const midStandings = fetchSeasonStandings(seasonNumber, midRound);
-    if (finalStandings && midStandings && finalStandings.length && midStandings.length) {
-      const midRank = {};
-      midStandings.forEach(s => { midRank[String(s.username || s.name)] = s.rank; });
+    if (needHope) {
+      // A New Hope: most places climbed between the midpoint round and the final
+      // round, counting only players present in both standings.
+      const midStandings = fetchSeasonStandings(seasonNumber, Math.floor(seasonLength / 2));
+      if (finalStandings && midStandings && finalStandings.length && midStandings.length) {
+        const midRank = {};
+        midStandings.forEach(s => { midRank[String(s.username || s.name)] = s.rank; });
 
-      const climbs = finalStandings
-        .filter(s => s.username && midRank[String(s.username)] !== undefined)
-        .map(s => ({ entry: s, climbed: midRank[String(s.username)] - s.rank }));
+        const climbs = finalStandings
+          .filter(s => s.username && midRank[String(s.username)] !== undefined)
+          .map(s => ({ entry: s, climbed: midRank[String(s.username)] - s.rank }));
 
-      if (climbs.length) {
-        const best = Math.max(...climbs.map(c => c.climbed));
-        if (best > 0) {
-          climbs
-            .filter(c => c.climbed === best)
-            .forEach(c => {
-              const id = resolvePlayerId(c.entry);
-              if (id) rows.push([String(seasonId), 'A New Hope', id]);
-            });
+        if (climbs.length) {
+          const best = Math.max(...climbs.map(c => c.climbed));
+          if (best > 0) {
+            climbs
+              .filter(c => c.climbed === best)
+              .forEach(c => {
+                const id = resolvePlayerId(c.entry);
+                if (id) rows.push([String(seasonId), 'A New Hope', id]);
+              });
+          }
         }
       }
     }

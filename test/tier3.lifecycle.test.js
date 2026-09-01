@@ -86,6 +86,77 @@ describe('calculateSeasonAwards', () => {
     assert.deepEqual(ruler.map((r) => r[2]).sort(), ['p1', 'p2']);
   });
 
+  test('skips site-based awards for players not present in the Players sheet', () => {
+    // A rank-1 player ('Stranger') is on the site but has no melee/name match in
+    // our Players table, so no Galactic Ruler row should be written for them.
+    const env = resetSheets(basicTables(), {
+      urlFixtures: {
+        [standingsUrl(1, 11)]: standingsHtml([
+          { user: 'Stranger', name: 'Stranger', rank: 1 }
+        ])
+      }
+    });
+    calculateSeasonAwards('S1');
+    const labels = env.sheets.Awards.rows.slice(1).map((r) => r[1]);
+    assert.ok(!labels.includes('Galactic Ruler'));
+  });
+
+  test('re-running the close does not duplicate award rows', () => {
+    const env = resetSheets(basicTables(), {
+      urlFixtures: {
+        [standingsUrl(1, 11)]: standingsHtml([
+          { user: 'MAlice', name: 'Alice', rank: 1 }
+        ])
+      }
+    });
+
+    calculateSeasonAwards('S1');
+    const afterFirst = env.sheets.Awards.rows.map((r) => r.slice());
+    calculateSeasonAwards('S1');
+    assert.deepEqual(env.sheets.Awards.rows, afterFirst);
+  });
+
+  test('a later run fills in previously-skipped site awards without duplicating others', () => {
+    // Simulate a first close where the site was unreachable: the vote-based
+    // awards + Bounty Hunter placeholder were written, but Ruler/NewHope were not.
+    const tables = basicTables();
+    tables.Awards = [
+      ['SEASON_ID', 'AWARD', 'PLAYER_ID'],
+      ['S1', 'Galactic Ambassador', 'p1'],
+      ['S1', 'Galactic Schemer', 'p1'],
+      ['S1', 'Bounty Hunter', '']
+    ];
+    // This time the site is reachable: MAlice is rank 1 at the end and climbed
+    // from rank 3 at the midpoint.
+    const env = resetSheets(tables, {
+      urlFixtures: {
+        [standingsUrl(1, 5)]: standingsHtml([
+          { user: 'MAlice', name: 'Alice', rank: 3 }
+        ]),
+        [standingsUrl(1, 11)]: standingsHtml([
+          { user: 'MAlice', name: 'Alice', rank: 1 }
+        ])
+      }
+    });
+
+    calculateSeasonAwards('S1');
+    const dataRows = env.sheets.Awards.rows.slice(1);
+
+    // Site awards are now filled in.
+    assert.deepEqual(
+      dataRows.filter((r) => r[1] === 'Galactic Ruler'),
+      [['S1', 'Galactic Ruler', 'p1']]
+    );
+    assert.deepEqual(
+      dataRows.filter((r) => r[1] === 'A New Hope'),
+      [['S1', 'A New Hope', 'p1']]
+    );
+    // Existing awards are not duplicated.
+    assert.equal(dataRows.filter((r) => r[1] === 'Galactic Ambassador').length, 1);
+    assert.equal(dataRows.filter((r) => r[1] === 'Galactic Schemer').length, 1);
+    assert.equal(dataRows.filter((r) => r[1] === 'Bounty Hunter').length, 1);
+  });
+
   test('A New Hope awards the most places climbed between midpoint and final round', () => {
     // Round 5 (midpoint): MAlice rank 5, MBob rank 1
     // Round 11 (final):   MAlice rank 2 (climbed 3), MBob rank 1 (unchanged),

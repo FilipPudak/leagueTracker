@@ -45,7 +45,12 @@ Awards are computed once at season close (final week per `SEASON_LENGTH`) by
   all tied for the top positive climb are recorded.
 - **Bounty Hunter** — **no data source.** At season close the code writes a placeholder row
   `[seasonId, 'Bounty Hunter', '']` whose `playerId` is entered **manually** after the rest
-  of the awards are calculated.
+  of the awards are calculated. Once filled in, it shows up for that player in My Stats like
+  any other award.
+
+Awards are **idempotent**: each `[seasonId, award]` is written at most once. Re-running the
+close (e.g. a retry after the site was unreachable) never duplicates existing rows, but a
+previously-skipped award (such as a site-based one) can still be filled in on a later run.
 
 Site players are matched to `Players` primarily by melee name (`Players` col C == the site's
 `playerUsername`), falling back to the display name (`Players` col B). Because awards must not
