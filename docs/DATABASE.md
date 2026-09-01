@@ -77,7 +77,8 @@ while `isActiveSeason && isVotingOpen(settings)`. The moment voting closes — e
 obfuscated.
 
 **Site-based live sections (Galactic Ruler / A New Hope):** while the season is live, these
-pull rank-1 / best-climb data from the SWU site in real time. The fetched round is the
+show a top-3 podium (Ruler) and the top-3 climbers (A New Hope) from the SWU site in real
+time, so there is a preview before the awards are finalized. The fetched round is the
 `CURRENT_WEEK` from Settings; once voting closes (or for historical seasons) the final round
 (`SEASON_LENGTH`) is used instead, because `CURRENT_WEEK` belongs to the active season only.
 If the site is unreachable these fields are sent as `null` and the section is hidden.

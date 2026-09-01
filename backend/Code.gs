@@ -613,21 +613,32 @@ function handleGetLeaderboardData(requestedSeasonId) {
   const midRound = seasonLength > 0 ? Math.floor(seasonLength / 2) : 0;
   const failoverRound = isLive && weekInSeason ? currentWeek : seasonLength;
 
-  function fetchRankOneEntries(roundNumber) {
+  function fetchTopRankEntries(roundNumber, limit) {
+    const top = limit || 3;
     if (!seasonNumber || !roundNumber) return null;
     const standings = fetchSeasonStandings(seasonNumber, roundNumber);
     if (!standings || standings.length === 0) return null;
-    const topRank = Math.min(...standings.map(s => s.rank));
-    if (topRank === Infinity || topRank <= 0) return null;
-    const entries = standings
-      .filter(s => s.rank === topRank)
-      .map(s => resolveSiteEntry(s))
-      .filter(Boolean)
-      .map(id => ({ id: id, name: playerMap[id] || id, score: `Rank #${topRank}`, subtitle: null }));
+    const ranked = standings
+      .filter(s => s.rank > 0)
+      .sort((a, b) => a.rank - b.rank)
+      .slice(0, top);
+    if (ranked.length === 0) return null;
+    const entries = [];
+    ranked.forEach((s, i) => {
+      const id = resolveSiteEntry(s);
+      if (id) entries.push({
+        id: id,
+        name: playerMap[id] || id,
+        displayRank: i + 1,
+        score: `Rank #${s.rank}`,
+        subtitle: null
+      });
+    });
     return entries.length ? entries : null;
   }
 
-  function fetchNewHopeEntries(mid, fin) {
+  function fetchTopClimbEntries(mid, fin, limit) {
+    const top = limit || 3;
     if (!seasonNumber || !mid) return null;
     const midStandings = fetchSeasonStandings(seasonNumber, mid);
     const finStandings = fetchSeasonStandings(seasonNumber, fin || mid);
@@ -638,20 +649,30 @@ function handleGetLeaderboardData(requestedSeasonId) {
       .filter(s => s.username && midRank[String(s.username)] !== undefined)
       .map(s => ({ entry: s, climbed: midRank[String(s.username)] - s.rank }));
     if (climbs.length === 0) return null;
-    const best = Math.max(...climbs.map(c => c.climbed));
-    if (best <= 0) return null;
-    const entries = climbs
-      .filter(c => c.climbed === best)
-      .map(c => resolveSiteEntry(c.entry))
-      .filter(Boolean)
-      .map(id => ({ id: id, name: playerMap[id] || id, score: `+${best} Climb`, subtitle: null }));
-    return entries.length ? entries : null;
+    const positive = climbs.filter(c => c.climbed > 0).sort((a, b) => b.climbed - a.climbed);
+    if (positive.length === 0) return null;
+    const rawhits = positive.slice(0, top);
+    const resolved = rawhits
+      .map(c => ({ entry: c.entry, id: resolveSiteEntry(c.entry), climbed: c.climbed }))
+      .filter(r => r.id);
+    if (resolved.length === 0) return null;
+    const ranked = assignStandardRanks(
+      resolved.map(r => ({ id: r.id, climbed: r.climbed })),
+      'climbed'
+    );
+    return ranked.map(r => ({
+      id: r.id,
+      name: playerMap[r.id] || r.id,
+      displayRank: r.displayRank,
+      score: `+${r.climbed} Climb`,
+      subtitle: null
+    }));
   }
 
   // Galactic Ruler: site rank-1 for the current week while live, the final
   // round once the season has ended.
   let ruler = awardedEntries(AWARD_NAMES.RULER);
-  if (!ruler) ruler = fetchRankOneEntries(failoverRound);
+  if (!ruler) ruler = fetchTopRankEntries(failoverRound, 3);
 
   // A New Hope: most places climbed between the midpoint round and the
   // comparison round. Live tracking starts the week after the midpoint
@@ -661,7 +682,7 @@ function handleGetLeaderboardData(requestedSeasonId) {
   if (!newHope && seasonLength > 0) {
     const liveReady = isLive && weekInSeason && currentWeek >= midRound + 1;
     if (!isLive || liveReady) {
-      newHope = fetchNewHopeEntries(midRound, failoverRound);
+      newHope = fetchTopClimbEntries(midRound, failoverRound, 3);
     }
   }
 

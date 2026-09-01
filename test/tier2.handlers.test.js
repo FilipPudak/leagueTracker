@@ -331,22 +331,47 @@ describe('handleGetLeaderboardData', () => {
       }
     });
     const res = handleGetLeaderboardData('S2');
-    assert.equal(res.ruler.length, 1);
+    // Top-3 podium from the current-week standings (no ties on the site).
+    assert.equal(res.ruler.length, 2);
     assert.equal(res.ruler[0].name, 'Alice');
+    assert.equal(res.ruler[0].displayRank, 1);
     assert.equal(res.ruler[0].score, 'Rank #1');
+    assert.equal(res.ruler[1].name, 'Bob');
+    assert.equal(res.ruler[1].displayRank, 2);
+    assert.equal(res.ruler[1].score, 'Rank #2');
     // Week 3 is before the midpoint+1 gate, so A New Hope stays hidden.
     assert.equal(res.newHope, null);
+  });
+
+  test('Ruler top-3 shows the podium with site ranks and drops the rest', () => {
+    resetSheets(freshTables(), {
+      urlFixtures: {
+        [standingsUrl(2, 3)]: standingsHtml([
+          { user: 'MAlice', name: 'Alice', rank: 1 },
+          { user: 'MBob', name: 'Bob', rank: 2 },
+          { user: 'MCara', name: 'Cara', rank: 3 },
+          { user: 'MDan', name: 'Dan', rank: 4 }
+        ])
+      }
+    });
+    const res = handleGetLeaderboardData('S2');
+    assert.equal(res.ruler.length, 3);
+    assert.deepEqual(res.ruler.map((r) => r.displayRank), [1, 2, 3]);
+    assert.deepEqual(res.ruler.map((r) => r.score), ['Rank #1', 'Rank #2', 'Rank #3']);
+    assert.deepEqual(res.ruler.map((r) => r.name), ['Alice', 'Bob', 'Cara']);
   });
 
   test('A New Hope appears only after the midpoint+1 week', () => {
     const fixtures = {
       [standingsUrl(2, 5)]: standingsHtml([
-        { user: 'MAlice', name: 'Alice', rank: 3 },
-        { user: 'MBob', name: 'Bob', rank: 1 }
+        { user: 'MAlice', name: 'Alice', rank: 6 },
+        { user: 'MBob', name: 'Bob', rank: 1 },
+        { user: 'MCara', name: 'Cara', rank: 4 }
       ]),
       [standingsUrl(2, 6)]: standingsHtml([
         { user: 'MAlice', name: 'Alice', rank: 1 },
-        { user: 'MBob', name: 'Bob', rank: 1 }
+        { user: 'MBob', name: 'Bob', rank: 1 },
+        { user: 'MCara', name: 'Cara', rank: 2 }
       ])
     };
 
@@ -356,14 +381,47 @@ describe('handleGetLeaderboardData', () => {
     resetSheets(week5Tables, { urlFixtures: fixtures });
     assert.equal(handleGetLeaderboardData('S2').newHope, null);
 
-    // Week 6 (midpoint + 1): A New Hope is now tracked.
+    // Week 6 (midpoint + 1): A New Hope is now tracked. Alice climbed 5
+    // places, Cara climbed 2, Bob was flat -> only positive climbers shown,
+    // ordered by climb.
     const week6Tables = freshTables();
     week6Tables.Settings[2] = ['CURRENT_WEEK', 'Week 6'];
     resetSheets(week6Tables, { urlFixtures: fixtures });
     const week6 = handleGetLeaderboardData('S2');
-    assert.equal(week6.newHope.length, 1);
+    assert.equal(week6.newHope.length, 2);
     assert.equal(week6.newHope[0].name, 'Alice');
-    assert.equal(week6.newHope[0].score, '+2 Climb');
+    assert.equal(week6.newHope[0].displayRank, 1);
+    assert.equal(week6.newHope[0].score, '+5 Climb');
+    assert.equal(week6.newHope[1].name, 'Cara');
+    assert.equal(week6.newHope[1].displayRank, 2);
+    assert.equal(week6.newHope[1].score, '+2 Climb');
+  });
+
+  test('A New Hope top-3 uses tie-aware ranks for equal climbs', () => {
+    const fixtures = {
+      [standingsUrl(2, 5)]: standingsHtml([
+        { user: 'MAlice', name: 'Alice', rank: 4 },
+        { user: 'MBob', name: 'Bob', rank: 5 },
+        { user: 'MCara', name: 'Cara', rank: 3 },
+        { user: 'MDan', name: 'Dan', rank: 2 }
+      ]),
+      [standingsUrl(2, 6)]: standingsHtml([
+        { user: 'MAlice', name: 'Alice', rank: 1 }, // climbed 3
+        { user: 'MBob', name: 'Bob', rank: 2 },     // climbed 3 (tie at 1st)
+        { user: 'MCara', name: 'Cara', rank: 2 },   // climbed 1
+        { user: 'MDan', name: 'Dan', rank: 1 }      // climbed 1
+      ])
+    };
+    const tables = freshTables();
+    tables.Settings[2] = ['CURRENT_WEEK', 'Week 6'];
+    resetSheets(tables, { urlFixtures: fixtures });
+    const res = handleGetLeaderboardData('S2');
+    assert.equal(res.newHope.length, 3);
+    // Alice + Bob tied at 1st; Cara (or Dan) holds 3rd.
+    assert.deepEqual(res.newHope.map((r) => r.displayRank), [1, 1, 3]);
+    assert.deepEqual(res.newHope.map((r) => r.score), ['+3 Climb', '+3 Climb', '+1 Climb']);
+    assert.deepEqual(res.newHope[0].name, 'Alice');
+    assert.deepEqual(res.newHope[1].name, 'Bob');
   });
 
   test('reveals real names the moment voting closes while still the active season', () => {
@@ -427,9 +485,12 @@ describe('handleGetLeaderboardData', () => {
     resetSheets(freshTables(), { urlFixtures: fixtures });
     const res = handleGetLeaderboardData('S1');
 
-    // Ruler = final round rank 1 (Alice), NOT round 3's rank 1 (Bob).
-    assert.equal(res.ruler.length, 1);
+    // Ruler = final round podium (Alice #1, Bob #2), NOT round 3's rank 1 (Bob).
+    assert.equal(res.ruler.length, 2);
     assert.equal(res.ruler[0].name, 'Alice');
+    assert.equal(res.ruler[0].score, 'Rank #1');
+    assert.equal(res.ruler[1].name, 'Bob');
+    assert.equal(res.ruler[1].score, 'Rank #2');
     // A New Hope compares midpoint round 5 vs final round 11.
     assert.equal(res.newHope.length, 1);
     assert.equal(res.newHope[0].name, 'Alice');

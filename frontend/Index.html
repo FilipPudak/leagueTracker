@@ -232,34 +232,36 @@
         <select id="season-filter" onchange="loadLeaderboardData()"></select>
       </div>
 
-      <div style="margin-top: 16px;">
-        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Most Played Leaders</h3>
-        <div id="most-played-container"></div>
-      </div>
+      <div id="leaderboard-content" style="display: none;">
+        <div style="margin-top: 16px;">
+          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Most Played Leaders</h3>
+          <div id="most-played-container"></div>
+        </div>
 
-      <div id="schemer-section" style="margin-top: 20px;">
-        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Schemer</h3>
-        <div id="schemer-container"></div>
-      </div>
+        <div id="schemer-section" style="margin-top: 20px;">
+          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Schemer</h3>
+          <div id="schemer-container"></div>
+        </div>
 
-      <div id="ambassador-section" style="margin-top: 20px;">
-        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Ambassador</h3>
-        <div id="ambassador-container"></div>
-      </div>
+        <div id="ambassador-section" style="margin-top: 20px;">
+          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Ambassador</h3>
+          <div id="ambassador-container"></div>
+        </div>
 
-      <div id="ruler-section" style="margin-top: 20px;">
-        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Ruler</h3>
-        <div id="ruler-container"></div>
-      </div>
+        <div id="ruler-section" style="margin-top: 20px;">
+          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Ruler</h3>
+          <div id="ruler-container"></div>
+        </div>
 
-      <div id="new-hope-section" style="margin-top: 20px;">
-        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">A New Hope</h3>
-        <div id="new-hope-container"></div>
-      </div>
+        <div id="new-hope-section" style="margin-top: 20px;">
+          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">A New Hope</h3>
+          <div id="new-hope-container"></div>
+        </div>
 
-      <div id="bounty-hunter-section" style="margin-top: 20px;">
-        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Bounty Hunter</h3>
-        <div id="bounty-hunter-container"></div>
+        <div id="bounty-hunter-section" style="margin-top: 20px;">
+          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Bounty Hunter</h3>
+          <div id="bounty-hunter-container"></div>
+        </div>
       </div>
     </div>
 
@@ -270,20 +272,22 @@
         <select id="myseason-season-filter" onchange="loadMySeasonStats()"></select>
       </div>
 
-      <div id="myseason-awards-section" style="margin-top: 16px; display: none;">
-        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Awards Won</h3>
-        <div id="myseason-awards-container"></div>
-      </div>
+      <div id="myseason-content" style="display: none;">
+        <div id="myseason-awards-section" style="margin-top: 16px; display: none;">
+          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Awards Won</h3>
+          <div id="myseason-awards-container"></div>
+        </div>
 
-      <div style="margin-top: 16px;">
-        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Leaders Played</h3>
-        <div id="myseason-leaders-container"></div>
+        <div style="margin-top: 16px;">
+          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Leaders Played</h3>
+          <div id="myseason-leaders-container"></div>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
-    let appState = { linkedPlayer: null, settings: {}, seasons: [], leaderboardCache: {} };
+    let appState = { linkedPlayer: null, settings: {}, seasons: [], leaderboardCache: {}, myseasonCache: {} };
 
     window.addEventListener('DOMContentLoaded', () => { fetchInitialAppData(); });
 
@@ -310,10 +314,14 @@
         else setActiveView('link-view', 0);
       } else if (tabId === 'leaderboard-view') {
         setActiveView('leaderboard-view', 1);
+        // Re-entering the tab forces a fresh fetch; toggling seasons within a
+        // visit still uses the per-season cache below.
+        appState.leaderboardCache = {};
         loadLeaderboardData();
       } else if (tabId === 'myseason-view') {
         if (appState.linkedPlayer) {
           setActiveView('myseason-view', 2);
+          appState.myseasonCache = {};
           loadMySeasonStats();
         } else {
           setActiveView('link-view', 2);
@@ -496,6 +504,10 @@
       renderLeaderboardSection('ruler-section', 'ruler-container', res, 'ruler');
       renderLeaderboardSection('new-hope-section', 'new-hope-container', res, 'newHope');
       renderLeaderboardSection('bounty-hunter-section', 'bounty-hunter-container', res, 'bountyHunter');
+
+      // Reveal the content only once it has been fully rendered, which avoids
+      // flashing the section titles (e.g. Bounty Hunter) before data arrives.
+      document.getElementById('leaderboard-content').style.display = 'block';
     }
 
     function renderLeaderboardSection(sectionId, containerId, res, field) {
@@ -516,10 +528,18 @@
     function loadMySeasonStats() {
       if (!appState.linkedPlayer) return;
       const selectedSeasonId = document.getElementById('myseason-season-filter').value;
+
+      const cached = appState.myseasonCache[selectedSeasonId];
+      if (cached) {
+        renderMySeasonStats(cached);
+        return;
+      }
+
       showSpinner(true);
       google.script.run
         .withSuccessHandler((res) => {
           showSpinner(false);
+          appState.myseasonCache[selectedSeasonId] = res;
           renderMySeasonStats(res);
         })
         .withFailureHandler((err) => { showSpinner(false); showStatus(err.message || 'Failed to load your stats.', false); })
@@ -549,6 +569,9 @@
         getScore: (item) => `${item.plays} Plays`,
         limit: Infinity
       });
+
+      // Reveal the content only once it has been fully rendered.
+      document.getElementById('myseason-content').style.display = 'block';
     }
 
     function escapeHtml(value) {
