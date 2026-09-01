@@ -12,7 +12,7 @@ header and is skipped.
 | `Seasons` | `A` id (number) · `B` name (e.g. `Season 4`) · `C` created date. The season id maps 1:1 to the SWU site's season number (`/season/{n}/round/{r}`) |
 | `LeaderVotes` | `A` timestamp · `B` seasonId · `C` week · `D` voter playerId · `E` leaderId (one row per player per week; also used to enforce one submission per week) |
 | `OpponentVotes` | `A` timestamp · `B` seasonId · `C` week · `D` opponentId (de-identified tally only — no voter attribution) |
-| `Awards` | `A` seasonId · `B` award · `C` playerId. Written once at season close (final week, per `SEASON_LENGTH`). `award` ∈ `Galactic Ruler`, `Galactic Schemer`, `Galactic Ambassador`, `A New Hope`, `Bounty Hunter`. Every tied winner is recorded as its own row. This is immutable history — never rewritten. |
+| `Awards` | `A` seasonId · `B` award · `C` playerId. Written once at season close (final week, per `SEASON_LENGTH`). `award` ∈ `Galactic Ruler`, `Galactic Schemer`, `Galactic Ambassador`, `A New Hope`, `Bounty Hunter`. **Every award gets a row**: winner(s) when resolved, otherwise a placeholder with an empty `playerId` that is filled in later (manually for Bounty Hunter, via `backfillSeasonAwards` otherwise). Every tied winner is its own row. Once written, a row is never overwritten by the close itself. |
 
 The `Players` and `Leaders` **`active`** columns gate who is selectable as a vote
 option in the current season. Historical leaderboards are computed on demand from the raw
@@ -33,7 +33,9 @@ shown only on the live leaderboard.
 ## Award computation notes
 
 Awards are computed once at season close (final week per `SEASON_LENGTH`) by
-`calculateSeasonAwards`, called from `advanceLeagueWeek`, and appended to `Awards`:
+`calculateSeasonAwards`, called from `advanceLeagueWeek`, and appended to `Awards`. Every
+award always receives a row — the resolved winner(s) when the data source is available, or a
+placeholder with an empty `playerId` otherwise:
 
 - **Galactic Ruler** — best final placing: rank 1 in the SWU site's round-`SEASON_LENGTH`
   standings (`https://stockholm.sw-unlimited.com/season/{id}/round/{n}`, base overridable via
@@ -43,20 +45,43 @@ Awards are computed once at season close (final week per `SEASON_LENGTH`) by
 - **A New Hope** — most places climbed between round `floor(SEASON_LENGTH / 2)` and the final
   round, comparing the SWU site's standings. Only players present in **both** rounds count;
   all tied for the top positive climb are recorded.
-- **Bounty Hunter** — **no data source.** At season close the code writes a placeholder row
+- **Bounty Hunter** — **no data source.** Always written as a placeholder row
   `[seasonId, 'Bounty Hunter', '']` whose `playerId` is entered **manually** after the rest
   of the awards are calculated. Once filled in, it shows up for that player in My Stats like
   any other award.
 
-Awards are **idempotent**: each `[seasonId, award]` is written at most once. Re-running the
-close (e.g. a retry after the site was unreachable) never duplicates existing rows, but a
-previously-skipped award (such as a site-based one) can still be filled in on a later run.
+Awards are **idempotent**: each `[seasonId, award]` is written at most once per season.
+Re-running the close (e.g. a retry after the site was unreachable) never duplicates existing
+rows. A placeholder written during a site-down close can still be resolved later by
+`backfillSeasonAwards`.
 
 Site players are matched to `Players` primarily by melee name (`Players` col C == the site's
 `playerUsername`), falling back to the display name (`Players` col B). Because awards must not
-fail the whole season close, the site-based awards (Galactic Ruler, A New Hope) are **skipped
-silently** if the SWU site is unreachable or its standings cannot be parsed; the vote-based
-awards and the Bounty Hunter placeholder are still written. The site is public (no auth), the
-same source the existing `syncPlayersFromWebsite` already scrapes. A season's id matches the
-site season number 1:1.
+fail the whole season close, the site-based awards (Galactic Ruler, A New Hope) are recorded as
+**empty placeholders** if the SWU site is unreachable or its standings cannot be parsed; the
+vote-based awards and the Bounty Hunter placeholder are still written. The site is public (no
+auth), the same source the existing `syncPlayersFromWebsite` already scrapes. A season's id
+matches the site season number 1:1.
+
+## Leaderboard (live award tracking)
+
+The leaderboard (`handleGetLeaderboardData`) always shows the Most Played Leaders (a tracked
+stat, not an award) and the vote-based Schemer / Ambassador sections as live failovers. Once
+all five Awards have been written at season close, the sections switch to an **awards-first**
+view: filled `playerId` rows are rendered as `"Awarded"` entries. An empty placeholder falls
+back to the live/vote source so the board remains useful while a season is still in progress.
+
+**Ambassador reveal gate:** Ambassador identities stay codenames (`Gold Leader`, etc.) only
+while `isActiveSeason && isVotingOpen(settings)`. The moment voting closes — even before
+`startNewSeason` resets the settings — real names are revealed. The Schemer section was never
+obfuscated.
+
+**Site-based live sections (Galactic Ruler / A New Hope):** while the season is live, these
+pull rank-1 / best-climb data from the SWU site in real time. The fetched round is the
+`CURRENT_WEEK` from Settings; once voting closes (or for historical seasons) the final round
+(`SEASON_LENGTH`) is used instead, because `CURRENT_WEEK` belongs to the active season only.
+If the site is unreachable these fields are sent as `null` and the section is hidden.
+
+**Bounty Hunter:** never computed from any data source. It is hidden while voting is open and
+appears as an empty (or filled) award row only after the season has ended.
 

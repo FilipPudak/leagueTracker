@@ -454,98 +454,232 @@ function handleGetLeaderboardData(requestedSeasonId) {
   const activeSeasonId = String(settings.ACTIVE_SEASON_ID || '');
   const targetSeasonId = requestedSeasonId ? String(requestedSeasonId) : activeSeasonId;
 
-  const isCurrentActiveSeason = (String(targetSeasonId) === activeSeasonId);
+  const isActiveSeason = (String(targetSeasonId) === activeSeasonId);
+  const votingOpen = isVotingOpen(settings);
+  // "Live" tracking: only while this season is the active one AND voting is
+  // open. The board flips to the award / final-round view the moment voting
+  // closes, even before startNewSeason resets the settings.
+  const isLive = isActiveSeason && votingOpen;
+
+  let seasonLength = 0;
+  try { seasonLength = getSeasonLength(); } catch (e) { /* SEASON_LENGTH not set */ }
+  const currentWeek = parseWeek(settings.CURRENT_WEEK);
+  const weekInSeason = seasonLength > 0 && currentWeek >= 1 && currentWeek <= seasonLength;
+
   const ss = getSpreadsheet();
 
-  const playerRows = ss.getSheetByName(SHEETS.PLAYERS).getDataRange().getValues().slice(1);
   const playerMap = {};
-  playerRows.forEach(r => { if (r[0]) playerMap[String(r[0])] = String(r[1]); });
+  const idByMelee = {};
+  const idByName = {};
+  const playerRows = ss.getSheetByName(SHEETS.PLAYERS) ?
+    ss.getSheetByName(SHEETS.PLAYERS).getDataRange().getValues().slice(1) : [];
+  playerRows.forEach(r => {
+    const id = String(r[0]);
+    if (!id) return;
+    playerMap[id] = String(r[1]);
+    if (r[2]) idByMelee[String(r[2]).trim().toLowerCase()] = id;
+    if (r[1]) idByName[String(r[1]).trim().toLowerCase()] = id;
+  });
+  // Matches the site's playerUsername to a Players melee name (col C), falling
+  // back to the display name (col B); null when the player is not tracked.
+  const resolveSiteEntry = (entry) =>
+    idByMelee[String(entry.username || '').trim().toLowerCase()] ||
+    idByName[String(entry.name || '').trim().toLowerCase()] ||
+    null;
 
-  const leaderRows = ss.getSheetByName(SHEETS.LEADERS).getDataRange().getValues().slice(1);
   const leaderMap = {};
+  const leaderRows = ss.getSheetByName(SHEETS.LEADERS) ?
+    ss.getSheetByName(SHEETS.LEADERS).getDataRange().getValues().slice(1) : [];
   leaderRows.forEach(r => { if (r[0]) leaderMap[String(r[0])] = `${r[1]} - ${r[2] || ''}`.trim(); });
 
-  const leaderVotes = ss.getSheetByName(SHEETS.LEADER_VOTES).getDataRange().getValues().slice(1);
-  
-  // Calculate Standard Counts
-  const leaderCounts = {};
-  const stats = {};
-
-  leaderVotes.forEach(r => {
-    if (String(r[1]) !== targetSeasonId) return;
-    const pId = String(r[3]);
-    const lId = String(r[4]);
-
-    leaderCounts[lId] = (leaderCounts[lId] || 0) + 1;
-
-    if (!stats[pId]) {
-      stats[pId] = { playerName: playerMap[pId] || `Unknown (${pId})`, leadersPlayed: new Set() };
-    }
-    stats[pId].leadersPlayed.add(lId);
-  });
-
-  const leaderLeaderboard = Object.keys(leaderCounts).map(lId => ({
-    id: lId,
-    name: leaderMap[lId] || lId,
-    votes: leaderCounts[lId]
-  })).sort((a, b) => b.votes - a.votes);
-
-  const diversity = [];
-
-  Object.keys(stats).forEach(id => {
-    const s = stats[id];
-    if (s.leadersPlayed.size > 0) diversity.push({ playerName: s.playerName, differentLeaders: s.leadersPlayed.size });
-  });
-
-  diversity.sort((a, b) => b.differentLeaders - a.differentLeaders || a.playerName.localeCompare(b.playerName));
-
-  // Opponent Counts
-  const opponentVotes = ss.getSheetByName(SHEETS.OPPONENT_VOTES) ? 
-    ss.getSheetByName(SHEETS.OPPONENT_VOTES).getDataRange().getValues().slice(1) : [];
-  
-  const opponentCounts = {};
-  opponentVotes.forEach(r => {
-    if (String(r[1]) === targetSeasonId) {
-      const pId = String(r[3]);
-      if (pId) opponentCounts[pId] = (opponentCounts[pId] || 0) + 1;
-    }
-  });
-
-  const opponentLeaderboard = Object.keys(opponentCounts).map(pId => ({
-    id: pId,
-    name: playerMap[pId] || pId,
-    votes: opponentCounts[pId]
-  })).sort((a, b) => b.votes - a.votes);
-
-  // Obfuscate the favorite-opponent identities while the season is still the
-  // active one, so real names never leave the server until the season ends.
-  // Codenames are assigned by rank, mirroring the old frontend display.
-  if (isCurrentActiveSeason) {
-    const callsigns = [
-      'Gold Leader',
-      'Green Leader',
-      'Red Leader',
-      'Blade Eleven',
-      'Rogue One',
-      'Phoenix Leader'
-    ];
-    opponentLeaderboard.forEach((entry, index) => {
-      entry.name = callsigns[index] || `Vanguard-${index + 1}`;
+  // Awards already recorded for the target season (written at season close).
+  // Only filled rows count; an empty placeholder falls through to the failover
+  // below so the board can still show a live value.
+  const seasonAwards = {};
+  const awardsSheet = ss.getSheetByName(SHEETS.AWARDS);
+  if (awardsSheet && awardsSheet.getLastRow() > 1) {
+    awardsSheet.getDataRange().getValues().slice(1).forEach(r => {
+      if (String(r[0]) !== targetSeasonId) return;
+      const award = String(r[1] || '');
+      const pid = String(r[2] || '').trim();
+      if (award && pid) {
+        if (!seasonAwards[award]) seasonAwards[award] = [];
+        seasonAwards[award].push(pid);
+      }
     });
   }
 
-  const rankedMostPlayed = assignStandardRanks(leaderLeaderboard, 'votes');
-  const rankedDiversity = assignStandardRanks(diversity, 'differentLeaders');
-  const rankedOpponents = assignStandardRanks(opponentLeaderboard, 'votes');
+  // Vote-based tallies feeding the failovers and the tracked stats.
+  const leaderCounts = {};
+  const playerLeaders = {};
+  const lvSheet = ss.getSheetByName(SHEETS.LEADER_VOTES);
+  if (lvSheet && lvSheet.getLastRow() > 1) {
+    lvSheet.getDataRange().getValues().slice(1).forEach(r => {
+      if (String(r[1]) !== targetSeasonId) return;
+      const lId = String(r[4]);
+      const pId = String(r[3]);
+      if (lId) leaderCounts[lId] = (leaderCounts[lId] || 0) + 1;
+      if (pId && lId) {
+        if (!playerLeaders[pId]) playerLeaders[pId] = new Set();
+        playerLeaders[pId].add(lId);
+      }
+    });
+  }
+
+  const opponentCounts = {};
+  const ovSheet = ss.getSheetByName(SHEETS.OPPONENT_VOTES);
+  if (ovSheet && ovSheet.getLastRow() > 1) {
+    ovSheet.getDataRange().getValues().slice(1).forEach(r => {
+      if (String(r[1]) === targetSeasonId) {
+        const pId = String(r[3]);
+        if (pId) opponentCounts[pId] = (opponentCounts[pId] || 0) + 1;
+      }
+    });
+  }
+
+  // Ranks a raw { id -> count } tally and formats each entry for the UI.
+  function rankedBoard(counts, toEntry, formatScore) {
+    return assignStandardRanks(
+      Object.keys(counts)
+        .map(k => toEntry(k))
+        .sort((a, b) => b.count - a.count),
+      'count'
+    ).map(e => ({ id: e.id, name: e.name, displayRank: e.displayRank, score: formatScore(e), subtitle: null }));
+  }
+
+  const leaderLeaderboard = rankedBoard(
+    leaderCounts,
+    (lId) => ({ id: lId, name: leaderMap[lId] || lId, count: leaderCounts[lId] }),
+    (e) => `${e.count} Plays`
+  );
+
+  // The vote-failover sources for Schemer / Ambassador.
+  const schemerCounts = {};
+  Object.keys(playerLeaders).forEach(pId => {
+    if (playerLeaders[pId].size > 0) schemerCounts[pId] = playerLeaders[pId].size;
+  });
+  const schemerFailover = rankedBoard(
+    schemerCounts,
+    (pid) => ({ id: pid, name: playerMap[pid] || `Unknown (${pid})`, count: schemerCounts[pid] }),
+    (e) => `${e.count} Leaders`
+  );
+  const ambassadorFailover = rankedBoard(
+    opponentCounts,
+    (pid) => ({ id: pid, name: playerMap[pid] || pid, count: opponentCounts[pid] }),
+    (e) => `${e.count} Votes`
+  );
+
+  // Awards-first: when the season has a filled award row its winner(s) render
+  // as "Awarded"; otherwise the section falls back to the live/vote source.
+  function awardedEntries(award) {
+    const ids = seasonAwards[award];
+    if (!ids || ids.length === 0) return null;
+    return assignStandardRanks(
+      ids.map(id => ({ id: id, name: playerMap[id] || id, count: 1 })),
+      'count'
+    ).map(e => ({ id: e.id, name: e.name, displayRank: e.displayRank, score: 'Awarded', subtitle: 'Awarded' }));
+  }
+
+  // Galactic Schemer: most distinct leaders played (vote failover).
+  const schemer = awardedEntries(AWARD_NAMES.SCHEMER) || schemerFailover;
+
+  // Galactic Ambassador: most favorite-opponent votes; identities stay
+  // codenames while the season is live, real names are revealed the moment
+  // voting closes.
+  let ambassador = awardedEntries(AWARD_NAMES.AMBASSADOR);
+  if (!ambassador) {
+    ambassador = ambassadorFailover.map(e => ({ ...e }));
+    if (isLive) {
+      const callsigns = [
+        'Gold Leader',
+        'Green Leader',
+        'Red Leader',
+        'Blade Eleven',
+        'Rogue One',
+        'Phoenix Leader'
+      ];
+      ambassador.forEach((entry, index) => {
+        entry.name = callsigns[index] || `Vanguard-${index + 1}`;
+      });
+    }
+  }
+
+  // Site-based awards. The round that drives them is the settings week while
+  // the target is the live active season; once the season has ended (or it is
+  // historical) we use the final round, because CURRENT_WEEK belongs to the
+  // active season only. "Season Ended" parses to 1, so it can never be
+  // distinguished from week 1 numerically — hence the closed->final round rule.
+  const seasonNumber = parseInt(targetSeasonId.replace(/\D/g, ''), 10) || null;
+  const midRound = seasonLength > 0 ? Math.floor(seasonLength / 2) : 0;
+  const failoverRound = isLive && weekInSeason ? currentWeek : seasonLength;
+
+  function fetchRankOneEntries(roundNumber) {
+    if (!seasonNumber || !roundNumber) return null;
+    const standings = fetchSeasonStandings(seasonNumber, roundNumber);
+    if (!standings || standings.length === 0) return null;
+    const topRank = Math.min(...standings.map(s => s.rank));
+    if (topRank === Infinity || topRank <= 0) return null;
+    const entries = standings
+      .filter(s => s.rank === topRank)
+      .map(s => resolveSiteEntry(s))
+      .filter(Boolean)
+      .map(id => ({ id: id, name: playerMap[id] || id, score: `Rank #${topRank}`, subtitle: null }));
+    return entries.length ? entries : null;
+  }
+
+  function fetchNewHopeEntries(mid, fin) {
+    if (!seasonNumber || !mid) return null;
+    const midStandings = fetchSeasonStandings(seasonNumber, mid);
+    const finStandings = fetchSeasonStandings(seasonNumber, fin || mid);
+    if (!midStandings || !finStandings || midStandings.length === 0 || finStandings.length === 0) return null;
+    const midRank = {};
+    midStandings.forEach(s => { midRank[String(s.username || s.name)] = s.rank; });
+    const climbs = finStandings
+      .filter(s => s.username && midRank[String(s.username)] !== undefined)
+      .map(s => ({ entry: s, climbed: midRank[String(s.username)] - s.rank }));
+    if (climbs.length === 0) return null;
+    const best = Math.max(...climbs.map(c => c.climbed));
+    if (best <= 0) return null;
+    const entries = climbs
+      .filter(c => c.climbed === best)
+      .map(c => resolveSiteEntry(c.entry))
+      .filter(Boolean)
+      .map(id => ({ id: id, name: playerMap[id] || id, score: `+${best} Climb`, subtitle: null }));
+    return entries.length ? entries : null;
+  }
+
+  // Galactic Ruler: site rank-1 for the current week while live, the final
+  // round once the season has ended.
+  let ruler = awardedEntries(AWARD_NAMES.RULER);
+  if (!ruler) ruler = fetchRankOneEntries(failoverRound);
+
+  // A New Hope: most places climbed between the midpoint round and the
+  // comparison round. Live tracking starts the week after the midpoint
+  // (`floor(SEASON_LENGTH / 2) + 1`); closed/historical seasons use the final
+  // round.
+  let newHope = awardedEntries(AWARD_NAMES.HOPE);
+  if (!newHope && seasonLength > 0) {
+    const liveReady = isLive && weekInSeason && currentWeek >= midRound + 1;
+    if (!isLive || liveReady) {
+      newHope = fetchNewHopeEntries(midRound, failoverRound);
+    }
+  }
+
+  // Bounty Hunter exists only in the Awards record (manual entry) and only
+  // after the season has ended; it is never computed from site/vote data.
+  const bountyHunter = isLive ? null : (awardedEntries(AWARD_NAMES.HUNTER) || []);
 
   return {
     success: true,
     seasonId: targetSeasonId,
     seasonName: getSeasonName(targetSeasonId),
-    isActiveSeason: isCurrentActiveSeason,
-    leaderLeaderboard: rankedMostPlayed,
-    opponentLeaderboard: rankedOpponents,
-    diversity: rankedDiversity
+    isActiveSeason: isActiveSeason,
+    leaderLeaderboard: leaderLeaderboard,
+    schemer: schemer,
+    ambassador: ambassador,
+    ruler: ruler,
+    newHope: newHope,
+    bountyHunter: bountyHunter
   };
 }
 
@@ -656,123 +790,148 @@ function advanceLeagueWeek() {
   }
 }
 
+const AWARD_NAMES = {
+  AMBASSADOR: 'Galactic Ambassador',
+  SCHEMER: 'Galactic Schemer',
+  RULER: 'Galactic Ruler',
+  HOPE: 'A New Hope',
+  HUNTER: 'Bounty Hunter'
+};
+
 function calculateSeasonAwards(seasonId) {
   const ss = getSpreadsheet();
   const awardsSheet = ss.getSheetByName(SHEETS.AWARDS);
   if (!awardsSheet) return;
 
-  const seasonNumber = parseInt(String(seasonId).replace(/\D/g, ''), 10) || null;
-  const seasonLength = getSeasonLength();
+  const seasonKey = String(seasonId);
 
   // Idempotency: each award is recorded at most once per season. Re-running the
-  // close (e.g. a retry after the site was unreachable) must not duplicate
-  // already-written awards, but must still be able to fill in awards that were
-  // skipped previously (like the site-based ones).
+  // close never duplicates already-written rows, but a row that is still empty
+  // (site was down, no votes, etc.) can be filled in later by
+  // backfillSeasonAwards rather than by rewriting it here.
   const alreadyWritten = new Set();
   const existingAwardRows = awardsSheet.getDataRange().getValues().slice(1);
   existingAwardRows.forEach(r => {
-    if (String(r[0]) === String(seasonId) && r[1]) alreadyWritten.add(String(r[1]));
+    if (String(r[0]) === seasonKey && r[1]) alreadyWritten.add(String(r[1]));
   });
 
-  const ovRows = ss.getSheetByName(SHEETS.OPPONENT_VOTES) ?
-    ss.getSheetByName(SHEETS.OPPONENT_VOTES).getDataRange().getValues().slice(1) : [];
-  const lvRows = ss.getSheetByName(SHEETS.LEADER_VOTES) ?
-    ss.getSheetByName(SHEETS.LEADER_VOTES).getDataRange().getValues().slice(1) : [];
-
+  const winners = computeAwardWinners(seasonKey);
   const rows = [];
-  const pushWinners = (award, counts) => {
-    // `counts` maps playerId -> score. Record every player tied for the top score.
+
+  // Every award always gets a row: the resolved winner(s) when we have them,
+  // otherwise an empty placeholder [seasonId, award, ''] whose playerId is
+  // filled in later (manually for Bounty Hunter, via backfill for the rest).
+  [
+    AWARD_NAMES.AMBASSADOR,
+    AWARD_NAMES.SCHEMER,
+    AWARD_NAMES.RULER,
+    AWARD_NAMES.HOPE,
+    AWARD_NAMES.HUNTER
+  ].forEach(award => {
     if (alreadyWritten.has(award)) return;
-    const entries = Object.keys(counts);
-    if (entries.length === 0) return;
-    let max = -Infinity;
-    entries.forEach(k => { if (counts[k] > max) max = counts[k]; });
-    if (max <= 0) return;
-    entries
-      .filter(k => counts[k] === max)
-      .forEach(k => rows.push([String(seasonId), award, String(k)]));
+    if (award === AWARD_NAMES.HUNTER) {
+      rows.push([seasonKey, award, '']);
+      return;
+    }
+    const ids = (winners[award] || []).filter(Boolean);
+    if (ids.length === 0) {
+      rows.push([seasonKey, award, '']);
+      return;
+    }
+    ids.forEach(id => rows.push([seasonKey, award, String(id)]));
+  });
+
+  if (rows.length > 0) {
+    awardsSheet.getRange(awardsSheet.getLastRow() + 1, 1, rows.length, 3)
+      .setValues(rows);
+  }
+
+  // Always sweep the other tracked seasons afterwards so that a previous close
+  // that left empty placeholders fine ones now that the site is reachable.
+  // The season that just closed is excluded — its rows were written above.
+  return backfillSeasonAwards(seasonKey, { lockAlreadyHeld: true });
+}
+
+// Computes this season's award winners (nothing is written). Returns
+//   { 'Galactic Ambassador': [playerId, ...], 'Galactic Schemer': [...],
+//     'Galactic Ruler': [...], 'A New Hope': [...] }
+// where each list holds EVERY player tied for the top score, and `[]` means no
+// winner resolved (no votes / site unreachable). Bounty Hunter is never
+// computed — it has no data source and is always manual. Results are memoized
+// per season for the current execution; pass `ctx` ({ cache: {} }) to share one
+// memo across several calls (backfills entire Seasons tab with a single site
+// fetch per season).
+function computeAwardWinners(seasonId, ctx) {
+  const context = ctx || { cache: {} };
+  const key = String(seasonId);
+  if (context.cache[key]) return context.cache[key];
+  const winners = computeAwardWinnersUncached(key);
+  context.cache[key] = winners;
+  return winners;
+}
+
+function computeAwardWinnersUncached(seasonKey) {
+  const ss = getSpreadsheet();
+  const seasonNumber = parseInt(seasonKey.replace(/\D/g, ''), 10) || null;
+  const seasonLength = getSeasonLength();
+
+  const winners = {
+    'Galactic Ambassador': [],
+    'Galactic Schemer': [],
+    'Galactic Ruler': [],
+    'A New Hope': []
   };
 
-  // Galactic Ambassador: player with the most favorite-opponent votes (OpponentVotes col 3 => oppId).
+  // Galactic Ambassador: player with the most favorite-opponent votes.
+  const ovRows = ss.getSheetByName(SHEETS.OPPONENT_VOTES) ?
+    ss.getSheetByName(SHEETS.OPPONENT_VOTES).getDataRange().getValues().slice(1) : [];
   const favCounts = {};
   ovRows.forEach(r => {
-    if (String(r[1]) === String(seasonId)) {
+    if (String(r[1]) === seasonKey) {
       const oppId = String(r[3]);
       if (oppId) favCounts[oppId] = (favCounts[oppId] || 0) + 1;
     }
   });
-  pushWinners('Galactic Ambassador', favCounts);
+  winners['Galactic Ambassador'] = maxKeys(favCounts);
 
   // Galactic Schemer: player with the most distinct leaders played.
-  const distinctLeaders = {};
+  const distinct = {};
+  const lvRows = ss.getSheetByName(SHEETS.LEADER_VOTES) ?
+    ss.getSheetByName(SHEETS.LEADER_VOTES).getDataRange().getValues().slice(1) : [];
   lvRows.forEach(r => {
-    if (String(r[1]) !== String(seasonId)) return;
+    if (String(r[1]) !== seasonKey) return;
     const pId = String(r[3]);
     const lId = String(r[4]);
     if (!pId || !lId) return;
-    if (!distinctLeaders[pId]) distinctLeaders[pId] = new Set();
-    distinctLeaders[pId].add(lId);
+    if (!distinct[pId]) distinct[pId] = new Set();
+    distinct[pId].add(lId);
   });
   const schemerCounts = {};
-  Object.keys(distinctLeaders).forEach(pId => {
-    schemerCounts[pId] = distinctLeaders[pId].size;
-  });
-  pushWinners('Galactic Schemer', schemerCounts);
+  Object.keys(distinct).forEach(pId => { schemerCounts[pId] = distinct[pId].size; });
+  winners['Galactic Schemer'] = maxKeys(schemerCounts);
 
-  // Bounty Hunter: no data source. Prepopulate an empty row for manual
-  // completion (the winner's playerId is entered by hand after this runs).
-  if (!alreadyWritten.has('Bounty Hunter')) {
-    rows.push([String(seasonId), 'Bounty Hunter', '']);
-  }
-
-  // The site-based awards need to map the external standings' playerUsername /
-  // playerName back to our Player ids. Players are matched primarily by melee
-  // name (Players col C), falling back to their display name (col B).
-  const playerIdByMelee = {};
-  const playerIdByName = {};
-  const playerRows = ss.getSheetByName(SHEETS.PLAYERS) ?
-    ss.getSheetByName(SHEETS.PLAYERS).getDataRange().getValues().slice(1) : [];
-  playerRows.forEach(r => {
-    const id = String(r[0]);
-    if (r[2]) playerIdByMelee[String(r[2]).trim().toLowerCase()] = id;
-    if (r[1]) playerIdByName[String(r[1]).trim().toLowerCase()] = id;
-  });
-  const resolvePlayerId = (entry) => {
-    const byMelee = playerIdByMelee[String(entry.username || '').trim().toLowerCase()];
-    if (byMelee) return byMelee;
-    return playerIdByName[String(entry.name || '').trim().toLowerCase()] || null;
-  };
-
-  // Round-based standings can fail if the site is unreachable; in that case the
-  // affected awards are skipped rather than failing the whole close. If an award
-  // is already recorded for this season it is never rewritten; a previously
-  // skipped award can still be filled in on a later run.
+  // Site-based awards. Round-based standings can fail if the site is
+  // unreachable; an empty list just means a placeholder row is written rather
+  // than failing the whole close.
   if (seasonNumber && isFinite(seasonNumber)) {
-    const needRuler = !alreadyWritten.has('Galactic Ruler');
-    const needHope = !alreadyWritten.has('A New Hope');
+    const { resolvePlayerId } = buildPlayerIdResolvers(ss);
 
-    const finalStandings = (needRuler || needHope)
-      ? fetchSeasonStandings(seasonNumber, seasonLength)
-      : null;
+    const finalStandings = fetchSeasonStandings(seasonNumber, seasonLength);
 
-    if (needRuler && finalStandings && finalStandings.length) {
+    if (finalStandings && finalStandings.length) {
       // Galactic Ruler: best final placing (all players tied for rank 1).
       const topRank = Math.min(...finalStandings.map(s => s.rank));
-      if (topRank !== Infinity) {
-        finalStandings
-          .filter(s => s.rank === topRank && topRank > 0)
-          .forEach(s => {
-            const id = resolvePlayerId(s);
-            if (id) rows.push([String(seasonId), 'Galactic Ruler', id]);
-          });
+      if (topRank !== Infinity && topRank > 0) {
+        winners['Galactic Ruler'] = finalStandings
+          .filter(s => s.rank === topRank)
+          .map(s => resolvePlayerId(s))
+          .filter(Boolean);
       }
-    }
 
-    if (needHope) {
-      // A New Hope: most places climbed between the midpoint round and the final
-      // round, counting only players present in both standings.
+      // A New Hope: most places climbed between the midpoint round and the
+      // final round, counting only players present in both standings.
       const midStandings = fetchSeasonStandings(seasonNumber, Math.floor(seasonLength / 2));
-      if (finalStandings && midStandings && finalStandings.length && midStandings.length) {
+      if (midStandings && midStandings.length) {
         const midRank = {};
         midStandings.forEach(s => { midRank[String(s.username || s.name)] = s.rank; });
 
@@ -783,22 +942,117 @@ function calculateSeasonAwards(seasonId) {
         if (climbs.length) {
           const best = Math.max(...climbs.map(c => c.climbed));
           if (best > 0) {
-            climbs
+            winners['A New Hope'] = climbs
               .filter(c => c.climbed === best)
-              .forEach(c => {
-                const id = resolvePlayerId(c.entry);
-                if (id) rows.push([String(seasonId), 'A New Hope', id]);
-              });
+              .map(c => resolvePlayerId(c.entry))
+              .filter(Boolean);
           }
         }
       }
     }
   }
 
-  if (rows.length > 0) {
-    awardsSheet.getRange(awardsSheet.getLastRow() + 1, 1, rows.length, 3)
-      .setValues(rows);
+  return winners;
+}
+
+function maxKeys(counts) {
+  const keys = Object.keys(counts);
+  if (keys.length === 0) return [];
+  let max = -Infinity;
+  keys.forEach(k => { if (counts[k] > max) max = counts[k]; });
+  if (max <= 0) return [];
+  return keys.filter(k => counts[k] === max);
+}
+
+// Builds the site-player -> Players-id resolver used by the award computation:
+// melee name (Players col C == the site's playerUsername) first, then display
+// name (col B). Returns null when there is no match.
+function buildPlayerIdResolvers(ss) {
+  const playerIdByMelee = {};
+  const playerIdByName = {};
+  const playerRows = ss.getSheetByName(SHEETS.PLAYERS) ?
+    ss.getSheetByName(SHEETS.PLAYERS).getDataRange().getValues().slice(1) : [];
+  playerRows.forEach(r => {
+    const id = String(r[0]);
+    if (!id) return;
+    if (r[2]) playerIdByMelee[String(r[2]).trim().toLowerCase()] = id;
+    if (r[1]) playerIdByName[String(r[1]).trim().toLowerCase()] = id;
+  });
+  return {
+    resolvePlayerId: (entry) => {
+      const byMelee = playerIdByMelee[String(entry.username || '').trim().toLowerCase()];
+      if (byMelee) return byMelee;
+      return playerIdByName[String(entry.name || '').trim().toLowerCase()] || null;
+    }
+  };
+}
+
+// Fills any non-Bounty-Hunter award row that still has an empty playerId for a
+// season listed in the Seasons tab, using the same award computation as the
+// close. Bounty Hunter is never touched and filled rows are never rewritten.
+// No arg = sweep every tracked season (Run-button friendly); pass
+// `excludeSeasonId` to skip one (used after a close). Acquires the script lock
+// unless `opts.lockAlreadyHeld` is true (safe when nesting inside
+// advanceLeagueWeek / calculateSeasonAwards, which already hold a lock).
+function backfillSeasonAwards(excludeSeasonId, opts) {
+  const options = opts || {};
+  const lock = LockService.getScriptLock();
+  if (!options.lockAlreadyHeld) lock.waitLock(10000);
+  try {
+    return backfillSeasonAwardsUnlocked(excludeSeasonId);
+  } finally {
+    if (!options.lockAlreadyHeld) lock.releaseLock();
   }
+}
+
+function backfillSeasonAwardsUnlocked(excludeSeasonId) {
+  const ss = getSpreadsheet();
+  const seasonsSheet = ss.getSheetByName(SHEETS.SEASONS);
+  if (!seasonsSheet || seasonsSheet.getLastRow() <= 1) return { scanned: 0, written: 0 };
+
+  const trackedSeasonIds = seasonsSheet.getDataRange().getValues().slice(1)
+    .map(r => String(r[0]).trim())
+    .filter(id => id && id !== String(excludeSeasonId));
+
+  if (trackedSeasonIds.length === 0) return { scanned: 0, written: 0 };
+
+  const awardsSheet = ss.getSheetByName(SHEETS.AWARDS);
+  if (!awardsSheet || awardsSheet.getLastRow() <= 1) return { scanned: 0, written: 0 };
+
+  const ctx = { cache: {} };
+  const rows = awardsSheet.getDataRange().getValues();
+  const fills = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const seasonId = String(rows[i][0]).trim();
+    const award = String(rows[i][1] || '').trim();
+    const playerId = String(rows[i][2] || '').trim();
+
+    if (!seasonId || !award) continue;
+    if (!trackedSeasonIds.includes(seasonId)) continue;
+    if (award === AWARD_NAMES.HUNTER) continue;
+    if (playerId) continue;
+
+    const ids = (computeAwardWinners(seasonId, ctx)[award] || []).filter(Boolean);
+    if (ids.length === 0) continue;
+    fills.push({ rowIndex: i + 1, seasonId: seasonId, award: award, ids: ids });
+  }
+
+  fills.forEach(f => {
+    // The first winner stays in the placeholder row; any additional tied
+    // winners are appended as extra rows (Awards rows are keyed by season + award).
+    awardsSheet.getRange(f.rowIndex, 3).setValue(String(f.ids[0]));
+    const adds = f.ids.slice(1);
+    if (adds.length > 0) {
+      awardsSheet.getRange(awardsSheet.getLastRow() + 1, 1, adds.length, 3)
+        .setValues(adds.map(id => [f.seasonId, f.award, String(id)]));
+    }
+  });
+
+  return {
+    scanned: fills.length,
+    written: fills.reduce((n, f) => n + f.ids.length, 0)
+  };
 }
 
 // Fetches a season's standings for a given round from the SWU league site and

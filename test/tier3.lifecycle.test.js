@@ -48,14 +48,20 @@ describe('calculateSeasonAwards', () => {
       [['S1', 'Galactic Schemer', 'p1']]
     );
     // Bounty Hunter placeholder -> empty playerId
-    assert.ok(
-      normalized.some((r) => r[1] === 'Bounty Hunter' && r[2] === ''),
-      'expected a Bounty Hunter placeholder row with empty playerId'
+    assert.deepEqual(
+      normalized.filter((r) => r[1] === 'Bounty Hunter'),
+      [['S1', 'Bounty Hunter', '']]
     );
     // Galactic Ruler -> p1 (rank 1 is MAlice)
     assert.deepEqual(
       normalized.filter((r) => r[1] === 'Galactic Ruler'),
       [['S1', 'Galactic Ruler', 'p1']]
+    );
+    // Only the final-round URL was given, so the midpoint fetch for A New Hope
+    // fails and it is recorded as an empty placeholder rather than skipped.
+    assert.deepEqual(
+      normalized.filter((r) => r[1] === 'A New Hope'),
+      [['S1', 'A New Hope', '']]
     );
   });
 
@@ -86,9 +92,10 @@ describe('calculateSeasonAwards', () => {
     assert.deepEqual(ruler.map((r) => r[2]).sort(), ['p1', 'p2']);
   });
 
-  test('skips site-based awards for players not present in the Players sheet', () => {
+  test('writes an empty placeholder for site awards with no matching player', () => {
     // A rank-1 player ('Stranger') is on the site but has no melee/name match in
-    // our Players table, so no Galactic Ruler row should be written for them.
+    // our Players table, so Galactic Ruler is recorded as an empty placeholder
+    // rather than a winner row (it is never skipped entirely).
     const env = resetSheets(basicTables(), {
       urlFixtures: {
         [standingsUrl(1, 11)]: standingsHtml([
@@ -98,7 +105,11 @@ describe('calculateSeasonAwards', () => {
     });
     calculateSeasonAwards('S1');
     const labels = env.sheets.Awards.rows.slice(1).map((r) => r[1]);
-    assert.ok(!labels.includes('Galactic Ruler'));
+    assert.ok(labels.includes('Galactic Ruler'));
+    assert.deepEqual(
+      env.sheets.Awards.rows.slice(1).filter((r) => r[1] === 'Galactic Ruler').map((r) => r[2]),
+      ['']
+    );
   });
 
   test('re-running the close does not duplicate award rows', () => {
@@ -116,14 +127,16 @@ describe('calculateSeasonAwards', () => {
     assert.deepEqual(env.sheets.Awards.rows, afterFirst);
   });
 
-  test('a later run fills in previously-skipped site awards without duplicating others', () => {
-    // Simulate a first close where the site was unreachable: the vote-based
-    // awards + Bounty Hunter placeholder were written, but Ruler/NewHope were not.
+  test('backfillSeasonAwards fills empty site awards without duplicating others', () => {
+    // Simulate a close where the site was unreachable: Ruler/NewHope were
+    // written as empty placeholders alongside the vote-based awards.
     const tables = basicTables();
     tables.Awards = [
       ['SEASON_ID', 'AWARD', 'PLAYER_ID'],
       ['S1', 'Galactic Ambassador', 'p1'],
       ['S1', 'Galactic Schemer', 'p1'],
+      ['S1', 'Galactic Ruler', ''],
+      ['S1', 'A New Hope', ''],
       ['S1', 'Bounty Hunter', '']
     ];
     // This time the site is reachable: MAlice is rank 1 at the end and climbed
@@ -139,10 +152,10 @@ describe('calculateSeasonAwards', () => {
       }
     });
 
-    calculateSeasonAwards('S1');
-    const dataRows = env.sheets.Awards.rows.slice(1);
+    const result = backfillSeasonAwards();
+    assert.equal(result.written, 2); // Galactic Ruler + A New Hope filled
 
-    // Site awards are now filled in.
+    const dataRows = env.sheets.Awards.rows.slice(1);
     assert.deepEqual(
       dataRows.filter((r) => r[1] === 'Galactic Ruler'),
       [['S1', 'Galactic Ruler', 'p1']]
@@ -155,6 +168,11 @@ describe('calculateSeasonAwards', () => {
     assert.equal(dataRows.filter((r) => r[1] === 'Galactic Ambassador').length, 1);
     assert.equal(dataRows.filter((r) => r[1] === 'Galactic Schemer').length, 1);
     assert.equal(dataRows.filter((r) => r[1] === 'Bounty Hunter').length, 1);
+
+    // Re-running the sweep is a no-op.
+    const again = backfillSeasonAwards();
+    assert.equal(again.written, 0);
+    assert.deepEqual(env.sheets.Awards.rows.slice(1), dataRows);
   });
 
   test('A New Hope awards the most places climbed between midpoint and final round', () => {
@@ -200,19 +218,30 @@ describe('calculateSeasonAwards', () => {
     assert.deepEqual(hope.map((r) => r[2]).sort(), ['p1', 'p3']);
   });
 
-  test('skips site-based awards and Bounty Hunter is still written when the site is unreachable', () => {
+  test('writes empty placeholders for site awards when the site is unreachable', () => {
     // No round URLs in urlFixtures -> fetchSeasonStandings returns null.
     const env = resetSheets(basicTables());
     calculateSeasonAwards('S1');
-    const labels = env.sheets.Awards.rows.slice(1).map((r) => r[1]);
-    assert.ok(!labels.includes('Galactic Ruler'));
-    assert.ok(!labels.includes('A New Hope'));
-    assert.ok(labels.includes('Galactic Ambassador'));
-    assert.ok(labels.includes('Galactic Schemer'));
-    assert.ok(labels.includes('Bounty Hunter'));
+    const dataRows = env.sheets.Awards.rows.slice(1);
+    const labels = dataRows.map((r) => r[1]);
+    // All five awards get a row.
+    [
+      'Galactic Ambassador',
+      'Galactic Schemer',
+      'Galactic Ruler',
+      'A New Hope',
+      'Bounty Hunter'
+    ].forEach((a) => assert.ok(labels.includes(a), `expected an award row for ${a}`));
+
+    // Vote-based awards resolved; site-based + Bounty Hunter are placeholders.
+    assert.ok(dataRows.some((r) => r[1] === 'Galactic Ambassador' && r[2] === 'p1'));
+    assert.ok(dataRows.some((r) => r[1] === 'Galactic Schemer' && r[2] === 'p1'));
+    assert.ok(dataRows.some((r) => r[1] === 'Galactic Ruler' && r[2] === ''));
+    assert.ok(dataRows.some((r) => r[1] === 'A New Hope' && r[2] === ''));
+    assert.ok(dataRows.some((r) => r[1] === 'Bounty Hunter' && r[2] === ''));
   });
 
-  test('writes Bounty Hunter placeholder even when a season has no votes at all', () => {
+  test('writes all five placeholder rows when a season has no votes and the site is unreachable', () => {
     const tables = basicTables();
     tables.LeaderVotes = [['TS', 'SEASON_ID', 'WEEK', 'PLAYER_ID', 'LEADER_ID']];
     tables.OpponentVotes = [['TS', 'SEASON_ID', 'WEEK', 'OPPONENT_ID']];
@@ -220,9 +249,117 @@ describe('calculateSeasonAwards', () => {
 
     calculateSeasonAwards('S1');
     const rows = env.sheets.Awards.rows.slice(1);
-    // Only the Bounty Hunter placeholder is written (no vote-based winners).
-    assert.equal(rows.length, 1);
-    assert.deepEqual(rows[0], ['S1', 'Bounty Hunter', '']);
+    assert.equal(rows.length, 5);
+    rows.forEach((r) => {
+      assert.equal(r[2], '');
+    });
+    assert.deepEqual(
+      rows.map((r) => r[1]),
+      ['Galactic Ambassador', 'Galactic Schemer', 'Galactic Ruler', 'A New Hope', 'Bounty Hunter']
+    );
+  });
+
+  test('backfillSeasonAwards only sweeps seasons listed in the Seasons tab', () => {
+    const tables = basicTables(); // Seasons: S1, S2
+    tables.Awards = [
+      ['SEASON_ID', 'AWARD', 'PLAYER_ID'],
+      ['S1', 'Galactic Ruler', ''],
+      ['S9', 'Galactic Ruler', '']
+    ];
+    const env = resetSheets(tables, {
+      urlFixtures: {
+        [standingsUrl(1, 11)]: standingsHtml([{ user: 'MAlice', name: 'Alice', rank: 1 }])
+      }
+    });
+
+    backfillSeasonAwards();
+
+    const rows = env.sheets.Awards.rows.slice(1);
+    assert.deepEqual(
+      rows.find((r) => r[0] === 'S1'),
+      ['S1', 'Galactic Ruler', 'p1']
+    );
+    // S9 is not tracked in Seasons -> untouched.
+    assert.deepEqual(
+      rows.find((r) => r[0] === 'S9'),
+      ['S9', 'Galactic Ruler', '']
+    );
+  });
+
+  test('backfillSeasonAwards never writes Bounty Hunter', () => {
+    const tables = basicTables();
+    tables.Awards = [
+      ['SEASON_ID', 'AWARD', 'PLAYER_ID'],
+      ['S1', 'Bounty Hunter', '']
+    ];
+    const env = resetSheets(tables, {
+      urlFixtures: {
+        [standingsUrl(1, 11)]: standingsHtml([{ user: 'MAlice', name: 'Alice', rank: 1 }])
+      }
+    });
+
+    const result = backfillSeasonAwards();
+    assert.equal(result.written, 0);
+    assert.deepEqual(env.sheets.Awards.rows.slice(1), [['S1', 'Bounty Hunter', '']]);
+  });
+
+  test('backfillSeasonAwards expands tied winners into multiple rows', () => {
+    const tables = basicTables();
+    tables.Awards = [
+      ['SEASON_ID', 'AWARD', 'PLAYER_ID'],
+      ['S1', 'Galactic Ruler', '']
+    ];
+    const env = resetSheets(tables, {
+      urlFixtures: {
+        [standingsUrl(1, 11)]: standingsHtml([
+          { user: 'MAlice', name: 'Alice', rank: 1 },
+          { user: 'MBob', name: 'Bob', rank: 1 }
+        ])
+      }
+    });
+
+    const result = backfillSeasonAwards();
+    assert.equal(result.written, 2);
+    const rulerRows = env.sheets.Awards.rows.slice(1).filter((r) => r[1] === 'Galactic Ruler');
+    assert.deepEqual(rulerRows.map((r) => r[2]).sort(), ['p1', 'p2']);
+  });
+
+  test('close auto-sweeps empty award rows for the other tracked seasons', () => {
+    // S2 closes now; S1 previously closed with an empty Ruler placeholder that
+    // is resolvable once the site is back up.
+    const tables = basicTables();
+    tables.Settings = [
+      ['KEY', 'VALUE'],
+      ['ACTIVE_SEASON_ID', 'S2'],
+      ['CURRENT_WEEK', 'Week 11'],
+      ['VOTING_OPEN', 'TRUE'],
+      ['SEASON_LENGTH', '11']
+    ];
+    tables.Awards = [
+      ['SEASON_ID', 'AWARD', 'PLAYER_ID'],
+      ['S1', 'Galactic Ruler', '']
+    ];
+    const env = resetSheets(tables, {
+      urlFixtures: {
+        [standingsUrl(1, 11)]: standingsHtml([{ user: 'MBob', name: 'Bob', rank: 1 }]),
+        [standingsUrl(2, 11)]: standingsHtml([{ user: 'MAlice', name: 'Alice', rank: 1 }])
+      }
+    });
+
+    const res = advanceLeagueWeek();
+    assert.equal(res.message, 'Season 11 completed, voting closed, awards calculated.');
+
+    const dataRows = env.sheets.Awards.rows.slice(1);
+    // S1's empty Ruler was filled by the auto-sweep (Bob).
+    assert.deepEqual(
+      dataRows.find((r) => r[0] === 'S1' && r[1] === 'Galactic Ruler'),
+      ['S1', 'Galactic Ruler', 'p2']
+    );
+    // S2's own award set was written by the close (Ruler = Alice).
+    assert.deepEqual(
+      dataRows.find((r) => r[0] === 'S2' && r[1] === 'Galactic Ruler'),
+      ['S2', 'Galactic Ruler', 'p1']
+    );
   });
 });
 
@@ -297,7 +434,8 @@ describe('advanceLeagueWeek', () => {
     const settings = getSettings();
     assert.equal(settings.VOTING_OPEN, 'FALSE');
     assert.equal(settings.CURRENT_WEEK, 'Season Ended');
-    // Award rows: Bounty Hunter placeholder + Galactic Ambassador p3.
+    // Awards: all five rows written; no site fixtures -> Ruler/NewHope are
+    // placeholders alongside the Bounty Hunter placeholder.
     const dataRows = env.sheets.Awards.rows.slice(1);
     assert.deepEqual(
       dataRows.find((r) => r[1] === 'Galactic Ambassador'),
@@ -306,6 +444,14 @@ describe('advanceLeagueWeek', () => {
     assert.deepEqual(
       dataRows.find((r) => r[1] === 'Bounty Hunter'),
       ['S2', 'Bounty Hunter', '']
+    );
+    assert.deepEqual(
+      dataRows.find((r) => r[1] === 'Galactic Ruler'),
+      ['S2', 'Galactic Ruler', '']
+    );
+    assert.deepEqual(
+      dataRows.find((r) => r[1] === 'A New Hope'),
+      ['S2', 'A New Hope', '']
     );
   });
 

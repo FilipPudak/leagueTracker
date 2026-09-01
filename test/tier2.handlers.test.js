@@ -9,6 +9,16 @@ function freshTables() {
   return basicTables();
 }
 
+// Helpers to stub SWU site standings pages (same format as tier3).
+const BASE = 'https://stockholm.sw-unlimited.com/';
+const standingsUrl = (seasonNumber, roundNumber) => `${BASE}season/${seasonNumber}/round/${roundNumber}`;
+function standingsHtml(players) {
+  const arr = players
+    .map((p) => `{id:0,roundId:0,playerUsername:"${p.user}",playerName:"${p.name}",rank:${p.rank},points:0}`)
+    .join(',');
+  return `<html>foo standings:[${arr}],seasonWinCounts:{} bar</html>`;
+}
+
 // Load the backend once into the host realm; swap sheets per test below.
 loadBackend();
 
@@ -260,45 +270,195 @@ describe('handleGetLeaderboardData', () => {
     env = resetSheets(freshTables());
   });
 
-  test('builds leader/opponent/diversity boards for a season', () => {
+  test('builds leader/ambassador/schemer boards for a closed season', () => {
     const res = handleGetLeaderboardData('S1');
     assert.equal(res.success, true);
     assert.equal(res.seasonId, 'S1');
     assert.equal(res.isActiveSeason, false);
 
-    // S1 leader votes: l1 once (p1), l2 twice (p2, p1). So l2 tops with 2 votes.
+    // S1 leader votes: l1 once (p1), l2 twice (p2, p1). So l2 tops with 2 plays.
     const topLeader = res.leaderLeaderboard[0];
     assert.equal(topLeader.name, 'Han Solo - R');
-    assert.equal(topLeader.votes, 2);
+    assert.equal(topLeader.score, '2 Plays');
     assert.equal(topLeader.displayRank, 1);
 
-    // Opponents: p2 chosen by p1; p1 chosen by p2 -> tie at 1 each.
-    assert.equal(res.opponentLeaderboard.length, 2);
-    assert.equal(res.opponentLeaderboard[0].votes, 1);
-    assert.equal(res.opponentLeaderboard[1].votes, 1);
-    // Ended season: real names are revealed (not obfuscated).
-    const oppNames = res.opponentLeaderboard.map((o) => o.name).sort();
-    assert.deepEqual(oppNames, ['Alice', 'Bob']);
+    // Ambassadors (vote fallback): p2 chosen by p1; p1 chosen by p2 -> tie at
+    // 1 each. Real names, because the season is closed.
+    assert.equal(res.ambassador.length, 2);
+    assert.equal(res.ambassador[0].score, '1 Votes');
+    const ambNames = res.ambassador.map((o) => o.name).sort();
+    assert.deepEqual(ambNames, ['Alice', 'Bob']);
 
-    // Diversity (Galactic Schemer basis): p1 played {l1,l2}, p2 {l2} -> p1 has 2 different leaders.
-    const div = res.diversity.filter((d) => d.playerName === 'Alice')[0];
-    assert.equal(div.differentLeaders, 2);
+    // Schemer (vote fallback): p1 played {l1,l2}, p2 {l2} -> p1 tops.
+    assert.equal(res.schemer[0].name, 'Alice');
+    assert.equal(res.schemer[0].score, '2 Leaders');
+
+    // No Awards rows for S1 and no site URLs -> site sections stay hidden.
+    assert.equal(res.ruler, null);
+    assert.equal(res.newHope, null);
+    // Bounty Hunter is shown (empty until manually filled) once closed.
+    assert.deepEqual(res.bountyHunter, []);
 
     // Loyalty was removed from the response.
     assert.equal(res.loyalty, undefined);
   });
 
-  test('defaults to the active season when none is requested', () => {
+  test('defaults to the active season when none is requested (live obfuscation)', () => {
     // Give the active season S2 some opponent votes to verify obfuscation.
     env.sheets.OpponentVotes.appendRow(['2026-01-01', 'S2', 3, 'p3']);
     env.sheets.OpponentVotes.appendRow(['2026-01-01', 'S2', 3, 'p3']);
     const res = handleGetLeaderboardData(undefined);
     assert.equal(res.seasonId, 'S2');
     assert.equal(res.isActiveSeason, true);
-    // Active season favorite opponents are obfuscated with codenames, not real names.
-    assert.equal(res.opponentLeaderboard.length, 1);
-    assert.equal(res.opponentLeaderboard[0].name, 'Gold Leader');
-    assert.equal(res.opponentLeaderboard[0].votes, 2);
+    // Live: favorite opponents are codenames, not real names.
+    assert.equal(res.ambassador.length, 1);
+    assert.equal(res.ambassador[0].name, 'Gold Leader');
+    assert.equal(res.ambassador[0].score, '2 Votes');
+    // No site fixtures -> live site sections hidden; Bounty Hunter hidden live.
+    assert.equal(res.ruler, null);
+    assert.equal(res.newHope, null);
+    assert.equal(res.bountyHunter, null);
+  });
+
+  test('live Galactic Ruler comes from the current-week standings', () => {
+    // S2 is the active season at Week 3 with voting open -> Ruler reads round 3.
+    resetSheets(freshTables(), {
+      urlFixtures: {
+        [standingsUrl(2, 3)]: standingsHtml([
+          { user: 'MAlice', name: 'Alice', rank: 1 },
+          { user: 'MBob', name: 'Bob', rank: 2 }
+        ])
+      }
+    });
+    const res = handleGetLeaderboardData('S2');
+    assert.equal(res.ruler.length, 1);
+    assert.equal(res.ruler[0].name, 'Alice');
+    assert.equal(res.ruler[0].score, 'Rank #1');
+    // Week 3 is before the midpoint+1 gate, so A New Hope stays hidden.
+    assert.equal(res.newHope, null);
+  });
+
+  test('A New Hope appears only after the midpoint+1 week', () => {
+    const fixtures = {
+      [standingsUrl(2, 5)]: standingsHtml([
+        { user: 'MAlice', name: 'Alice', rank: 3 },
+        { user: 'MBob', name: 'Bob', rank: 1 }
+      ]),
+      [standingsUrl(2, 6)]: standingsHtml([
+        { user: 'MAlice', name: 'Alice', rank: 1 },
+        { user: 'MBob', name: 'Bob', rank: 1 }
+      ])
+    };
+
+    // Week 5 (the midpoint): the mid+1 gate is not reached -> hidden.
+    const week5Tables = freshTables();
+    week5Tables.Settings[2] = ['CURRENT_WEEK', 'Week 5'];
+    resetSheets(week5Tables, { urlFixtures: fixtures });
+    assert.equal(handleGetLeaderboardData('S2').newHope, null);
+
+    // Week 6 (midpoint + 1): A New Hope is now tracked.
+    const week6Tables = freshTables();
+    week6Tables.Settings[2] = ['CURRENT_WEEK', 'Week 6'];
+    resetSheets(week6Tables, { urlFixtures: fixtures });
+    const week6 = handleGetLeaderboardData('S2');
+    assert.equal(week6.newHope.length, 1);
+    assert.equal(week6.newHope[0].name, 'Alice');
+    assert.equal(week6.newHope[0].score, '+2 Climb');
+  });
+
+  test('reveals real names the moment voting closes while still the active season', () => {
+    const tables = freshTables();
+    tables.Settings[2] = ['CURRENT_WEEK', 'Season Ended'];
+    tables.Settings[3] = ['VOTING_OPEN', 'FALSE'];
+    tables.OpponentVotes.push(['2026-01-01', 'S2', 11, 'p3']);
+    tables.OpponentVotes.push(['2026-01-01', 'S2', 11, 'p3']);
+    resetSheets(tables);
+    const res = handleGetLeaderboardData('S2');
+    assert.equal(res.isActiveSeason, true);
+    assert.equal(res.ambassador[0].name, 'Cara');
+    assert.equal(res.ambassador[0].score, '2 Votes');
+    // Closed -> Bounty Hunter section appears (empty until manually filled).
+    assert.deepEqual(res.bountyHunter, []);
+  });
+
+  test('awards-first: a filled award row overrides the vote-based section', () => {
+    const tables = freshTables();
+    tables.Awards.push(['S1', 'Galactic Ambassador', 'p3']);
+    tables.Awards.push(['S1', 'Galactic Schemer', 'p2']);
+    resetSheets(tables);
+    const res = handleGetLeaderboardData('S1');
+    assert.equal(res.ambassador.length, 1);
+    assert.equal(res.ambassador[0].name, 'Cara');
+    assert.equal(res.ambassador[0].score, 'Awarded');
+    assert.equal(res.ambassador[0].subtitle, 'Awarded');
+    assert.equal(res.schemer.length, 1);
+    assert.equal(res.schemer[0].name, 'Bob');
+    assert.equal(res.schemer[0].score, 'Awarded');
+  });
+
+  test('filled site-award rows override the live board even before the gate', () => {
+    const tables = freshTables();
+    tables.Settings[2] = ['CURRENT_WEEK', 'Week 2'];
+    tables.Awards.push(['S2', 'Galactic Ruler', 'p3']);
+    tables.Awards.push(['S2', 'A New Hope', 'p1']);
+    resetSheets(tables);
+    const res = handleGetLeaderboardData('S2');
+    assert.equal(res.isActiveSeason, true);
+    assert.equal(res.ruler[0].name, 'Cara');
+    assert.equal(res.newHope[0].name, 'Alice');
+  });
+
+  test('historical failover uses the final round, not the active season week', () => {
+    // Active season is S2 at week 3; viewing S1 must read round 11 (final).
+    // Round 3 rank 1 is Bob (would win if we wrongly read the settings week).
+    const fixtures = {
+      [standingsUrl(1, 3)]: standingsHtml([
+        { user: 'MBob', name: 'Bob', rank: 1 }
+      ]),
+      [standingsUrl(1, 5)]: standingsHtml([
+        { user: 'MAlice', name: 'Alice', rank: 3 },
+        { user: 'MBob', name: 'Bob', rank: 1 }
+      ]),
+      [standingsUrl(1, 11)]: standingsHtml([
+        { user: 'MAlice', name: 'Alice', rank: 1 },
+        { user: 'MBob', name: 'Bob', rank: 2 }
+      ])
+    };
+    resetSheets(freshTables(), { urlFixtures: fixtures });
+    const res = handleGetLeaderboardData('S1');
+
+    // Ruler = final round rank 1 (Alice), NOT round 3's rank 1 (Bob).
+    assert.equal(res.ruler.length, 1);
+    assert.equal(res.ruler[0].name, 'Alice');
+    // A New Hope compares midpoint round 5 vs final round 11.
+    assert.equal(res.newHope.length, 1);
+    assert.equal(res.newHope[0].name, 'Alice');
+    assert.equal(res.newHope[0].score, '+2 Climb');
+  });
+
+  test('site outage leaves the site-based sections hidden but keeps the board up', () => {
+    // No URL fixtures -> fetch throws -> the leaderboard still succeeds.
+    const res = handleGetLeaderboardData('S1');
+    assert.equal(res.success, true);
+    assert.equal(res.ruler, null);
+    assert.equal(res.newHope, null);
+    assert.ok(res.schemer.length > 0);
+  });
+
+  test('Bounty Hunter is hidden live and appears only after the season ends', () => {
+    // Live: hidden.
+    assert.equal(handleGetLeaderboardData('S2').bountyHunter, null);
+
+    // After close, with a manually-filled row: shown as an award.
+    const tables = freshTables();
+    tables.Settings[2] = ['CURRENT_WEEK', 'Season Ended'];
+    tables.Settings[3] = ['VOTING_OPEN', 'FALSE'];
+    tables.Awards.push(['S2', 'Bounty Hunter', 'p1']);
+    resetSheets(tables);
+    const res = handleGetLeaderboardData('S2');
+    assert.equal(res.bountyHunter.length, 1);
+    assert.equal(res.bountyHunter[0].name, 'Alice');
+    assert.equal(res.bountyHunter[0].score, 'Awarded');
   });
 });
 
