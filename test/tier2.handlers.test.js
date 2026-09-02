@@ -185,6 +185,30 @@ describe('handleLinkGoogleAccount', () => {
     assert.throws(() => handleLinkGoogleAccount('', 'x@x.com'), /Missing Player Selection/);
     assert.throws(() => handleLinkGoogleAccount('p3', ''), /Missing Player Selection/);
   });
+
+  test('returns votingOpen in the response (open when voting is open)', () => {
+    const res = handleLinkGoogleAccount('p3', 'cara@x.com');
+    assert.equal(res.success, true);
+    assert.equal(res.votingOpen, true);
+  });
+
+  test('returns votingOpen:false when voting is closed', () => {
+    const tables = freshTables();
+    tables.Settings[3] = ['VOTING_OPEN', 'FALSE'];
+    resetSheets(tables);
+    const res = handleLinkGoogleAccount('p3', 'cara@x.com');
+    assert.equal(res.success, true);
+    assert.equal(res.votingOpen, false);
+  });
+
+  test('returns votingOpen on the already-linked (no-op) path too', () => {
+    const tables = freshTables();
+    tables.Settings[3] = ['VOTING_OPEN', 'FALSE'];
+    resetSheets(tables);
+    const res = handleLinkGoogleAccount('p1', 'alice@x.com');
+    assert.equal(res.linkedPlayer.id, 'p1');
+    assert.equal(res.votingOpen, false);
+  });
 });
 
 describe('handleSubmitVote', () => {
@@ -545,6 +569,78 @@ describe('handleGetLeaderboardData', () => {
     assert.equal(res.bountyHunter.length, 1);
     assert.equal(res.bountyHunter[0].name, 'Alice');
     assert.equal(res.bountyHunter[0].score, null);
+  });
+
+  test('reads the Awards sheet exactly once for all five stored awards', () => {
+    // Five stored podium blocks are read from a SINGLE Awards data read rather
+    // than one full read per award (was 10 reads per leaderboard request).
+    const tables = freshTables();
+    tables.Awards.push(['S1', 'Galactic Ruler', 'p1', 67]);
+    tables.Awards.push(['S1', 'A New Hope', 'p1', 5]);
+    tables.Awards.push(['S1', 'Galactic Schemer', 'p2', 3]);
+    tables.Awards.push(['S1', 'Galactic Ambassador', 'p3', 2]);
+    tables.Awards.push(['S1', 'Bounty Hunter', 'p2', 8]);
+    const env = resetSheets(tables);
+    handleGetLeaderboardData('S1');
+    assert.equal(env.sheets.Awards._dataRangeCalls(), 1, 'Awards data range read once');
+  });
+
+  test('does not scan vote sheets for stored awards but keeps the live leader board', () => {
+    // With Schemer+Ambassador blocks materialized, the OpponentVotes scan and
+    // the Schemer distinct-leader tally are skipped; LeaderVotes is still read
+    // because the Most-Played leader board is always live.
+    const tables = freshTables();
+    tables.Awards.push(['S1', 'Galactic Schemer', 'p2', 3]);
+    tables.Awards.push(['S1', 'Galactic Ambassador', 'p3', 2]);
+    const env = resetSheets(tables);
+    const beforeLeaders = env.sheets.LeaderVotes._dataRangeCalls();
+    const beforeOpponents = env.sheets.OpponentVotes._dataRangeCalls();
+    const res = handleGetLeaderboardData('S1');
+    assert.ok(res.ambassador.length > 0, 'stored ambassador used');
+    assert.ok(res.schemer.length > 0, 'stored schemer used');
+    // Only the LeaderVotes scan happened during this request; OpponentVotes
+    // and the Schemer tally must not have been scanned for the stored awards.
+    assert.equal(
+      env.sheets.OpponentVotes._dataRangeCalls() - beforeOpponents,
+      0,
+      'OpponentVotes not scanned when Ambassador block exists'
+    );
+    assert.equal(env.sheets.LeaderVotes._dataRangeCalls() - beforeLeaders, 1);
+  });
+
+  test('Bounty Hunter shows the owner-filled score as "N Bounties"', () => {
+    const tables = freshTables();
+    tables.Settings[2] = ['CURRENT_WEEK', 'Season Ended'];
+    tables.Settings[3] = ['VOTING_OPEN', 'FALSE'];
+    tables.Awards.push(['S2', 'Bounty Hunter', 'p2', 8]);
+    tables.Awards.push(['S2', 'Bounty Hunter', 'p4', 4]);
+    resetSheets(tables);
+    const res = handleGetLeaderboardData('S2');
+    assert.equal(res.bountyHunter.length, 2);
+    assert.equal(res.bountyHunter[0].name, 'Bob');
+    assert.equal(res.bountyHunter[0].score, '8 Bounties');
+    assert.equal(res.bountyHunter[1].score, '4 Bounties');
+  });
+
+  test('live fallback memoizes site fetches (one fetch per distinct round)', () => {
+    // S1 historical failover: Ruler reads round 11; New Hope reads midpoint
+    // round 5 and round 11. Round 11 is shared, so with per-request memoization
+    // the site is hit once per distinct round (2 fetches), not 3.
+    const fixtures = {
+      [standingsUrl(1, 5)]: standingsHtml([
+        { user: 'MAlice', name: 'Alice', rank: 3 },
+        { user: 'MBob', name: 'Bob', rank: 1 }
+      ]),
+      [standingsUrl(1, 11)]: standingsHtml([
+        { user: 'MAlice', name: 'Alice', rank: 1, points: 67 },
+        { user: 'MBob', name: 'Bob', rank: 2, points: 60 }
+      ])
+    };
+    const env = resetSheets(freshTables(), { urlFixtures: fixtures });
+    const res = handleGetLeaderboardData('S1', { cache: {} });
+    assert.equal(env.state.siteFetches, 2, 'each distinct round fetched once');
+    assert.equal(res.ruler.length, 2);
+    assert.equal(res.newHope.length, 1);
   });
 });
 

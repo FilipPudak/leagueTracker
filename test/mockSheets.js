@@ -10,13 +10,16 @@
 
 function makeSheet(headerAndRows) {
   const grid = headerAndRows.map((row) => row.slice());
+  let dataRangeCalls = 0;
 
   return {
     _grid: grid,
+    _dataRangeCalls: () => dataRangeCalls,
     getLastRow() {
       return grid.length;
     },
     getDataRange() {
+      dataRangeCalls++;
       return {
         getValues() {
           return grid.map((row) => row.slice());

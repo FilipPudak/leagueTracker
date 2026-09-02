@@ -440,6 +440,9 @@
           if (res.alreadyVoted) {
             document.getElementById('vote-form').style.display = 'none';
             document.getElementById('already-voted-card').style.display = 'block';
+          } else if (!res.votingOpen) {
+            document.getElementById('vote-form').style.display = 'none';
+            showStatus('Voting is currently closed for this week.', false);
           } else {
             populateVotingDropdowns(res.leaders, res.players, appState.linkedPlayer.id);
           }

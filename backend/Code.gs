@@ -393,7 +393,7 @@ function handleLinkGoogleAccount(playerId, email, req) {
   if (existing) {
     if (existing.id === String(playerId)) {
       console.info(`[Link] already-linked email=${email} playerId=${playerId}`);
-      return { player: existing, linkedPlayer: existing };
+      return { player: existing, linkedPlayer: existing, votingOpen: isVotingOpen(getSettings(req)) };
     }
     console.warn(`[Link] REJECTED email-taking email=${email} attemptedPlayerId=${playerId} takenBy=${existing.id} (${existing.name})`);
     userError('Google account already linked to ' + existing.name);
@@ -426,6 +426,7 @@ function handleLinkGoogleAccount(playerId, email, req) {
         linkedPlayer: playerObj,
         players: getSeasonPlayers(req),
         leaders: getSeasonLeaders(req),
+        votingOpen: isVotingOpen(settings),
         alreadyVoted: hasSubmittedThisWeek(playerObj.id, activeSeasonId, currentWeek, req)
       };
     }
@@ -528,7 +529,13 @@ function seasonNumberFrom(seasonKey) {
 // leader board and the voting-derived awards:
 //   { leaderCounts: {leaderId: count}, playerLeaders: {playerId: Set(leaderId)},
 //     opponentCounts: {playerId: count} }
-function computeVoteTallies(ss, seasonKey) {
+// Options gate which tallies are built so the vote sheets are only scanned when
+// needed: leaderCounts (from LeaderVotes) is always computed for the live
+// Most-Played board; playerLeaders and opponentCounts (OpponentVotes scan) are
+// skipped unless opts.needPlayerLeaders / opts.needOpponentCounts are true.
+function computeVoteTallies(ss, seasonKey, opts) {
+  const needPlayerLeaders = !opts || opts.needPlayerLeaders !== false;
+  const needOpponentCounts = !opts || opts.needOpponentCounts !== false;
   const leaderCounts = {};
   const playerLeaders = {};
   const opponentCounts = {};
@@ -540,20 +547,22 @@ function computeVoteTallies(ss, seasonKey) {
       const lId = String(r[4]);
       const pId = String(r[3]);
       if (lId) leaderCounts[lId] = (leaderCounts[lId] || 0) + 1;
-      if (pId && lId) {
+      if (needPlayerLeaders && pId && lId) {
         if (!playerLeaders[pId]) playerLeaders[pId] = new Set();
         playerLeaders[pId].add(lId);
       }
     });
   }
 
-  const ovSheet = ss.getSheetByName(SHEETS.OPPONENT_VOTES);
-  if (ovSheet && ovSheet.getLastRow() > 1) {
-    ovSheet.getDataRange().getValues().slice(1).forEach(r => {
-      if (String(r[1]) !== seasonKey) return;
-      const pId = String(r[3]);
-      if (pId) opponentCounts[pId] = (opponentCounts[pId] || 0) + 1;
-    });
+  if (needOpponentCounts) {
+    const ovSheet = ss.getSheetByName(SHEETS.OPPONENT_VOTES);
+    if (ovSheet && ovSheet.getLastRow() > 1) {
+      ovSheet.getDataRange().getValues().slice(1).forEach(r => {
+        if (String(r[1]) !== seasonKey) return;
+        const pId = String(r[3]);
+        if (pId) opponentCounts[pId] = (opponentCounts[pId] || 0) + 1;
+      });
+    }
   }
 
   return { leaderCounts, playerLeaders, opponentCounts };
@@ -573,7 +582,7 @@ function tallyTop3(counts, minScore) {
 
 // Galactic Schemer: top-3 players by distinct leaders played.
 function computeSchemerPodium(ss, seasonKey) {
-  const { playerLeaders } = computeVoteTallies(ss, seasonKey);
+  const { playerLeaders } = computeVoteTallies(ss, seasonKey, { needPlayerLeaders: true });
   const counts = {};
   Object.keys(playerLeaders).forEach(pId => {
     if (playerLeaders[pId].size > 0) counts[pId] = playerLeaders[pId].size;
@@ -583,15 +592,16 @@ function computeSchemerPodium(ss, seasonKey) {
 
 // Galactic Ambassador: top-3 players by favorite-opponent votes.
 function computeAmbassadorPodium(ss, seasonKey) {
-  const { opponentCounts } = computeVoteTallies(ss, seasonKey);
+  const { opponentCounts } = computeVoteTallies(ss, seasonKey, { needOpponentCounts: true });
   return tallyTop3(opponentCounts);
 }
 
 // Galactic Ruler: top-3 by (rank, points) from a round's standings, so rank 1
 // is always the lowest sheet row (row 1 = rank 1). Returns `{id, score: points}`.
-function computeRulerPodium(seasonNumber, roundNumber, resolvePlayerId) {
+// `req` (optional) enables per-request memoization of the site fetches.
+function computeRulerPodium(seasonNumber, roundNumber, resolvePlayerId, req) {
   if (!seasonNumber || !roundNumber) return [];
-  const standings = fetchSeasonStandings(seasonNumber, roundNumber);
+  const standings = fetchSeasonStandings(seasonNumber, roundNumber, req);
   if (!standings || standings.length === 0) return [];
   const ranked = standings
     .map(s => ({ entry: s, id: resolvePlayerId(s) }))
@@ -602,10 +612,11 @@ function computeRulerPodium(seasonNumber, roundNumber, resolvePlayerId) {
 
 // A New Hope: top-3 by places climbed between the midpoint round and the
 // comparison round, counting only players present in both. Returns `{id, score}`.
-function computeHopePodium(seasonNumber, midRound, compRound, resolvePlayerId) {
+// `req` (optional) enables per-request memoization of the site fetches.
+function computeHopePodium(seasonNumber, midRound, compRound, resolvePlayerId, req) {
   if (!seasonNumber || !midRound || !compRound) return [];
-  const midStandings = fetchSeasonStandings(seasonNumber, midRound);
-  const finStandings = fetchSeasonStandings(seasonNumber, compRound);
+  const midStandings = fetchSeasonStandings(seasonNumber, midRound, req);
+  const finStandings = fetchSeasonStandings(seasonNumber, compRound, req);
   if (!midStandings || !finStandings || midStandings.length === 0 || finStandings.length === 0) return [];
   const midRank = {};
   midStandings.forEach(s => { midRank[String(s.username || s.name)] = s.rank; });
@@ -724,19 +735,18 @@ function refreshAwardsPodium(seasonId) {
   return { success: true, seasonId: seasonKey };
 }
 
-// Reads a season's stored podium block as leaderboard entries, first 3
+// Reads a season's stored podium block from an in-memory Awards data array
+// (0-based, header already sliced off) as leaderboard entries, first 3
 // non-empty rows, ranked by SCORE. Returns null when the block is absent or has
 // no filled rows (callers fall back to live sources for the active season).
-function readPodiumBlock(ss, seasonKey, awardName, playerMap) {
-  const awardsSheet = ss.getSheetByName(SHEETS.AWARDS);
-  if (!awardsSheet || awardsSheet.getLastRow() <= 1) return null;
-  const block = findPodiumBlock(awardsSheet, seasonKey, awardName);
-  if (!block) return null;
+// NOTE: this never touches the sheet — the caller reads Awards once and passes
+// the same array, so 5 awards cost 1 sheet read instead of 10.
+function materializeBlock(awardsData, seasonKey, awardName, playerMap) {
+  if (!awardsData || awardsData.length === 0) return null;
 
   const entries = [];
-  const data = awardsSheet.getDataRange().getValues().slice(1);
-  block.rows.forEach(r => {
-    const row = data[r - 2];
+  awardsData.forEach(row => {
+    if (String(row[0]) !== seasonKey || String(row[1]) !== awardName) return;
     const id = String(row[2] || '').trim();
     if (!id) return;
     const sc = Number(row[3]);
@@ -784,9 +794,26 @@ function handleGetLeaderboardData(requestedSeasonId, req) {
     ss.getSheetByName(SHEETS.LEADERS).getDataRange().getValues().slice(1) : [];
   leaderRows.forEach(r => { if (r[0]) leaderMap[String(r[0])] = `${r[1]} - ${r[2] || ''}`.trim(); });
 
-  // Most-played leader board. This board is intentionally live (it is not an
-  // award) so the vote sheets are still scanned once per request here.
-  const { leaderCounts, playerLeaders, opponentCounts } = computeVoteTallies(ss, targetSeasonId);
+  // Read the season's stored podium blocks from the Awards sheet ONCE. All
+  // five awards share this single data read; each block is then materialized
+  // from the in-memory rows (awards cost 1 sheet read, not 10).
+  const awardsSheet = ss.getSheetByName(SHEETS.AWARDS);
+  const awardsData = (awardsSheet && awardsSheet.getLastRow() > 1)
+    ? awardsSheet.getDataRange().getValues().slice(1) : [];
+  const rulerBlockRaw = materializeBlock(awardsData, targetSeasonId, AWARD_NAMES.RULER, playerMap);
+  const hopeBlockRaw = materializeBlock(awardsData, targetSeasonId, AWARD_NAMES.HOPE, playerMap);
+  const schemerBlockRaw = materializeBlock(awardsData, targetSeasonId, AWARD_NAMES.SCHEMER, playerMap);
+  const ambassadorBlockRaw = materializeBlock(awardsData, targetSeasonId, AWARD_NAMES.AMBASSADOR, playerMap);
+  const hunterBlockRaw = materializeBlock(awardsData, targetSeasonId, AWARD_NAMES.HUNTER, playerMap);
+
+  // The Most-Played leader board is intentionally live (it is not an award), so
+  // LeaderVotes is always scanned. OpponentVotes / the Schemer tally are only
+  // needed as live fallbacks when the corresponding podium block is missing, so
+  // they are skipped entirely when the stored award is present.
+  const { leaderCounts, playerLeaders, opponentCounts } = computeVoteTallies(
+    ss, targetSeasonId,
+    { needPlayerLeaders: !schemerBlockRaw, needOpponentCounts: !ambassadorBlockRaw }
+  );
   const leaderLeaderboard = assignStandardRanks(
     Object.keys(leaderCounts)
       .map(lId => ({ id: lId, name: leaderMap[lId] || lId, count: leaderCounts[lId] }))
@@ -813,7 +840,7 @@ function handleGetLeaderboardData(requestedSeasonId, req) {
   function fetchTopRankEntries(roundNumber, limit) {
     const top = limit || 3;
     if (!seasonNumber || !roundNumber) return null;
-    const pod = computeRulerPodium(seasonNumber, roundNumber, resolvePlayerId);
+    const pod = computeRulerPodium(seasonNumber, roundNumber, resolvePlayerId, req);
     if (pod.length === 0) return null;
     return pod.map(e => ({
       id: e.id,
@@ -827,7 +854,7 @@ function handleGetLeaderboardData(requestedSeasonId, req) {
   function fetchTopClimbEntries(mid, fin, limit) {
     const top = limit || 3;
     if (!seasonNumber || !mid) return null;
-    const pod = computeHopePodium(seasonNumber, mid, fin || mid, resolvePlayerId);
+    const pod = computeHopePodium(seasonNumber, mid, fin || mid, resolvePlayerId, req);
     if (pod.length === 0) return null;
     const ranked = assignStandardRanks(
       pod.map(r => ({ id: r.id, climbed: r.score })),
@@ -848,11 +875,11 @@ function handleGetLeaderboardData(requestedSeasonId, req) {
     if (!block) return null;
     return block.map(e => ({ id: e.id, name: e.name, displayRank: e.displayRank, score: fmt(e), subtitle: null }));
   }
-  const rulerBlock = formatBlock(readPodiumBlock(ss, targetSeasonId, AWARD_NAMES.RULER, playerMap), (e) => `${e.score} Pts`);
-  const hopeBlock = formatBlock(readPodiumBlock(ss, targetSeasonId, AWARD_NAMES.HOPE, playerMap), (e) => `+${e.score} Climb`);
-  const schemerBlock = formatBlock(readPodiumBlock(ss, targetSeasonId, AWARD_NAMES.SCHEMER, playerMap), (e) => `${e.score} Leaders`);
-  const ambassadorBlock = formatBlock(readPodiumBlock(ss, targetSeasonId, AWARD_NAMES.AMBASSADOR, playerMap), (e) => `${e.score} Votes`);
-  const hunterBlock = formatBlock(readPodiumBlock(ss, targetSeasonId, AWARD_NAMES.HUNTER, playerMap), (e) => null);
+  const rulerBlock = formatBlock(rulerBlockRaw, (e) => `${e.score} Pts`);
+  const hopeBlock = formatBlock(hopeBlockRaw, (e) => `+${e.score} Climb`);
+  const schemerBlock = formatBlock(schemerBlockRaw, (e) => `${e.score} Leaders`);
+  const ambassadorBlock = formatBlock(ambassadorBlockRaw, (e) => `${e.score} Votes`);
+  const hunterBlock = formatBlock(hunterBlockRaw, (e) => (e.score ? `${e.score} Bounties` : null));
 
   // Galactic Ruler: the stored podium (points) when present, else the live site.
   let ruler = rulerBlock;
