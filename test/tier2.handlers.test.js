@@ -14,7 +14,7 @@ const BASE = 'https://stockholm.sw-unlimited.com/';
 const standingsUrl = (seasonNumber, roundNumber) => `${BASE}season/${seasonNumber}/round/${roundNumber}`;
 function standingsHtml(players) {
   const arr = players
-    .map((p) => `{id:0,roundId:0,playerUsername:"${p.user}",playerName:"${p.name}",rank:${p.rank},points:0}`)
+    .map((p) => `{id:0,roundId:0,playerUsername:"${p.user}",playerName:"${p.name}",rank:${p.rank},points:${p.points ?? 0}}`)
     .join(',');
   return `<html>foo standings:[${arr}],seasonWinCounts:{} bar</html>`;
 }
@@ -320,13 +320,26 @@ describe('handleGetLeaderboardData', () => {
     assert.equal(res.bountyHunter, null);
   });
 
+  test('materialized Ambassador podium still obfuscates codenames while live', () => {
+    // A stored Ambassador block for the active season is read, but because
+    // voting is still open the real names must not leak to the client.
+    const tables = freshTables();
+    tables.Awards.push(['S2', 'Galactic Ambassador', 'p3', 2]);
+    const env = resetSheets(tables);
+    const res = handleGetLeaderboardData('S2');
+    assert.equal(res.isActiveSeason, true);
+    assert.equal(res.ambassador.length, 1);
+    assert.equal(res.ambassador[0].name, 'Gold Leader');
+    assert.equal(res.ambassador[0].score, '2 Votes');
+  });
+
   test('live Galactic Ruler comes from the current-week standings', () => {
     // S2 is the active season at Week 3 with voting open -> Ruler reads round 3.
     resetSheets(freshTables(), {
       urlFixtures: {
         [standingsUrl(2, 3)]: standingsHtml([
-          { user: 'MAlice', name: 'Alice', rank: 1 },
-          { user: 'MBob', name: 'Bob', rank: 2 }
+          { user: 'MAlice', name: 'Alice', rank: 1, points: 67 },
+          { user: 'MBob', name: 'Bob', rank: 2, points: 60 }
         ])
       }
     });
@@ -335,10 +348,10 @@ describe('handleGetLeaderboardData', () => {
     assert.equal(res.ruler.length, 2);
     assert.equal(res.ruler[0].name, 'Alice');
     assert.equal(res.ruler[0].displayRank, 1);
-    assert.equal(res.ruler[0].score, 'Rank #1');
+    assert.equal(res.ruler[0].score, '67 Pts');
     assert.equal(res.ruler[1].name, 'Bob');
     assert.equal(res.ruler[1].displayRank, 2);
-    assert.equal(res.ruler[1].score, 'Rank #2');
+    assert.equal(res.ruler[1].score, '60 Pts');
     // Week 3 is before the midpoint+1 gate, so A New Hope stays hidden.
     assert.equal(res.newHope, null);
   });
@@ -347,17 +360,17 @@ describe('handleGetLeaderboardData', () => {
     resetSheets(freshTables(), {
       urlFixtures: {
         [standingsUrl(2, 3)]: standingsHtml([
-          { user: 'MAlice', name: 'Alice', rank: 1 },
-          { user: 'MBob', name: 'Bob', rank: 2 },
-          { user: 'MCara', name: 'Cara', rank: 3 },
-          { user: 'MDan', name: 'Dan', rank: 4 }
+          { user: 'MAlice', name: 'Alice', rank: 1, points: 70 },
+          { user: 'MBob', name: 'Bob', rank: 2, points: 60 },
+          { user: 'MCara', name: 'Cara', rank: 3, points: 50 },
+          { user: 'MDan', name: 'Dan', rank: 4, points: 40 }
         ])
       }
     });
     const res = handleGetLeaderboardData('S2');
     assert.equal(res.ruler.length, 3);
     assert.deepEqual(res.ruler.map((r) => r.displayRank), [1, 2, 3]);
-    assert.deepEqual(res.ruler.map((r) => r.score), ['Rank #1', 'Rank #2', 'Rank #3']);
+    assert.deepEqual(res.ruler.map((r) => r.score), ['70 Pts', '60 Pts', '50 Pts']);
     assert.deepEqual(res.ruler.map((r) => r.name), ['Alice', 'Bob', 'Cara']);
   });
 
@@ -439,31 +452,43 @@ describe('handleGetLeaderboardData', () => {
     assert.deepEqual(res.bountyHunter, []);
   });
 
-  test('awards-first: a filled award row overrides the vote-based section', () => {
+  test('stored podium block is read instead of recomputing from votes', () => {
+    // A fully materialized podium (all 5 blocks) is read entirely from the
+    // sheet with zero site fetches and the stored scores formatted for the UI.
     const tables = freshTables();
-    tables.Awards.push(['S1', 'Galactic Ambassador', 'p3']);
-    tables.Awards.push(['S1', 'Galactic Schemer', 'p2']);
-    resetSheets(tables);
+    tables.Awards.push(['S1', 'Galactic Ruler', 'p1', 67]);
+    tables.Awards.push(['S1', 'A New Hope', 'p1', 5]);
+    tables.Awards.push(['S1', 'Galactic Schemer', 'p2', 3]);
+    tables.Awards.push(['S1', 'Galactic Ambassador', 'p3', 2]);
+    tables.Awards.push(['S1', 'Bounty Hunter', 'p2', 1]);
+    const env = resetSheets(tables);
     const res = handleGetLeaderboardData('S1');
+    assert.equal(env.state.siteFetches, 0, 'no site fetch when podium is materialized');
     assert.equal(res.ambassador.length, 1);
     assert.equal(res.ambassador[0].name, 'Cara');
-    assert.equal(res.ambassador[0].score, 'Awarded');
-    assert.equal(res.ambassador[0].subtitle, 'Awarded');
+    assert.equal(res.ambassador[0].score, '2 Votes');
     assert.equal(res.schemer.length, 1);
     assert.equal(res.schemer[0].name, 'Bob');
-    assert.equal(res.schemer[0].score, 'Awarded');
+    assert.equal(res.schemer[0].score, '3 Leaders');
+    assert.equal(res.ruler[0].score, '67 Pts');
+    assert.equal(res.newHope[0].score, '+5 Climb');
   });
 
-  test('filled site-award rows override the live board even before the gate', () => {
+  test('a filled site-award podium block wins even before the midpoint gate', () => {
+    // A materialized Ruler/NewHope block for the active season is read instead
+    // of scraping, regardless of the current week (week 2, pre-gate).
     const tables = freshTables();
     tables.Settings[2] = ['CURRENT_WEEK', 'Week 2'];
-    tables.Awards.push(['S2', 'Galactic Ruler', 'p3']);
-    tables.Awards.push(['S2', 'A New Hope', 'p1']);
-    resetSheets(tables);
+    tables.Awards.push(['S2', 'Galactic Ruler', 'p3', 67]);
+    tables.Awards.push(['S2', 'A New Hope', 'p1', 5]);
+    const env = resetSheets(tables);
     const res = handleGetLeaderboardData('S2');
+    assert.equal(env.state.siteFetches, 0, 'no site fetch when podium is materialized');
     assert.equal(res.isActiveSeason, true);
     assert.equal(res.ruler[0].name, 'Cara');
+    assert.equal(res.ruler[0].score, '67 Pts');
     assert.equal(res.newHope[0].name, 'Alice');
+    assert.equal(res.newHope[0].score, '+5 Climb');
   });
 
   test('historical failover uses the final round, not the active season week', () => {
@@ -478,8 +503,8 @@ describe('handleGetLeaderboardData', () => {
         { user: 'MBob', name: 'Bob', rank: 1 }
       ]),
       [standingsUrl(1, 11)]: standingsHtml([
-        { user: 'MAlice', name: 'Alice', rank: 1 },
-        { user: 'MBob', name: 'Bob', rank: 2 }
+        { user: 'MAlice', name: 'Alice', rank: 1, points: 67 },
+        { user: 'MBob', name: 'Bob', rank: 2, points: 60 }
       ])
     };
     resetSheets(freshTables(), { urlFixtures: fixtures });
@@ -488,9 +513,9 @@ describe('handleGetLeaderboardData', () => {
     // Ruler = final round podium (Alice #1, Bob #2), NOT round 3's rank 1 (Bob).
     assert.equal(res.ruler.length, 2);
     assert.equal(res.ruler[0].name, 'Alice');
-    assert.equal(res.ruler[0].score, 'Rank #1');
+    assert.equal(res.ruler[0].score, '67 Pts');
     assert.equal(res.ruler[1].name, 'Bob');
-    assert.equal(res.ruler[1].score, 'Rank #2');
+    assert.equal(res.ruler[1].score, '60 Pts');
     // A New Hope compares midpoint round 5 vs final round 11.
     assert.equal(res.newHope.length, 1);
     assert.equal(res.newHope[0].name, 'Alice');
@@ -510,16 +535,16 @@ describe('handleGetLeaderboardData', () => {
     // Live: hidden.
     assert.equal(handleGetLeaderboardData('S2').bountyHunter, null);
 
-    // After close, with a manually-filled row: shown as an award.
+    // After close, with a manually-filled row: shown as an award (scoreless).
     const tables = freshTables();
     tables.Settings[2] = ['CURRENT_WEEK', 'Season Ended'];
     tables.Settings[3] = ['VOTING_OPEN', 'FALSE'];
-    tables.Awards.push(['S2', 'Bounty Hunter', 'p1']);
+    tables.Awards.push(['S2', 'Bounty Hunter', 'p1', '']);
     resetSheets(tables);
     const res = handleGetLeaderboardData('S2');
     assert.equal(res.bountyHunter.length, 1);
     assert.equal(res.bountyHunter[0].name, 'Alice');
-    assert.equal(res.bountyHunter[0].score, 'Awarded');
+    assert.equal(res.bountyHunter[0].score, null);
   });
 });
 

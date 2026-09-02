@@ -97,6 +97,7 @@ function resetSheets(tables, opts = {}) {
   registry.state.scriptLockGranted = true;
   registry.state.scriptLockWaited = false;
   registry.state.tryLockCalls = 0;
+  registry.state.siteFetches = 0;
   return { ss, sheets, state: registry.state };
 }
 
@@ -108,7 +109,7 @@ function installMocks() {
     // SPREADSHEET_ID / API_SECRET resolve during vm.runInThisContext.
     props: { SPREADSHEET_ID: 'TEST', API_SECRET: 'test-secret' },
     urlFixtures: {},
-    state: { openCount: 0, scriptLockGranted: true, scriptLockWaited: false }
+    state: { openCount: 0, scriptLockGranted: true, scriptLockWaited: false, tryLockCalls: 0, siteFetches: 0 }
   };
 
   global.__TEST_REGISTRY__ = registry;
@@ -164,6 +165,7 @@ function installMocks() {
 
   global.UrlFetchApp = {
     fetch: (url) => {
+      registry.state.siteFetches++;
       const body = registry.urlFixtures[url];
       if (body === undefined) {
         const err = new Error('NETWORK_ERROR');
