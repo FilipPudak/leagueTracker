@@ -553,4 +553,32 @@ describe('syncPlayersFromWebsite', () => {
     syncPlayersFromWebsite();
     assert.equal(env.sheets.Players.rows.length, before);
   });
+
+  test('avoids id collision when players have gaps', () => {
+    const tables = basicTables();
+    // Remove p4; keep p1,p2,p3,p5 (gap at p4). Old code used rows.length=5
+    // (header+4 rows) → nextId = P005, colliding with p5.
+    tables.Players = [
+      ['ID', 'NAME', 'MELEE', 'EMAIL', 'ACTIVE'],
+      ['p1', 'Alice', 'MAlice', 'alice@x.com', 'TRUE'],
+      ['p2', 'Bob', 'MBob', 'bob@x.com', 'TRUE'],
+      ['p3', 'Cara', 'MCara', '', 'TRUE'],
+      ['p5', 'Eve', 'MEve', 'eve@x.com', 'TRUE']
+    ];
+    const env = resetSheets(tables, {
+      props: { SCRAPE_URL: 'https://example.test/' },
+      urlFixtures: {
+        'https://example.test/': '<a href="/player/MAlice">Alice</a>' +
+          '<a href="/player/MNew">New Player</a>'
+      }
+    });
+    syncPlayersFromWebsite();
+    const players = env.sheets.Players.rows;
+    const newPlayer = players.find(r => r[1] === 'New Player');
+    assert.ok(newPlayer, 'expected a new player row');
+    // max existing id = 5 → next = 6 → P006 (not P005 which would collide).
+    assert.equal(newPlayer[0], 'P006');
+    // Original p5 remains intact.
+    assert.ok(players.find(r => r[0] === 'p5'), 'p5 should still exist');
+  });
 });

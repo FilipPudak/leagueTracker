@@ -633,8 +633,42 @@ describe('doPost dispatch & security', () => {
 
   test('returns a busy error when the script lock cannot be acquired', () => {
     env.state.scriptLockGranted = false;
-    const res = doPostJson({ action: 'getAppData', userEmail: 'alice@x.com', apiSecret: SECRET });
+    const res = doPostJson({ action: 'submitVote', userEmail: 'alice@x.com', apiSecret: SECRET, leader1Id: 'l1', opponentId: 'p2' });
     assert.equal(res.success, false);
     assert.equal(res.error, 'Database is busy. Please try again.');
+  });
+
+  test('read actions do not acquire the script lock', () => {
+    doPostJson({ action: 'getAppData', userEmail: 'alice@x.com', apiSecret: SECRET });
+    assert.equal(env.state.tryLockCalls, 0, 'getAppData should not call tryLock');
+
+    doPostJson({ action: 'getLeaderboardData', seasonId: 'S1', apiSecret: SECRET, userEmail: 'test@x.com' });
+    assert.equal(env.state.tryLockCalls, 0, 'getLeaderboardData should not call tryLock');
+  });
+
+  test('write actions acquire the script lock', () => {
+    doPostJson({ action: 'submitVote', userEmail: 'alice@x.com', apiSecret: SECRET, leader1Id: 'l1', opponentId: 'p2' });
+    assert.equal(env.state.tryLockCalls, 1);
+  });
+});
+
+describe('per-request memoization', () => {
+  let env;
+  beforeEach(() => { env = resetSheets(freshTables()); });
+
+  test('getAppData opens the spreadsheet only once', () => {
+    doPostJson({ action: 'getAppData', userEmail: 'alice@x.com', apiSecret: SECRET });
+    assert.equal(env.state.openCount, 1);
+  });
+
+  test('getLeaderboardData opens the spreadsheet only once', () => {
+    doPostJson({ action: 'getLeaderboardData', seasonId: 'S1', apiSecret: SECRET, userEmail: 'test@x.com' });
+    assert.equal(env.state.openCount, 1);
+  });
+
+  test('handleGetLeaderboardData works without a req (direct call)', () => {
+    const res = handleGetLeaderboardData('S1');
+    assert.equal(res.success, true);
+    assert.equal(res.seasonId, 'S1');
   });
 });

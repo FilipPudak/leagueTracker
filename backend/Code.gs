@@ -37,17 +37,32 @@ function getSpreadsheet() {
   return SpreadsheetApp.openById(SPREADSHEET_ID);
 }
 
+// Returns the spreadsheet handle once per request (shared by the memoized read
+// helpers below). Falls back to a fresh handle when no request context is
+// supplied, preserving direct-call behavior.
+function getSpreadsheetCached(req) {
+  if (req && req.cache) {
+    if (!req.cache.ss) req.cache.ss = getSpreadsheet();
+    return req.cache.ss;
+  }
+  return getSpreadsheet();
+}
+
+// Memoizes `compute()` per request under `req.cache[key]`. When `req` is
+// omitted (direct helper calls) the value is always computed fresh.
+function reqCached(req, key, compute) {
+  if (req && req.cache && key in req.cache) return req.cache[key];
+  const value = compute();
+  if (req && req.cache) req.cache[key] = value;
+  return value;
+}
+
 /**
  * Web App Endpoint: Receives proxy API requests from Script 2.
  */
 function userError(msg) { const e = new Error(msg); e.userMessage = msg; throw e; }
 
 function doPost(e) {
-  const lock = LockService.getScriptLock();
-  if (!lock.tryLock(10000)) {
-    return createJsonResponse({ success: false, error: 'Database is busy. Please try again.' });
-  }
-
   let action = '';
   try {
     const payload = JSON.parse(e.postData.contents);
@@ -63,24 +78,43 @@ function doPost(e) {
       return createJsonResponse({ success: false, error: 'Unauthorized.' });
     }
 
-    let result = {};
-
-    if (action === 'getAppData') {
-      result = handleGetAppData(userEmail);
-    } else if (action === 'linkGoogleAccount') {
-      result = handleLinkGoogleAccount(payload.playerId, userEmail);
-    } else if (action === 'submitVote') {
-      result = handleSubmitVote(payload, userEmail);
-    } else if (action === 'getLeaderboardData') {
-      result = handleGetLeaderboardData(payload.seasonId);
-    } else if (action === 'getMySeasonStats') {
-      result = handleGetMySeasonStats(payload.seasonId, userEmail);
-    } else {
-      throw new Error('Invalid action requested.');
+    // Only write operations need the script lock so two concurrent voters
+    // can't both pass the duplicate-check. Read-only actions run
+    // concurrently, eliminating the "Database is busy" bottleneck for
+    // leaderboard/stats requests that perform slow site fetches.
+    const needsLock = (action === 'linkGoogleAccount' || action === 'submitVote');
+    const lock = LockService.getScriptLock();
+    if (needsLock && !lock.tryLock(10000)) {
+      return createJsonResponse({ success: false, error: 'Database is busy. Please try again.' });
     }
 
-    return createJsonResponse({ success: true, data: result });
+    try {
+      let result = {};
 
+      // Per-request memo context shared by the data helpers so each sheet and
+      // external standing is opened/fetched at most once per request. Passing
+      // no context (direct helper calls from tests/tools) keeps the old
+      // behavior.
+      const req = { cache: {} };
+
+      if (action === 'getAppData') {
+        result = handleGetAppData(userEmail, req);
+      } else if (action === 'linkGoogleAccount') {
+        result = handleLinkGoogleAccount(payload.playerId, userEmail, req);
+      } else if (action === 'submitVote') {
+        result = handleSubmitVote(payload, userEmail, req);
+      } else if (action === 'getLeaderboardData') {
+        result = handleGetLeaderboardData(payload.seasonId, req);
+      } else if (action === 'getMySeasonStats') {
+        result = handleGetMySeasonStats(payload.seasonId, userEmail, req);
+      } else {
+        throw new Error('Invalid action requested.');
+      }
+
+      return createJsonResponse({ success: true, data: result });
+    } finally {
+      if (needsLock) lock.releaseLock();
+    }
   } catch (err) {
     console.error('API Error:', err);
     var gen = { getAppData: "Couldn't load your league data. Please try again.",
@@ -90,8 +124,6 @@ function doPost(e) {
                 getMySeasonStats: "Couldn't load your stats. Please try again."
               }[action] || 'Something went wrong. Please try again.';
     return createJsonResponse({ success: false, error: err.userMessage || gen });
-  } finally {
-    lock.releaseLock();
   }
 }
 
@@ -104,19 +136,21 @@ function createJsonResponse(data) {
  * SETTINGS & CONFIGURATION HELPERS
  * ============================================================================ */
 
-function getSettings() {
-  const ss = getSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.SETTINGS);
-  if (!sheet) return {};
+function getSettings(req) {
+  return reqCached(req, 'settings', () => {
+    const ss = getSpreadsheetCached(req);
+    const sheet = ss.getSheetByName(SHEETS.SETTINGS);
+    if (!sheet) return {};
 
-  const data = sheet.getDataRange().getValues();
-  const settings = {};
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0]) {
-      settings[String(data[i][0]).trim()] = data[i][1];
+    const data = sheet.getDataRange().getValues();
+    const settings = {};
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0]) {
+        settings[String(data[i][0]).trim()] = data[i][1];
+      }
     }
-  }
-  return settings;
+    return settings;
+  });
 }
 
 function updateSetting(sheet, key, value) {
@@ -139,8 +173,8 @@ function parseWeek(val) {
 // telling the code how many rounds a season runs. Unlike CURRENT_WEEK /
 // ACTIVE_SEASON_ID it is never written by the code — it is a fixed parameter.
 // It is required, so we fail loudly rather than guessing if it is missing.
-function getSeasonLength() {
-  const val = Number(getSettings().SEASON_LENGTH);
+function getSeasonLength(req) {
+  const val = Number(getSettings(req).SEASON_LENGTH);
   if (!Number.isInteger(val) || val <= 0) {
     throw new Error('SEASON_LENGTH is not set in Settings.');
   }
@@ -151,29 +185,31 @@ function getSeasonLength() {
  * DATA RETRIEVAL HELPERS
  * ============================================================================ */
 
-function getAllSeasons() {
-  const ss = getSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.SEASONS);
-  if (!sheet || sheet.getLastRow() <= 1) return [];
+function getAllSeasons(req) {
+  return reqCached(req, 'allSeasons', () => {
+    const ss = getSpreadsheetCached(req);
+    const sheet = ss.getSheetByName(SHEETS.SEASONS);
+    if (!sheet || sheet.getLastRow() <= 1) return [];
 
-  return sheet.getDataRange().getValues().slice(1)
-    .filter(r => r[0] !== undefined && r[0] !== '')
-    .map(r => {
-      const id = String(r[0]);
-      const num = parseInt(id.replace(/\D/g, ''), 10);
-      return {
-        id: id,
-        name: String(r[1] || `Season ${id}`),
-        sortNum: isNaN(num) ? 0 : num
-      };
-    })
-    .sort((a, b) => b.sortNum - a.sortNum)
-    .map(({ id, name }) => ({ id, name }));
+    return sheet.getDataRange().getValues().slice(1)
+      .filter(r => r[0] !== undefined && r[0] !== '')
+      .map(r => {
+        const id = String(r[0]);
+        const num = parseInt(id.replace(/\D/g, ''), 10);
+        return {
+          id: id,
+          name: String(r[1] || `Season ${id}`),
+          sortNum: isNaN(num) ? 0 : num
+        };
+      })
+      .sort((a, b) => b.sortNum - a.sortNum)
+      .map(({ id, name }) => ({ id, name }));
+  });
 }
 
-function getSeasonName(seasonId) {
+function getSeasonName(seasonId, req) {
   if (!seasonId) return 'Unknown Season';
-  const seasons = getAllSeasons();
+  const seasons = getAllSeasons(req);
   const found = seasons.find(x => String(x.id) === String(seasonId));
   if (found && found.name) return found.name;
 
@@ -181,74 +217,80 @@ function getSeasonName(seasonId) {
   return cleanNum ? `Season ${cleanNum}` : `Season ${seasonId}`;
 }
 
-function getSeasonPlayers() {
-  const ss = getSpreadsheet();
-  const masterPlayers = {};
+function getSeasonPlayers(req) {
+  return reqCached(req, 'players', () => {
+    const ss = getSpreadsheetCached(req);
+    const masterPlayers = {};
 
-  const playerSheet = ss.getSheetByName(SHEETS.PLAYERS);
-  if (playerSheet && playerSheet.getLastRow() > 1) {
-    playerSheet.getDataRange().getValues().slice(1).forEach(r => {
-      if (r[0] && String(r[4] || 'TRUE').toUpperCase() === 'TRUE') {
-        masterPlayers[String(r[0])] = {
-          id: String(r[0]),
-          name: String(r[1]),
-          meleeName: String(r[2] || ''),
-          email: String(r[3] || '').toLowerCase()
-        };
-      }
-    });
-  }
+    const playerSheet = ss.getSheetByName(SHEETS.PLAYERS);
+    if (playerSheet && playerSheet.getLastRow() > 1) {
+      playerSheet.getDataRange().getValues().slice(1).forEach(r => {
+        if (r[0] && String(r[4] || 'TRUE').toUpperCase() === 'TRUE') {
+          masterPlayers[String(r[0])] = {
+            id: String(r[0]),
+            name: String(r[1]),
+            meleeName: String(r[2] || ''),
+            email: String(r[3] || '').toLowerCase()
+          };
+        }
+      });
+    }
 
-  return Object.values(masterPlayers).sort((a, b) => a.name.localeCompare(b.name));
+    return Object.values(masterPlayers).sort((a, b) => a.name.localeCompare(b.name));
+  });
 }
 
-function getUnlinkedPlayers() {
-  const players = getSeasonPlayers();
+function getUnlinkedPlayers(req) {
+  const players = getSeasonPlayers(req);
   return players.filter(p => !p.email);
 }
 
-function getSeasonLeaders() {
-  const ss = getSpreadsheet();
-  const masterLeaders = {};
+function getSeasonLeaders(req) {
+  return reqCached(req, 'leaders', () => {
+    const ss = getSpreadsheetCached(req);
+    const masterLeaders = {};
 
-  const leaderSheet = ss.getSheetByName(SHEETS.LEADERS);
-  if (leaderSheet && leaderSheet.getLastRow() > 1) {
-    leaderSheet.getDataRange().getValues().slice(1).forEach(r => {
-      if (r[0] && String(r[3] || 'TRUE').toUpperCase() === 'TRUE') {
-        masterLeaders[String(r[0])] = {
-          id: String(r[0]),
-          name: `${r[1]} - ${r[2] || ''}`.trim()
-        };
-      }
-    });
-  }
+    const leaderSheet = ss.getSheetByName(SHEETS.LEADERS);
+    if (leaderSheet && leaderSheet.getLastRow() > 1) {
+      leaderSheet.getDataRange().getValues().slice(1).forEach(r => {
+        if (r[0] && String(r[3] || 'TRUE').toUpperCase() === 'TRUE') {
+          masterLeaders[String(r[0])] = {
+            id: String(r[0]),
+            name: `${r[1]} - ${r[2] || ''}`.trim()
+          };
+        }
+      });
+    }
 
-  return Object.values(masterLeaders).sort((a, b) => a.name.localeCompare(b.name));
+    return Object.values(masterLeaders).sort((a, b) => a.name.localeCompare(b.name));
+  });
 }
 
-function findPlayerByGoogleEmail(email) {
+function findPlayerByGoogleEmail(email, req) {
   if (!email) return null;
-  const ss = getSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.PLAYERS);
-  if (!sheet || sheet.getLastRow() <= 1) return null;
+  return reqCached(req, 'email-' + String(email).toLowerCase().trim(), () => {
+    const ss = getSpreadsheetCached(req);
+    const sheet = ss.getSheetByName(SHEETS.PLAYERS);
+    if (!sheet || sheet.getLastRow() <= 1) return null;
 
-  const target = String(email).toLowerCase().trim();
-  const found = sheet.getDataRange().getValues().slice(1)
-    .find(r => String(r[3] || '').toLowerCase().trim() === target);
+    const target = String(email).toLowerCase().trim();
+    const found = sheet.getDataRange().getValues().slice(1)
+      .find(r => String(r[3] || '').toLowerCase().trim() === target);
 
-  if (!found) return null;
+    if (!found) return null;
 
-  return {
-    id: String(found[0]),
-    name: String(found[1]),
-    meleeName: String(found[2] || ''),
-    email: target,
-    active: String(found[4] || 'TRUE').toUpperCase() === 'TRUE'
-  };
+    return {
+      id: String(found[0]),
+      name: String(found[1]),
+      meleeName: String(found[2] || ''),
+      email: target,
+      active: String(found[4] || 'TRUE').toUpperCase() === 'TRUE'
+    };
+  });
 }
 
-function hasSubmittedThisWeek(playerId, seasonId, weekVal) {
-  const ss = getSpreadsheet();
+function hasSubmittedThisWeek(playerId, seasonId, weekVal, req) {
+  const ss = getSpreadsheetCached(req);
   const weekNum = parseWeek(weekVal);
 
   const lvSheet = ss.getSheetByName(SHEETS.LEADER_VOTES);
@@ -282,15 +324,15 @@ function isVotingOpen(settings) {
   return normalized === 'TRUE' || normalized === 'YES' || normalized === '1';
 }
 
-function handleGetAppData(userEmail) {
-  const settings = getSettings();
+function handleGetAppData(userEmail, req) {
+  const settings = getSettings(req);
   const activeSeasonId = String(settings.ACTIVE_SEASON_ID || '');
-  const linkedPlayer = findPlayerByGoogleEmail(userEmail);
+  const linkedPlayer = findPlayerByGoogleEmail(userEmail, req);
   console.info(`[AppData] userEmail=${userEmail} linked=${Boolean(linkedPlayer)}`);
   const currentWeek = parseWeek(settings.CURRENT_WEEK);
   const votingOpen = isVotingOpen(settings);
 
-  const allSeasons = getAllSeasons();
+  const allSeasons = getAllSeasons(req);
 
   const data = {
     settings: {
@@ -299,7 +341,7 @@ function handleGetAppData(userEmail) {
       votingOpen: votingOpen
     },
     seasonId: activeSeasonId,
-    seasonName: getSeasonName(activeSeasonId),
+    seasonName: getSeasonName(activeSeasonId, req),
     seasons: allSeasons,
     week: currentWeek,
     votingOpen: votingOpen,
@@ -316,30 +358,30 @@ function handleGetAppData(userEmail) {
   };
 
   if (linkedPlayer) {
-    data.players = getSeasonPlayers();
-    data.leaders = getSeasonLeaders();
-    const submitted = hasSubmittedThisWeek(linkedPlayer.id, activeSeasonId, currentWeek);
+    data.players = getSeasonPlayers(req);
+    data.leaders = getSeasonLeaders(req);
+    const submitted = hasSubmittedThisWeek(linkedPlayer.id, activeSeasonId, currentWeek, req);
     data.alreadySubmitted = submitted;
     data.alreadyVoted = submitted;
     data.hasVoted = submitted;
   } else {
-    data.unlinkedPlayers = getUnlinkedPlayers();
+    data.unlinkedPlayers = getUnlinkedPlayers(req);
   }
 
   return data;
 }
 
-function handleLinkGoogleAccount(playerId, email) {
+function handleLinkGoogleAccount(playerId, email, req) {
   if (!playerId || !email) {
     userError('Missing Player Selection or User Email.');
   }
   console.info(`[Link] attempt email=${email} playerId=${playerId}`);
 
-  const ss = getSpreadsheet();
+  const ss = getSpreadsheetCached(req);
   const sheet = ss.getSheetByName(SHEETS.PLAYERS);
   const rows = sheet.getDataRange().getValues();
 
-  const existing = findPlayerByGoogleEmail(email);
+  const existing = findPlayerByGoogleEmail(email, req);
   if (existing) {
     if (existing.id === String(playerId)) {
       console.info(`[Link] already-linked email=${email} playerId=${playerId}`);
@@ -366,7 +408,7 @@ function handleLinkGoogleAccount(playerId, email) {
       };
       console.info(`[Link] LINKED email=${email} playerId=${playerId}`);
 
-      const settings = getSettings();
+      const settings = getSettings(req);
       const activeSeasonId = String(settings.ACTIVE_SEASON_ID || '');
       const currentWeek = parseWeek(settings.CURRENT_WEEK);
 
@@ -374,9 +416,9 @@ function handleLinkGoogleAccount(playerId, email) {
         success: true,
         player: playerObj,
         linkedPlayer: playerObj,
-        players: getSeasonPlayers(),
-        leaders: getSeasonLeaders(),
-        alreadyVoted: hasSubmittedThisWeek(playerObj.id, activeSeasonId, currentWeek)
+        players: getSeasonPlayers(req),
+        leaders: getSeasonLeaders(req),
+        alreadyVoted: hasSubmittedThisWeek(playerObj.id, activeSeasonId, currentWeek, req)
       };
     }
   }
@@ -384,14 +426,14 @@ function handleLinkGoogleAccount(playerId, email) {
   throw new Error('Player ID not found in master directory.');
 }
 
-function handleSubmitVote(payload, email) {
-  const settings = getSettings();
+function handleSubmitVote(payload, email, req) {
+  const settings = getSettings(req);
 
   if (!isVotingOpen(settings)) {
     userError('Voting is currently closed for this week.');
   }
 
-  const player = findPlayerByGoogleEmail(email);
+  const player = findPlayerByGoogleEmail(email, req);
   if (!player || (player.active !== undefined && !player.active)) {
     console.warn(`[Vote] REJECTED unknown/inactive email=${email} playerId=${player ? player.id : 'none'}`);
     userError('Identity unlinked or inactive. Please link your player account.');
@@ -400,7 +442,7 @@ function handleSubmitVote(payload, email) {
   const seasonId = String(settings.ACTIVE_SEASON_ID || '');
   const week = parseWeek(settings.CURRENT_WEEK);
 
-  if (hasSubmittedThisWeek(player.id, seasonId, week)) {
+  if (hasSubmittedThisWeek(player.id, seasonId, week, req)) {
     console.warn(`[Vote] DUPLICATE email=${email} playerId=${player.id} season=${seasonId} week=${week}`);
     userError('You have already submitted votes for this week.');
   }
@@ -416,7 +458,7 @@ function handleSubmitVote(payload, email) {
     userError("You can't select yourself as your favorite opponent.");
   }
 
-  const ss = getSpreadsheet();
+  const ss = getSpreadsheetCached(req);
   const timestamp = new Date();
 
   let leaderVoteRow = null, opponentVoteRow = null;
@@ -449,8 +491,8 @@ function handleSubmitVote(payload, email) {
   }
 }
 
-function handleGetLeaderboardData(requestedSeasonId) {
-  const settings = getSettings();
+function handleGetLeaderboardData(requestedSeasonId, req) {
+  const settings = getSettings(req);
   const activeSeasonId = String(settings.ACTIVE_SEASON_ID || '');
   const targetSeasonId = requestedSeasonId ? String(requestedSeasonId) : activeSeasonId;
 
@@ -462,11 +504,11 @@ function handleGetLeaderboardData(requestedSeasonId) {
   const isLive = isActiveSeason && votingOpen;
 
   let seasonLength = 0;
-  try { seasonLength = getSeasonLength(); } catch (e) { /* SEASON_LENGTH not set */ }
+  try { seasonLength = getSeasonLength(req); } catch (e) { /* SEASON_LENGTH not set */ }
   const currentWeek = parseWeek(settings.CURRENT_WEEK);
   const weekInSeason = seasonLength > 0 && currentWeek >= 1 && currentWeek <= seasonLength;
 
-  const ss = getSpreadsheet();
+  const ss = getSpreadsheetCached(req);
 
   const playerMap = {};
   const idByMelee = {};
@@ -616,7 +658,7 @@ function handleGetLeaderboardData(requestedSeasonId) {
   function fetchTopRankEntries(roundNumber, limit) {
     const top = limit || 3;
     if (!seasonNumber || !roundNumber) return null;
-    const standings = fetchSeasonStandings(seasonNumber, roundNumber);
+    const standings = fetchSeasonStandings(seasonNumber, roundNumber, req);
     if (!standings || standings.length === 0) return null;
     const ranked = standings
       .filter(s => s.rank > 0)
@@ -640,8 +682,8 @@ function handleGetLeaderboardData(requestedSeasonId) {
   function fetchTopClimbEntries(mid, fin, limit) {
     const top = limit || 3;
     if (!seasonNumber || !mid) return null;
-    const midStandings = fetchSeasonStandings(seasonNumber, mid);
-    const finStandings = fetchSeasonStandings(seasonNumber, fin || mid);
+    const midStandings = fetchSeasonStandings(seasonNumber, mid, req);
+    const finStandings = fetchSeasonStandings(seasonNumber, fin || mid, req);
     if (!midStandings || !finStandings || midStandings.length === 0 || finStandings.length === 0) return null;
     const midRank = {};
     midStandings.forEach(s => { midRank[String(s.username || s.name)] = s.rank; });
@@ -693,7 +735,7 @@ function handleGetLeaderboardData(requestedSeasonId) {
   return {
     success: true,
     seasonId: targetSeasonId,
-    seasonName: getSeasonName(targetSeasonId),
+    seasonName: getSeasonName(targetSeasonId, req),
     isActiveSeason: isActiveSeason,
     leaderLeaderboard: leaderLeaderboard,
     schemer: schemer,
@@ -704,17 +746,17 @@ function handleGetLeaderboardData(requestedSeasonId) {
   };
 }
 
-function handleGetMySeasonStats(requestedSeasonId, userEmail) {
-  const linkedPlayer = findPlayerByGoogleEmail(userEmail);
+function handleGetMySeasonStats(requestedSeasonId, userEmail, req) {
+  const linkedPlayer = findPlayerByGoogleEmail(userEmail, req);
   if (!linkedPlayer) {
     userError('Link your account first.');
   }
 
-  const settings = getSettings();
+  const settings = getSettings(req);
   const activeSeasonId = String(settings.ACTIVE_SEASON_ID || '');
   const seasonId = requestedSeasonId ? String(requestedSeasonId) : activeSeasonId;
   const isCurrentActiveSeason = (String(seasonId) === activeSeasonId);
-  const ss = getSpreadsheet();
+  const ss = getSpreadsheetCached(req);
 
   // Awards won this season (from the Awards record written at season close).
   const awardsWon = [];
@@ -729,7 +771,7 @@ function handleGetMySeasonStats(requestedSeasonId, userEmail) {
 
   // Leaders played this season, computed on demand from raw LeaderVotes rows.
   const leaderNames = {};
-  getSeasonLeaders().forEach(l => { leaderNames[l.id] = l.name; });
+  getSeasonLeaders(req).forEach(l => { leaderNames[l.id] = l.name; });
 
   const counts = {};
   const lvSheet = ss.getSheetByName(SHEETS.LEADER_VOTES);
@@ -1079,53 +1121,55 @@ function backfillSeasonAwardsUnlocked(excludeSeasonId) {
 // Fetches a season's standings for a given round from the SWU league site and
 // returns [{ username, name, rank, points }, ...], or null if the site is
 // unreachable / parse fails (safe fallthrough).
-function fetchSeasonStandings(seasonNumber, roundNumber) {
-  const base = getConfig('SCRAPE_URL') || 'https://stockholm.sw-unlimited.com/';
-  const url = `${base}season/${seasonNumber}/round/${roundNumber}`;
+function fetchSeasonStandings(seasonNumber, roundNumber, req) {
+  return reqCached(req, 'standings-' + seasonNumber + '-' + roundNumber, () => {
+    const base = getConfig('SCRAPE_URL') || 'https://stockholm.sw-unlimited.com/';
+    const url = `${base}season/${seasonNumber}/round/${roundNumber}`;
 
-  let html;
-  try {
-    const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    if (response.getResponseCode() !== 200) return null;
-    html = response.getContentText();
-  } catch (err) {
-    console.error(`[Awards] Failed to fetch standings ${url}: ${err}`);
-    return null;
-  }
-  if (!html) return null;
+    let html;
+    try {
+      const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      if (response.getResponseCode() !== 200) return null;
+      html = response.getContentText();
+    } catch (err) {
+      console.error(`[Awards] Failed to fetch standings ${url}: ${err}`);
+      return null;
+    }
+    if (!html) return null;
 
-  // The page embeds a SvelteKit data payload containing a "standings" array.
-  // Entries are JS object literals with UNQUOTED keys (e.g. {id:13192,rank:1}),
-  // so they are not valid JSON. We extract each object and read fields by regex.
-  const arrayMatch = html.match(/standings:\[([\s\S]*?)\],seasonWinCounts/);
-  if (!arrayMatch) return null;
+    // The page embeds a SvelteKit data payload containing a "standings" array.
+    // Entries are JS object literals with UNQUOTED keys (e.g. {id:13192,rank:1}),
+    // so they are not valid JSON. We extract each object and read fields by regex.
+    const arrayMatch = html.match(/standings:\[([\s\S]*?)\],seasonWinCounts/);
+    if (!arrayMatch) return null;
 
-  const standings = [];
-  // Match each curly-braced object literal inside the standings array.
-  const objRe = /\{([^{}]*)\}/g;
-  let objMatch;
-  while ((objMatch = objRe.exec(arrayMatch[1])) !== null) {
-    const block = objMatch[1];
-    const grab = (key) => {
-      const m = block.match(new RegExp(key + ':([^,]*)'));
-      if (!m) return '';
-      return m[1].trim().replace(/^"|"$/g, '');
-    };
-    const user = grab('playerUsername');
-    if (!user) continue;
-    standings.push({
-      username: user,
-      name: grab('playerName'),
-      rank: Number(grab('rank')),
-      points: Number(grab('points'))
-    });
-  }
+    const standings = [];
+    // Match each curly-braced object literal inside the standings array.
+    const objRe = /\{([^{}]*)\}/g;
+    let objMatch;
+    while ((objMatch = objRe.exec(arrayMatch[1])) !== null) {
+      const block = objMatch[1];
+      const grab = (key) => {
+        const m = block.match(new RegExp(key + ':([^,]*)'));
+        if (!m) return '';
+        return m[1].trim().replace(/^"|"$/g, '');
+      };
+      const user = grab('playerUsername');
+      if (!user) continue;
+      standings.push({
+        username: user,
+        name: grab('playerName'),
+        rank: Number(grab('rank')),
+        points: Number(grab('points'))
+      });
+    }
 
-  if (standings.length === 0) {
-    console.error(`[Awards] Failed to parse standings ${url}`);
-    return null;
-  }
-  return standings;
+    if (standings.length === 0) {
+      console.error(`[Awards] Failed to parse standings ${url}`);
+      return null;
+    }
+    return standings;
+  });
 }
 
 function startNewSeason() {
@@ -1206,14 +1250,17 @@ function syncPlayersFromWebsite() {
   const rows = playerSheet.getDataRange().getValues();
   
   const existingMeleeMap = new Map();
+  let maxIdNum = 0;
   for (let i = 1; i < rows.length; i++) {
     const existingMelee = String(rows[i][2] || '').toLowerCase().trim();
     if (existingMelee) {
       existingMeleeMap.set(existingMelee, { rowIndex: i + 1, playerId: String(rows[i][0]) });
     }
+    const num = parseInt(String(rows[i][0] || '').replace(/\D/g, ''), 10);
+    if (!isNaN(num) && num > maxIdNum) maxIdNum = num;
   }
 
-  let nextIdNumber = rows.length;
+  let nextIdNumber = maxIdNum + 1;
 
   scrapedPlayers.forEach((playerData, key) => {
     if (existingMeleeMap.has(key)) {

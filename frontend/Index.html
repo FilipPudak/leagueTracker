@@ -287,7 +287,7 @@
   </div>
 
   <script>
-    let appState = { linkedPlayer: null, settings: {}, seasons: [], leaderboardCache: {}, myseasonCache: {} };
+    let appState = { linkedPlayer: null, settings: {}, seasons: [], leaderboardCache: {}, myseasonCache: {}, leaderboardToken: 0, myseasonToken: 0 };
 
     window.addEventListener('DOMContentLoaded', () => { fetchInitialAppData(); });
 
@@ -316,11 +316,13 @@
         setActiveView('leaderboard-view', 1);
         // Re-entering the tab forces a fresh fetch; toggling seasons within a
         // visit still uses the per-season cache below.
+        appState.leaderboardToken++;
         appState.leaderboardCache = {};
         loadLeaderboardData();
       } else if (tabId === 'myseason-view') {
         if (appState.linkedPlayer) {
           setActiveView('myseason-view', 2);
+          appState.myseasonToken++;
           appState.myseasonCache = {};
           loadMySeasonStats();
         } else {
@@ -447,22 +449,45 @@
         .linkGoogleAccount(playerId);
     }
 
+    let voteInFlight = false;
+
     function submitVotes() {
       const l1 = document.getElementById('leader-1').value;
       const opp = document.getElementById('favorite-opponent').value;
 
       if (!l1 || !opp) { showStatus('Please select your Leader and Favorite Opponent.', false); return; }
+      if (voteInFlight) return;
+      voteInFlight = true;
+      const btn = document.getElementById('btn-vote-submit');
+      if (btn) btn.disabled = true;
       showSpinner(true); clearStatus();
 
+      function endFlight() {
+        voteInFlight = false;
+        if (btn) btn.disabled = false;
+        showSpinner(false);
+      }
+
+      function showVoteRecorded() {
+        document.getElementById('vote-form').style.display = 'none';
+        document.getElementById('already-voted-card').style.display = 'block';
+        clearStatus();
+        appState.leaderboardCache = {};
+      }
+
       google.script.run
-        .withSuccessHandler(() => {
-          showSpinner(false);
-          document.getElementById('vote-form').style.display = 'none';
-          document.getElementById('already-voted-card').style.display = 'block';
-          clearStatus();
-          appState.leaderboardCache = {};
+        .withSuccessHandler(() => { endFlight(); showVoteRecorded(); })
+        .withFailureHandler((err) => {
+          endFlight();
+          const msg = err.message || '';
+          // The backend returns a duplicate-submission message when the
+          // vote was actually saved by an earlier in-flight request.
+          if (msg.includes('already submitted votes for this week')) {
+            showVoteRecorded();
+          } else {
+            showStatus(msg || 'Vote submission failed.', false);
+          }
         })
-        .withFailureHandler((err) => { showSpinner(false); showStatus(err.message || 'Vote submission failed.', false); })
         .submitVote(l1, null, opp);
     }
 
@@ -475,14 +500,20 @@
         return;
       }
 
+      const token = ++appState.leaderboardToken;
       showSpinner(true);
       google.script.run
         .withSuccessHandler((res) => {
+          if (token !== appState.leaderboardToken) return;
           showSpinner(false);
           appState.leaderboardCache[selectedSeasonId] = res;
           renderLeaderboard(res);
         })
-        .withFailureHandler((err) => { showSpinner(false); showStatus(err.message || 'Failed to load leaderboard.', false); })
+        .withFailureHandler((err) => {
+          if (token !== appState.leaderboardToken) return;
+          showSpinner(false);
+          showStatus(err.message || 'Failed to load leaderboard.', false);
+        })
         .getLeaderboardData(selectedSeasonId);
     }
 
@@ -535,14 +566,20 @@
         return;
       }
 
+      const token = ++appState.myseasonToken;
       showSpinner(true);
       google.script.run
         .withSuccessHandler((res) => {
+          if (token !== appState.myseasonToken) return;
           showSpinner(false);
           appState.myseasonCache[selectedSeasonId] = res;
           renderMySeasonStats(res);
         })
-        .withFailureHandler((err) => { showSpinner(false); showStatus(err.message || 'Failed to load your stats.', false); })
+        .withFailureHandler((err) => {
+          if (token !== appState.myseasonToken) return;
+          showSpinner(false);
+          showStatus(err.message || 'Failed to load your stats.', false);
+        })
         .getMySeasonStats(selectedSeasonId);
     }
 

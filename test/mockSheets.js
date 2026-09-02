@@ -96,6 +96,7 @@ function resetSheets(tables, opts = {}) {
   registry.state.openCount = 0;
   registry.state.scriptLockGranted = true;
   registry.state.scriptLockWaited = false;
+  registry.state.tryLockCalls = 0;
   return { ss, sheets, state: registry.state };
 }
 
@@ -139,7 +140,7 @@ function installMocks() {
 
   global.LockService = {
     getScriptLock: () => ({
-      tryLock: () => registry.state.scriptLockGranted,
+      tryLock: () => { registry.state.tryLockCalls++; return registry.state.scriptLockGranted; },
       waitLock: () => {
         registry.state.scriptLockWaited = true;
       },
