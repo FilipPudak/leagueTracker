@@ -14,11 +14,18 @@ function getConfig(key, fallback) {
   return val || fallback;
 }
 
-const SPREADSHEET_ID = getConfig('SPREADSHEET_ID');
+// Config is read lazily (not at load time) so rotating these Script Properties
+// takes effect immediately instead of waiting for a warm Apps Script instance
+// to be recycled.
+function getSpreadsheetId() {
+  return getConfig('SPREADSHEET_ID');
+}
 
 // Secret shared with the frontend proxy (Script 2). Every request must present it
 // so that only our own web app can talk to this backend. Never exposed to browsers.
-const API_SECRET = getConfig('API_SECRET', '');
+function getApiSecret() {
+  return getConfig('API_SECRET', '');
+}
 
 const SHEETS = {
   SETTINGS: 'Settings',
@@ -31,10 +38,11 @@ const SHEETS = {
 };
 
 function getSpreadsheet() {
-  if (!SPREADSHEET_ID) {
+  const spreadsheetId = getConfig('SPREADSHEET_ID');
+  if (!spreadsheetId) {
     throw new Error('Configuration error: SPREADSHEET_ID is missing. Check your .env / deployment environment.');
   }
-  return SpreadsheetApp.openById(SPREADSHEET_ID);
+  return SpreadsheetApp.openById(spreadsheetId);
 }
 
 // Returns the spreadsheet handle once per request (shared by the memoized read
@@ -73,7 +81,7 @@ function doPost(e) {
 
     // Reject any request that doesn't carry our shared secret. This prevents
     // third parties who discover the public URL from calling the API directly.
-    if (String(payload.apiSecret) !== String(API_SECRET)) {
+    if (String(payload.apiSecret) !== String(getApiSecret())) {
       console.warn(`[API] Unauthorized attempt: action=${action || '?'} userEmail=${userEmail || 'unset'}`);
       return createJsonResponse({ success: false, error: 'Unauthorized.' });
     }
@@ -510,24 +518,10 @@ function handleGetLeaderboardData(requestedSeasonId, req) {
 
   const ss = getSpreadsheetCached(req);
 
-  const playerMap = {};
-  const idByMelee = {};
-  const idByName = {};
-  const playerRows = ss.getSheetByName(SHEETS.PLAYERS) ?
-    ss.getSheetByName(SHEETS.PLAYERS).getDataRange().getValues().slice(1) : [];
-  playerRows.forEach(r => {
-    const id = String(r[0]);
-    if (!id) return;
-    playerMap[id] = String(r[1]);
-    if (r[2]) idByMelee[String(r[2]).trim().toLowerCase()] = id;
-    if (r[1]) idByName[String(r[1]).trim().toLowerCase()] = id;
-  });
-  // Matches the site's playerUsername to a Players melee name (col C), falling
-  // back to the display name (col B); null when the player is not tracked.
-  const resolveSiteEntry = (entry) =>
-    idByMelee[String(entry.username || '').trim().toLowerCase()] ||
-    idByName[String(entry.name || '').trim().toLowerCase()] ||
-    null;
+  // Player id->name map plus site-entry lookup, shared with the awards path so
+  // the melee/name matching logic lives in exactly one place.
+  const { playerNames: playerMap, resolvePlayerId } = buildPlayerIdResolvers(ss);
+  const resolveSiteEntry = resolvePlayerId;
 
   const leaderMap = {};
   const leaderRows = ss.getSheetByName(SHEETS.LEADERS) ?
@@ -1033,11 +1027,13 @@ function maxKeys(counts) {
 function buildPlayerIdResolvers(ss) {
   const playerIdByMelee = {};
   const playerIdByName = {};
+  const playerNames = {};
   const playerRows = ss.getSheetByName(SHEETS.PLAYERS) ?
     ss.getSheetByName(SHEETS.PLAYERS).getDataRange().getValues().slice(1) : [];
   playerRows.forEach(r => {
     const id = String(r[0]);
     if (!id) return;
+    playerNames[id] = String(r[1]);
     if (r[2]) playerIdByMelee[String(r[2]).trim().toLowerCase()] = id;
     if (r[1]) playerIdByName[String(r[1]).trim().toLowerCase()] = id;
   });
@@ -1046,7 +1042,8 @@ function buildPlayerIdResolvers(ss) {
       const byMelee = playerIdByMelee[String(entry.username || '').trim().toLowerCase()];
       if (byMelee) return byMelee;
       return playerIdByName[String(entry.name || '').trim().toLowerCase()] || null;
-    }
+    },
+    playerNames
   };
 }
 
@@ -1172,40 +1169,55 @@ function fetchSeasonStandings(seasonNumber, roundNumber, req) {
   });
 }
 
+// Formats a date as YYYY-MM-DD so the Seasons DATE column matches the existing
+// ISO-string rows instead of a raw Date object.
+function formatISODate(date) {
+  return Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
 function startNewSeason() {
-  const ss = getSpreadsheet();
-  const seasonsSheet = ss.getSheetByName(SHEETS.SEASONS);
-  const rows = seasonsSheet.getDataRange().getValues().slice(1);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = getSpreadsheet();
+    const seasonsSheet = ss.getSheetByName(SHEETS.SEASONS);
+    const rows = seasonsSheet.getDataRange().getValues().slice(1);
 
-  let maxSeasonNum = 0;
-  rows.forEach(r => {
-    if (r[0] !== undefined && r[0] !== '') {
-      const num = parseInt(String(r[0]).replace(/\D/g, ''), 10);
-      if (!isNaN(num) && num > maxSeasonNum) {
-        maxSeasonNum = num;
+    let maxSeasonNum = 0;
+    rows.forEach(r => {
+      if (r[0] !== undefined && r[0] !== '') {
+        const num = parseInt(String(r[0]).replace(/\D/g, ''), 10);
+        if (!isNaN(num) && num > maxSeasonNum) {
+          maxSeasonNum = num;
+        }
       }
-    }
-  });
+    });
 
-  const nextSeasonId = maxSeasonNum + 1;
-  const nextSeasonName = `Season ${nextSeasonId}`;
+    const nextSeasonId = maxSeasonNum + 1;
+    const nextSeasonName = `Season ${nextSeasonId}`;
 
-  seasonsSheet.appendRow([nextSeasonId, nextSeasonName, new Date()]);
+    seasonsSheet.appendRow([nextSeasonId, nextSeasonName, formatISODate(new Date())]);
 
-  const settingsSheet = ss.getSheetByName(SHEETS.SETTINGS);
-  updateSetting(settingsSheet, 'ACTIVE_SEASON_ID', nextSeasonId);
-  updateSetting(settingsSheet, 'CURRENT_WEEK', 'Week 1');
-  updateSetting(settingsSheet, 'VOTING_OPEN', 'TRUE');
+    const settingsSheet = ss.getSheetByName(SHEETS.SETTINGS);
+    updateSetting(settingsSheet, 'ACTIVE_SEASON_ID', nextSeasonId);
+    updateSetting(settingsSheet, 'CURRENT_WEEK', 'Week 1');
+    updateSetting(settingsSheet, 'VOTING_OPEN', 'TRUE');
 
-  return { success: true, seasonId: nextSeasonId, seasonName: nextSeasonName };
+    return { success: true, seasonId: nextSeasonId, seasonName: nextSeasonName };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function syncPlayersFromWebsite() {
-  const settings = getSettings();
-  const votingOpen = isVotingOpen(settings);
-  const activeSeasonId = String(settings.ACTIVE_SEASON_ID || '');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const settings = getSettings();
+    const votingOpen = isVotingOpen(settings);
+    const activeSeasonId = String(settings.ACTIVE_SEASON_ID || '');
 
-  if (!votingOpen || !activeSeasonId) return;
+    if (!votingOpen || !activeSeasonId) return;
 
   const url = getConfig('SCRAPE_URL') || 'https://stockholm.sw-unlimited.com/';
 
@@ -1275,4 +1287,7 @@ function syncPlayersFromWebsite() {
       nextIdNumber++;
     }
   });
+  } finally {
+    lock.releaseLock();
+  }
 }

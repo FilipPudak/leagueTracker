@@ -498,6 +498,21 @@ describe('startNewSeason', () => {
     assert.equal(settings.ACTIVE_SEASON_ID, 3);
     assert.equal(settings.CURRENT_WEEK, 'Week 1');
     assert.equal(settings.VOTING_OPEN, 'TRUE');
+
+    assert.equal(env.state.scriptLockWaited, true, 'startNewSeason should hold the script lock');
+  });
+
+  test('formats the appended DATE cell as YYYY-MM-DD', () => {
+    const tables = basicTables();
+    tables.Seasons = [
+      ['ID', 'NAME', 'DATE'],
+      ['S1', 'Season 1', '2026-01-01']
+    ];
+    const env = resetSheets(tables);
+    startNewSeason();
+    const seasons = env.sheets.Seasons.rows;
+    const last = seasons[seasons.length - 1];
+    assert.match(String(last[2]), /^\d{4}-\d{2}-\d{2}$/);
   });
 
   test('derives the next id from mixed season id formats', () => {
@@ -528,6 +543,7 @@ describe('syncPlayersFromWebsite', () => {
     syncPlayersFromWebsite();
 
     const players = env.sheets.Players.rows;
+    assert.equal(env.state.scriptLockWaited, true, 'syncPlayersFromWebsite should hold the script lock');
     // Existing player p1 (melee MAlice) name updated.
     const alice = players.find((r) => r[0] === 'p1');
     assert.equal(alice[1], 'Alice Updated');

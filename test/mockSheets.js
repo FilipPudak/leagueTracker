@@ -138,6 +138,20 @@ function installMocks() {
     MimeType: { JSON: 'application/json' }
   };
 
+  global.Session = {
+    getScriptTimeZone: () => 'Europe/Berlin'
+  };
+
+  global.Utilities = {
+    formatDate: (date, timezone, format) => {
+      const pad = (n) => String(n).padStart(2, '0');
+      if (format === 'yyyy-MM-dd') {
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+      }
+      return String(date);
+    }
+  };
+
   global.LockService = {
     getScriptLock: () => ({
       tryLock: () => { registry.state.tryLockCalls++; return registry.state.scriptLockGranted; },

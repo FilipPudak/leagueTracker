@@ -10,11 +10,17 @@ function getConfig(key, fallback) {
   return val || fallback;
 }
 
-// Published Script 1 Executable URL
-const API_URL = getConfig('API_URL');
+// Config is read lazily (not at load time) so rotating these Script Properties
+// takes effect immediately instead of waiting for a warm Apps Script instance
+// to be recycled.
+function getApiUrl() {
+  return getConfig('API_URL');
+}
 
 // Shared secret required by the backend. Stays server-side (never sent to the browser).
-const API_SECRET = getConfig('API_SECRET', '');
+function getApiSecret() {
+  return getConfig('API_SECRET', '');
+}
 
 function doGet() {
   return HtmlService
@@ -33,7 +39,7 @@ function callApi(action, payloadData = {}) {
     throw new Error('Could not identify your Google email. Make sure you are signed into Chrome/Google.');
   }
 
-  const payload = Object.assign({ action: action, userEmail: email, apiSecret: API_SECRET }, payloadData);
+  const payload = Object.assign({ action: action, userEmail: email, apiSecret: getApiSecret() }, payloadData);
 
   const options = {
     method: 'post',
@@ -42,7 +48,7 @@ function callApi(action, payloadData = {}) {
     muteHttpExceptions: true
   };
 
-  const response = UrlFetchApp.fetch(API_URL, options);
+  const response = UrlFetchApp.fetch(getApiUrl(), options);
   const text = response.getContentText();
   let result;
   try {
