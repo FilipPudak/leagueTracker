@@ -373,6 +373,26 @@ function deleteSessionByToken(token, req) {
   return false;
 }
 
+// Deletes EVERY Sessions row for (playerId, deviceId) — used by unlink so a
+// device's residual duplicate/superseded session rows are all cleared, not just
+// the row whose token the client happens to hold. Rows for other deviceIds (legit
+// multi-device logins) are untouched. Returns the number of rows removed.
+function deleteSessionsByPlayerAndDevice(playerId, deviceId, req) {
+  if (!playerId) return 0;
+  const sh = getSessionsSheet(req);
+  if (sh.getLastRow() <= 1) return 0;
+  const rows = sh.getDataRange().getValues();
+  let removed = 0;
+  for (let i = rows.length - 1; i >= 1; i--) {
+    const r = rows[i];
+    if (String(r[1]) === String(playerId) && String(r[2]) === String(deviceId || '')) {
+      sh.deleteRow(i + 1);
+      removed++;
+    }
+  }
+  return removed;
+}
+
 // Returns a single authoritative token for (playerId, deviceId), preferring the
 // NEWEST Sessions row (highest row index). If none exists, mints one. Any other
 // rows for the same (playerId, deviceId) are collapsed so a browser never holds
@@ -615,7 +635,23 @@ function handleUnlinkAccount(payload, req) {
   if (!token) {
     userError('Missing token.');
   }
-  const removed = deleteSessionByToken(token, req);
+  // Resolve the token to its (playerId, deviceId), then de-authorize the whole
+  // device by removing ALL of its session rows. This collapses residual duplicate
+  // rows that share the same (player, device) so an unlink fully clears the device.
+  const sh = getSessionsSheet(req);
+  const rows = sh.getDataRange().getValues();
+  let playerId = '', deviceId = '';
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(token)) {
+      playerId = String(rows[i][1]);
+      deviceId = String(rows[i][2] || '');
+      break;
+    }
+  }
+  let removed = 0;
+  if (playerId) {
+    removed = deleteSessionsByPlayerAndDevice(playerId, deviceId, req);
+  }
   return { success: true, removed: removed };
 }
 

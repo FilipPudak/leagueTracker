@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Star Wars Unlimited League Voting</title>
+  <link rel="icon" type="image/svg+xml" href="rebel-alliance.svg">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap');
 
@@ -219,10 +220,10 @@
   <div class="app-container">
     <div class="header">
       <div class="header-content">
-      <!-- OFFICIAL REBEL ALLIANCE EMBLEM FROM WIKIMEDIA -->
+      <!-- OFFICIAL REBEL ALLIANCE EMBLEM (bundled locally; also serves as the tab favicon) -->
       <img 
         class="header-logo" 
-        src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Rebel_Alliance_logo.svg" 
+        src="rebel-alliance.svg" 
         alt="Rebel Alliance Logo" 
       />
         <h1 id="app-title">SWU League Voting</h1>
@@ -348,6 +349,10 @@
         </div>
       </div>
     </div>
+
+    <footer class="site-footer">
+      <span>v<span id="site-version">dev</span></span>
+    </footer>
   </div>
 
   <!-- INLINE UNLINK CONFIRM OVERLAY -->
@@ -361,10 +366,6 @@
       </div>
     </div>
   </div>
-
-  <footer class="site-footer">
-    <span>v<span id="site-version">dev</span></span>
-  </footer>
 
   <script src="app.js"></script>
 </body>

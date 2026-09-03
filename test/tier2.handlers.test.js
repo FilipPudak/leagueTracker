@@ -948,7 +948,7 @@ describe('token layer (linkAccount / unlinkAccount)', () => {
     const b = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D2', apiSecret: SECRET });
     const unlink = doPostJson({ action: 'unlinkAccount', token: a.data.token, apiSecret: SECRET });
     assert.equal(unlink.success, true);
-    assert.equal(unlink.data.removed, true);
+    assert.equal(unlink.data.removed, 1);
     // The unlinked device's token is now invalid.
     const invalid = doPostJson({ action: 'getAppData', token: a.data.token, apiSecret: SECRET });
     assert.equal(invalid.data.status, 'invalid-token');
@@ -958,6 +958,21 @@ describe('token layer (linkAccount / unlinkAccount)', () => {
     // col D is preserved (player is NOT unclaimed): email still maps to p3.
     const stillLinked = findPlayerByGoogleEmail('cara@x.com');
     assert.equal(stillLinked.id, 'p3');
+  });
+
+  test('unlinkAccount clears ALL duplicate session rows for that device', () => {
+    const a = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
+    // Simulate a residual duplicate row (same player + device, different token).
+    env.sheets.Sessions.rows.push([a.data.token + '-dup', 'p3', 'D1', 'cara@x.com', 'x']);
+    const b = doPostJson({ action: 'unlinkAccount', token: a.data.token, apiSecret: SECRET });
+    assert.equal(b.success, true);
+    // Both rows for (p3, D1) were removed.
+    assert.equal(b.data.removed, 2);
+    const remaining = env.sheets.Sessions.rows.slice(1).filter((r) => String(r[1]) === 'p3' && String(r[2]) === 'D1');
+    assert.equal(remaining.length, 0);
+    // A different device is untouched.
+    const other = env.sheets.Sessions.rows.slice(1).filter((r) => String(r[2]) === 'D2');
+    assert.equal(other.length, 0);
   });
 
   test('admin unclaim (clear col D) rejects the token on next use and lazily deletes it', () => {

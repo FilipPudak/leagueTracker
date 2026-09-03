@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.1';
 
 let appState = {
   status: 'unlinked',
