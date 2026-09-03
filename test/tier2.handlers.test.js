@@ -734,9 +734,17 @@ describe('doPost dispatch & security', () => {
     assert.equal(bad.error, 'Something went wrong. Please try again.');
   });
 
-  test('rejects a missing user identity', () => {
-    const bad = doPostJson({ action: 'getAppData', userEmail: '', apiSecret: SECRET });
+  test('getAppData is token-optional (no identity returns a bootstrap list)', () => {
+    const res = doPostJson({ action: 'getAppData', userEmail: '', apiSecret: SECRET });
+    assert.equal(res.success, true);
+    assert.equal(res.data.status, 'unlinked');
+    assert.deepEqual(res.data.unlinkedPlayers.map((p) => p.id).sort(), ['p3', 'p4']);
+  });
+
+  test('rejects a missing user identity for identity-bound actions', () => {
+    const bad = doPostJson({ action: 'submitVote', userEmail: '', apiSecret: SECRET, leaderId: 'l1' });
     assert.equal(bad.success, false);
+    assert.equal(bad.error, "We couldn't submit your vote. Please try again.");
   });
 
   test('maps business errors to per-action friendly messages', () => {
@@ -791,5 +799,136 @@ describe('per-request memoization', () => {
     const res = handleGetLeaderboardData('S1');
     assert.equal(res.success, true);
     assert.equal(res.seasonId, 'S1');
+  });
+});
+
+describe('token layer (linkAccount / unlinkAccount)', () => {
+  let env;
+  beforeEach(() => {
+    env = resetSheets(freshTables());
+  });
+
+  test('linkAccount links an unlinked player and returns a token + picker list', () => {
+    const res = doPostJson({
+      action: 'linkAccount',
+      email: 'cara@x.com',
+      playerId: 'p3',
+      deviceId: 'D1',
+      apiSecret: SECRET
+    });
+    assert.equal(res.success, true);
+    assert.ok(res.data.token);
+    assert.equal(res.data.linkedPlayer.id, 'p3');
+    assert.equal(res.data.player.id, 'p3');
+    assert.equal(res.data.token.length > 0, true);
+    // p3 is now linked, so it leaves the unlinked picker.
+    assert.deepEqual(res.data.unlinkedPlayers.map((p) => p.id).sort(), ['p4']);
+    // Unified shape present on the fresh-link path.
+    assert.ok(Array.isArray(res.data.players));
+    assert.ok(Array.isArray(res.data.leaders));
+    assert.equal(typeof res.data.votingOpen, 'boolean');
+    assert.equal(typeof res.data.alreadyVoted, 'boolean');
+  });
+
+  test('linkAccount reuses the token for the same (player, deviceId)', () => {
+    const a = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
+    const b = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
+    assert.equal(a.data.token, b.data.token);
+  });
+
+  test('linkAccount mints a separate token for a new deviceId (multi-device)', () => {
+    const a = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
+    const b = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D2', apiSecret: SECRET });
+    assert.notEqual(a.data.token, b.data.token);
+    assert.equal(a.data.token.length > 0, true);
+    assert.equal(b.data.token.length > 0, true);
+  });
+
+  test('linkAccount returns a unified shape on the already-linked returning path', () => {
+    // p1 already owns alice@x.com; returning via the same email/player.
+    const res = doPostJson({ action: 'linkAccount', email: 'alice@x.com', playerId: 'p1', deviceId: 'D9', apiSecret: SECRET });
+    assert.equal(res.success, true);
+    assert.equal(res.data.linkedPlayer.id, 'p1');
+    assert.ok(res.data.token);
+    assert.ok(Array.isArray(res.data.players));
+    assert.ok(Array.isArray(res.data.leaders));
+    assert.equal(typeof res.data.alreadyVoted, 'boolean');
+    assert.ok(Array.isArray(res.data.unlinkedPlayers));
+  });
+
+  test('linkAccount rejects an email already taken by another player', () => {
+    const res = doPostJson({ action: 'linkAccount', email: 'alice@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
+    assert.equal(res.success, false);
+    assert.match(res.error, /already linked to/i);
+  });
+
+  test('linkAccount rejects a player already linked to another account', () => {
+    const res = doPostJson({ action: 'linkAccount', email: 'someone@x.com', playerId: 'p1', deviceId: 'D1', apiSecret: SECRET });
+    assert.equal(res.success, false);
+    assert.match(res.error, /already linked to another/i);
+  });
+
+  test('getAppData resolves identity by token (status: linked)', () => {
+    const link = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
+    const res = doPostJson({ action: 'getAppData', token: link.data.token, apiSecret: SECRET });
+    assert.equal(res.data.status, 'linked');
+    assert.equal(res.data.linkedPlayer.id, 'p3');
+  });
+
+  test('submitVote resolves identity by token', () => {
+    const link = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
+    const res = doPostJson({
+      action: 'submitVote',
+      token: link.data.token,
+      apiSecret: SECRET,
+      leaderId: 'l1',
+      opponentId: 'p1'
+    });
+    assert.equal(res.success, true);
+  });
+
+  test('unlinkAccount removes only that device; the other device stays linked', () => {
+    const a = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
+    const b = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D2', apiSecret: SECRET });
+    const unlink = doPostJson({ action: 'unlinkAccount', token: a.data.token, apiSecret: SECRET });
+    assert.equal(unlink.success, true);
+    assert.equal(unlink.data.removed, true);
+    // The unlinked device's token is now invalid.
+    const invalid = doPostJson({ action: 'getAppData', token: a.data.token, apiSecret: SECRET });
+    assert.equal(invalid.data.status, 'invalid-token');
+    // The other device's token is still valid.
+    const valid = doPostJson({ action: 'getAppData', token: b.data.token, apiSecret: SECRET });
+    assert.equal(valid.data.status, 'linked');
+    // col D is preserved (player is NOT unclaimed): email still maps to p3.
+    const stillLinked = findPlayerByGoogleEmail('cara@x.com');
+    assert.equal(stillLinked.id, 'p3');
+  });
+
+  test('admin unclaim (clear col D) rejects the token on next use and lazily deletes it', () => {
+    const link = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
+    // Admin manually clears the player's email (col D) in the Players sheet.
+    env.sheets.Players.rows[3][3] = '';
+    const res = doPostJson({ action: 'getAppData', token: link.data.token, apiSecret: SECRET });
+    assert.equal(res.data.status, 'invalid-token');
+    // The stale session row was lazily deleted.
+    assert.equal(findSessionByToken(link.data.token, { cache: {} }), null);
+  });
+
+  test('linkAccount requires playerId and email', () => {
+    const res = doPostJson({ action: 'linkAccount', email: '', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
+    assert.equal(res.success, false);
+    assert.match(res.error, /Missing Player Selection or User Email/);
+  });
+
+  test('auto-creates the Sessions sheet when it is missing (stale DB safety)', () => {
+    const tables = freshTables();
+    delete tables.Sessions; // simulate a DB that predates the Sessions sheet
+    resetSheets(tables);
+    const res = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
+    assert.equal(res.success, true);
+    assert.ok(res.data.token);
+    // The auto-created sheet now resolves the session by token.
+    const found = findSessionByToken(res.data.token, { cache: {} });
+    assert.equal(found.playerId, 'p3');
   });
 });

@@ -49,6 +49,10 @@ function basicTables() {
     Awards: [
       // seasonId, award, playerId, score (15-row podium per season: 5 awards x 3)
       ['SEASON_ID', 'AWARD', 'PLAYER_ID', 'SCORE']
+    ],
+    Sessions: [
+      // token, playerId, deviceId, email, created
+      ['TOKEN', 'PLAYER_ID', 'DEVICE_ID', 'EMAIL', 'CREATED']
     ]
   };
 }

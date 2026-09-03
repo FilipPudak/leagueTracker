@@ -34,7 +34,8 @@ const SHEETS = {
   SEASONS: 'Seasons',
   LEADER_VOTES: 'LeaderVotes',
   OPPONENT_VOTES: 'OpponentVotes',
-  AWARDS: 'Awards'
+  AWARDS: 'Awards',
+  SESSIONS: 'Sessions'
 };
 
 function getSpreadsheet() {
@@ -76,8 +77,20 @@ function doPost(e) {
     const payload = JSON.parse(e.postData.contents);
     action = payload.action;
     const userEmail = String(payload.userEmail || '').toLowerCase().trim();
+    // Per-request memo context shared by the data helpers so each sheet and
+    // external standing is opened/fetched at most once per request. Passing
+    // no context (direct helper calls from tests/tools) keeps the old
+    // behavior.
+    const req = { cache: {} };
 
-    if (!userEmail) throw new Error('User identity missing.');
+    // Open / token-optional actions may be called with no email at all.
+    // Everything else needs an email (legacy) or a token (new).
+    const openActions = ['linkAccount', 'unlinkAccount', 'getLeaderboardData'];
+    const tokenOptional = ['getAppData'];
+    const token = String(payload.token || '').trim();
+    if (!userEmail && !token && openActions.indexOf(action) === -1 && tokenOptional.indexOf(action) === -1) {
+      throw new Error('User identity missing.');
+    }
 
     // Reject any request that doesn't carry our shared secret. This prevents
     // third parties who discover the public URL from calling the API directly.
@@ -86,11 +99,22 @@ function doPost(e) {
       return createJsonResponse({ success: false, error: 'Unauthorized.' });
     }
 
+    // Resolve a token to its linked player's email when no explicit email was
+    // sent, so the identity-bound handlers can run unchanged. (Dual-path: the
+    // legacy client-asserted email works until Stage 2 cuts over to token-only.)
+    let identityEmail = userEmail;
+    if (token && !identityEmail) {
+      const session = findSessionByToken(token, req);
+      if (session) identityEmail = session.email;
+    }
+    const effectiveEmail = identityEmail || userEmail;
+
     // Only write operations need the script lock so two concurrent voters
     // can't both pass the duplicate-check. Read-only actions run
     // concurrently, eliminating the "Database is busy" bottleneck for
     // leaderboard/stats requests that perform slow site fetches.
-    const needsLock = (action === 'linkGoogleAccount' || action === 'submitVote');
+    const needsLock = (action === 'linkGoogleAccount' || action === 'submitVote' ||
+                       action === 'linkAccount' || action === 'unlinkAccount');
     const lock = LockService.getScriptLock();
     if (needsLock && !lock.tryLock(10000)) {
       return createJsonResponse({ success: false, error: 'Database is busy. Please try again.' });
@@ -99,22 +123,20 @@ function doPost(e) {
     try {
       let result = {};
 
-      // Per-request memo context shared by the data helpers so each sheet and
-      // external standing is opened/fetched at most once per request. Passing
-      // no context (direct helper calls from tests/tools) keeps the old
-      // behavior.
-      const req = { cache: {} };
-
       if (action === 'getAppData') {
-        result = handleGetAppData(userEmail, req);
+        result = handleGetAppData(effectiveEmail, req, token);
       } else if (action === 'linkGoogleAccount') {
-        result = handleLinkGoogleAccount(payload.playerId, userEmail, req);
+        result = handleLinkGoogleAccount(payload.playerId, effectiveEmail, req);
+      } else if (action === 'linkAccount') {
+        result = handleLinkAccount(payload, req);
+      } else if (action === 'unlinkAccount') {
+        result = handleUnlinkAccount(payload, req);
       } else if (action === 'submitVote') {
-        result = handleSubmitVote(payload, userEmail, req);
+        result = handleSubmitVote(payload, effectiveEmail, req);
       } else if (action === 'getLeaderboardData') {
         result = handleGetLeaderboardData(payload.seasonId, req);
       } else if (action === 'getMySeasonStats') {
-        result = handleGetMySeasonStats(payload.seasonId, userEmail, req);
+        result = handleGetMySeasonStats(payload.seasonId, effectiveEmail, req);
       } else {
         throw new Error('Invalid action requested.');
       }
@@ -127,6 +149,8 @@ function doPost(e) {
     console.error('API Error:', err);
     var gen = { getAppData: "Couldn't load your league data. Please try again.",
                 linkGoogleAccount: "We couldn't link your account. Please try again.",
+                linkAccount: "We couldn't link your account. Please try again.",
+                unlinkAccount: "We couldn't unlink this device. Please try again.",
                 submitVote: "We couldn't submit your vote. Please try again.",
                 getLeaderboardData: "Couldn't load the leaderboard. Please try again.",
                 getMySeasonStats: "Couldn't load your stats. Please try again."
@@ -297,6 +321,89 @@ function findPlayerByGoogleEmail(email, req) {
   });
 }
 
+/* ============================================================================
+ * SESSION (token) HELPERS
+ * ============================================================================ */
+
+// Returns the Sessions sheet, auto-creating it (with a header) if a stale DB
+// doesn't have one yet. Columns: TOKEN, PLAYER_ID, DEVICE_ID, EMAIL, CREATED.
+function getSessionsSheet(req) {
+  const ss = getSpreadsheetCached(req);
+  let sh = ss.getSheetByName(SHEETS.SESSIONS);
+  if (!sh) {
+    sh = ss.insertSheet(SHEETS.SESSIONS);
+    sh.appendRow(['TOKEN', 'PLAYER_ID', 'DEVICE_ID', 'EMAIL', 'CREATED']);
+  }
+  return sh;
+}
+
+function mintToken() {
+  return String(Utilities.getUuid());
+}
+
+// Looks up an active session by token. Cross-checks that the linked player's
+// Players col D email is still set and matches the session; if the admin has
+// unclaimed the player (cleared col D) the stale session row is lazily deleted
+// and null is returned, so a stale token can never keep voting.
+function findSessionByToken(token, req) {
+  if (!token) return null;
+  const sh = getSessionsSheet(req);
+  if (sh.getLastRow() <= 1) return null;
+  const rows = sh.getDataRange().getValues().slice(1);
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (String(r[0]) === String(token)) {
+      const playerId = String(r[1]);
+      const email = String(r[3] || '').toLowerCase().trim();
+      const player = reqCached(req, 'email-' + email, () => {
+        if (!email) return null;
+        return findPlayerByGoogleEmail(email, req);
+      });
+      // Admin unclaimed / email cleared -> drop the stale session.
+      if (!player || String(player.id) !== playerId) {
+        deleteSessionByToken(token, req);
+        return null;
+      }
+      return { token: String(r[0]), playerId: playerId, deviceId: String(r[2]), email: email };
+    }
+  }
+  return null;
+}
+
+function findSessionByPlayerAndDevice(playerId, deviceId, req) {
+  if (!deviceId || !playerId) return null;
+  const sh = getSessionsSheet(req);
+  if (sh.getLastRow() <= 1) return null;
+  const rows = sh.getDataRange().getValues().slice(1);
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (String(r[1]) === String(playerId) && String(r[2]) === String(deviceId)) {
+      return { token: String(r[0]), playerId: String(r[1]), deviceId: String(r[2]), email: String(r[3] || '') };
+    }
+  }
+  return null;
+}
+
+function insertSession(playerId, deviceId, email, req) {
+  const token = mintToken();
+  getSessionsSheet(req).appendRow([token, String(playerId), String(deviceId || ''), String(email || '').toLowerCase().trim(), formatISODate(new Date())]);
+  return token;
+}
+
+function deleteSessionByToken(token, req) {
+  if (!token) return false;
+  const sh = getSessionsSheet(req);
+  if (sh.getLastRow() <= 1) return false;
+  const rows = sh.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(token)) {
+      sh.deleteRow(i + 1);
+      return true;
+    }
+  }
+  return false;
+}
+
 function hasSubmittedThisWeek(playerId, seasonId, weekVal, req) {
   const ss = getSpreadsheetCached(req);
   const weekNum = parseWeek(weekVal);
@@ -332,7 +439,7 @@ function isVotingOpen(settings) {
   return normalized === 'TRUE' || normalized === 'YES' || normalized === '1';
 }
 
-function handleGetAppData(userEmail, req) {
+function handleGetAppData(userEmail, req, token) {
   const settings = getSettings(req);
   const activeSeasonId = String(settings.ACTIVE_SEASON_ID || '');
   const linkedPlayer = findPlayerByGoogleEmail(userEmail, req);
@@ -342,12 +449,24 @@ function handleGetAppData(userEmail, req) {
 
   const allSeasons = getAllSeasons(req);
 
+  // Status drives the static client's boot branch:
+  //  - 'invalid-token' -> stale token, re-prompt to link
+  //  - 'linked'        -> show the vote view
+  //  - 'unlinked'      -> fresh/returning device, show the link form (bootstrap)
+  let status = 'unlinked';
+  if (linkedPlayer) {
+    status = 'linked';
+  } else if (token && !findSessionByToken(token, req)) {
+    status = 'invalid-token';
+  }
+
   const data = {
     settings: {
       activeSeasonId: activeSeasonId,
       currentWeek: `Week ${currentWeek}`,
       votingOpen: votingOpen
     },
+    status: status,
     seasonId: activeSeasonId,
     seasonName: getSeasonName(activeSeasonId, req),
     seasons: allSeasons,
@@ -433,6 +552,63 @@ function handleLinkGoogleAccount(playerId, email, req) {
   }
 
   throw new Error('Player ID not found in master directory.');
+}
+
+// Open self-registration: type an email + pick a player -> link + mint a token.
+// Backed by a per-device session so the same account can be on many devices, and
+// re-linking the same device (after cleared localStorage) reuses its token.
+function handleLinkAccount(payload, req) {
+  const playerId = String(payload.playerId || '');
+  const email = String(payload.email || '').toLowerCase().trim();
+  const deviceId = String(payload.deviceId || '');
+
+  if (!playerId || !email) {
+    userError('Missing Player Selection or User Email.');
+  }
+
+  // Reuse the existing validation + Players col D write. This returns the unified
+  // linked-player shape on both the fresh-link and already-linked paths.
+  const linkRes = handleLinkGoogleAccount(playerId, email, req);
+  const player = linkRes.linkedPlayer || linkRes.player;
+  if (!player) {
+    userError('Could not resolve the player after linking.');
+  }
+
+  const settings = getSettings(req);
+  const activeSeasonId = String(settings.ACTIVE_SEASON_ID || '');
+  const currentWeek = parseWeek(settings.CURRENT_WEEK);
+
+  // Reuse an existing token for the same (player, device); otherwise mint one.
+  let token = '';
+  if (deviceId) {
+    const existing = findSessionByPlayerAndDevice(player.id, deviceId, req);
+    token = existing ? existing.token : insertSession(player.id, deviceId, email, req);
+  } else {
+    token = insertSession(player.id, '', email, req);
+  }
+
+  return {
+    success: true,
+    player: player,
+    linkedPlayer: player,
+    players: getSeasonPlayers(req),
+    leaders: getSeasonLeaders(req),
+    votingOpen: isVotingOpen(settings),
+    alreadyVoted: hasSubmittedThisWeek(player.id, activeSeasonId, currentWeek, req),
+    token: token,
+    unlinkedPlayers: getUnlinkedPlayers(req)
+  };
+}
+
+// One-device de-auth: delete only this device's session row. Players col D is kept,
+// so the player stays claimed by its email (admin can unclaim via a manual sheet edit).
+function handleUnlinkAccount(payload, req) {
+  const token = String(payload.token || '');
+  if (!token) {
+    userError('Missing token.');
+  }
+  const removed = deleteSessionByToken(token, req);
+  return { success: true, removed: removed };
 }
 
 function handleSubmitVote(payload, email, req) {

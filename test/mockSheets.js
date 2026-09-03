@@ -84,6 +84,11 @@ function resetSheets(tables, opts = {}) {
     getSheetByName(name) {
       return sheets[name] || null;
     },
+    insertSheet(name) {
+      const sh = makeSheet([['HEADER']]);
+      sheets[name] = sh;
+      return sh;
+    },
     getSheets() {
       return Object.keys(sheets).map((n) => sheets[n]);
     },
@@ -101,6 +106,7 @@ function resetSheets(tables, opts = {}) {
   registry.state.scriptLockWaited = false;
   registry.state.tryLockCalls = 0;
   registry.state.siteFetches = 0;
+  registry.state.uuidCount = 0;
   return { ss, sheets, state: registry.state };
 }
 
@@ -112,7 +118,7 @@ function installMocks() {
     // SPREADSHEET_ID / API_SECRET resolve during vm.runInThisContext.
     props: { SPREADSHEET_ID: 'TEST', API_SECRET: 'test-secret' },
     urlFixtures: {},
-    state: { openCount: 0, scriptLockGranted: true, scriptLockWaited: false, tryLockCalls: 0, siteFetches: 0 }
+    state: { openCount: 0, scriptLockGranted: true, scriptLockWaited: false, tryLockCalls: 0, siteFetches: 0, uuidCount: 0 }
   };
 
   global.__TEST_REGISTRY__ = registry;
@@ -153,7 +159,8 @@ function installMocks() {
         return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
       }
       return String(date);
-    }
+    },
+    getUuid: () => 'uuid-' + (registry.state.uuidCount = (registry.state.uuidCount || 0) + 1)
   };
 
   global.LockService = {
