@@ -313,6 +313,9 @@
         if (appState.linkedPlayer) setActiveView('vote-view', 0);
         else setActiveView('link-view', 0);
       } else if (tabId === 'leaderboard-view') {
+        // The status box is global; clear any vote-scoped notice (e.g. "Voting
+        // is currently closed") so it only shows on the Vote tab.
+        clearStatus();
         setActiveView('leaderboard-view', 1);
         // Re-entering the tab forces a fresh fetch; toggling seasons within a
         // visit still uses the per-season cache below.
@@ -321,6 +324,7 @@
         loadLeaderboardData();
       } else if (tabId === 'myseason-view') {
         if (appState.linkedPlayer) {
+          clearStatus();
           setActiveView('myseason-view', 2);
           appState.myseasonToken++;
           appState.myseasonCache = {};

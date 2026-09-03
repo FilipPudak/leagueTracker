@@ -879,7 +879,7 @@ function handleGetLeaderboardData(requestedSeasonId, req) {
   const hopeBlock = formatBlock(hopeBlockRaw, (e) => `+${e.score} Climb`);
   const schemerBlock = formatBlock(schemerBlockRaw, (e) => `${e.score} Leaders`);
   const ambassadorBlock = formatBlock(ambassadorBlockRaw, (e) => `${e.score} Votes`);
-  const hunterBlock = formatBlock(hunterBlockRaw, (e) => (e.score ? `${e.score} Bounties` : null));
+  const hunterBlock = formatBlock(hunterBlockRaw, (e) => (e.score ? `${e.score} 💀` : null));
 
   // Galactic Ruler: the stored podium (points) when present, else the live site.
   let ruler = rulerBlock;

@@ -618,8 +618,8 @@ describe('handleGetLeaderboardData', () => {
     const res = handleGetLeaderboardData('S2');
     assert.equal(res.bountyHunter.length, 2);
     assert.equal(res.bountyHunter[0].name, 'Bob');
-    assert.equal(res.bountyHunter[0].score, '8 Bounties');
-    assert.equal(res.bountyHunter[1].score, '4 Bounties');
+    assert.equal(res.bountyHunter[0].score, '8 💀');
+    assert.equal(res.bountyHunter[1].score, '4 💀');
   });
 
   test('live fallback memoizes site fetches (one fetch per distinct round)', () => {
