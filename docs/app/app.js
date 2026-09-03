@@ -60,14 +60,15 @@ function readPrefill() {
 
 /* ------------------------------------------------------------- api layer --- */
 
-async function callApi(action, payload = {}) {
+async function callApi(action, payload = {}, _isRetry = false) {
   const body = Object.assign({ action: action, token: getToken(), deviceId: getDeviceId() }, payload);
   let res;
   try {
     res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      redirect: 'follow'
     });
   } catch (err) {
     throw new Error('Could not connect to the server. Check your connection and try again.');
@@ -76,6 +77,12 @@ async function callApi(action, payload = {}) {
   try {
     json = await res.json();
   } catch (err) {
+    // Apps Script web apps return an HTML interstitial on a cold-start redirect
+    // BEFORE the real JSON. That body often isn't JSON even though the backend
+    // already ran (e.g. token minted). Retry once to ride out the cold start.
+    if (!_isRetry && action !== 'getAppData') {
+      return callApi(action, payload, true);
+    }
     throw new Error('The server returned an unexpected response. Please try again.');
   }
   if (!json.success) {
