@@ -117,6 +117,14 @@
     }
     select:focus { border-color: #38bdf8; box-shadow: 0 0 8px rgba(56, 189, 248, 0.3); }
 
+    .text-input {
+      width: 100%; min-height: 48px; font-size: 1rem; font-family: 'Rajdhani', sans-serif; font-weight: 600;
+      padding: 0 12px; background-color: #090d16; border: 1px solid #334155; border-radius: 6px; color: #f8fafc; outline: none;
+      box-sizing: border-box; transition: border 0.2s ease;
+    }
+    .text-input:focus { border-color: #38bdf8; box-shadow: 0 0 8px rgba(56, 189, 248, 0.3); }
+    .text-input::placeholder { color: #64748b; font-weight: 500; }
+
     .btn-submit { 
       width: 100%; min-height: 50px; font-family: 'Orbitron', sans-serif; font-size: 0.95rem; font-weight: 900; letter-spacing: 1px;
       color: #050811; background-color: #38bdf8; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; 
@@ -192,7 +200,11 @@
     <div id="link-view" class="view-panel">
       <div class="card">
         <h3 style="margin-top:0; font-family:'Orbitron', sans-serif;">Link Account</h3>
-        <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 0;">Select your registered player profile to continue.</p>
+        <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 0;">Enter your email and select your registered player profile to continue. You can re-link with the same email on any device.</p>
+      </div>
+      <div class="form-group">
+        <label for="link-email">Your Email</label>
+        <input type="email" id="link-email" class="text-input" placeholder="you@example.com" autocomplete="email" required />
       </div>
       <div class="form-group">
         <label for="link-player-select">Select Your Name</label>
@@ -341,8 +353,6 @@
       google.script.run
         .withSuccessHandler((data) => {
           showSpinner(false);
-          // Reveal the nav tabs only once initial data has loaded successfully.
-          document.querySelector('.nav-tabs').style.display = 'flex';
           renderAppUI(data);
         })
         .withFailureHandler((err) => {
@@ -391,7 +401,12 @@
         mySeasonFilter.appendChild(opt.cloneNode(true));
       });
 
+      const tabs = document.querySelector('.nav-tabs');
+
       if (!appState.linkedPlayer) {
+        // No identity yet: keep the nav tabs hidden — the user is on the link
+        // screen and cannot vote / view personal stats until they link.
+        tabs.style.display = 'none';
         setActiveView('link-view', 0);
         const select = document.getElementById('link-player-select');
         select.innerHTML = '<option value="">-- Choose Your Name --</option>';
@@ -399,6 +414,7 @@
           select.appendChild(new Option(p.name, p.id));
         });
       } else {
+        tabs.style.display = 'flex';
         setActiveView('vote-view', 0);
         document.getElementById('linked-player-name').textContent = appState.linkedPlayer.name;
 
@@ -431,7 +447,12 @@
     }
 
     function submitAccountLink() {
+      const emailEl = document.getElementById('link-email');
+      const email = emailEl.value.trim();
       const playerId = document.getElementById('link-player-select').value;
+      if (!email) { showStatus('Please enter your email address.', false); return; }
+      // Basic sanity check; the type=email input already enforces format when used in a form.
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showStatus('Please enter a valid email address.', false); return; }
       if (!playerId) { showStatus('Please select your player name.', false); return; }
       showSpinner(true); clearStatus();
 
@@ -439,6 +460,7 @@
         .withSuccessHandler((res) => {
           showSpinner(false);
           appState.linkedPlayer = res.linkedPlayer || res.player;
+          document.querySelector('.nav-tabs').style.display = 'flex';
           setActiveView('vote-view', 0);
           document.getElementById('linked-player-name').textContent = appState.linkedPlayer.name;
           if (res.alreadyVoted) {

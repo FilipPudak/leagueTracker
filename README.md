@@ -1,38 +1,38 @@
 # SWU League Voting
 
-A two-part Google Apps Script (GAS) app for running a **Star Wars: Unlimited** league's
-weekly voting and leaderboards.
+A **Star Wars: Unlimited** league app for weekly voting and leaderboards, built as a static
+front end on GitHub Pages backed by a single Google Apps Script (GAS) "database engine".
 
 ## What it is
 
-- Players link their Google account once, then submit a weekly vote (a favorite leader
-  and favorite opponent) through a mobile-styled web app.
+- Players link once on each device by entering an email and picking their player profile; the
+  backend mints a per-device token. They then submit a weekly vote (a favorite leader and
+  favorite opponent) through a mobile-styled web app.
 - A spreadsheet-backed backend tracks votes, compiles leaderboards, advances weeks, and
   calculates end-of-season awards.
 - Player rosters are synced from the league website (`SCRAPE_URL`) on a recurring trigger.
 
 ## Architecture
 
-| Folder     | Role                                                        |
-|------------|-------------------------------------------------------------|
-| `backend/` | Script 1 — spreadsheet-backed "database engine". Exposes a `doPost` JSON API for linking accounts, submitting weekly votes, and returning leaderboard data. Also handles the weekly lifecycle (advancing weeks, compiling summaries, calculating end-of-season awards) and syncs players from the SWU league website. |
-| `frontend/` | Script 2 — the client web app. Proxies requests to Script 1's published URL and serves a mobile-styled UI (`Index.html`) for voting and viewing leaderboards. |
+| Folder       | Role                                                        |
+|--------------|-------------------------------------------------------------|
+| `backend/`   | Apps Script "database engine". Exposes a `doPost` JSON API for linking accounts via per-device session tokens, submitting weekly votes, and returning leaderboard data. Also handles the weekly lifecycle (advancing weeks, compiling summaries, calculating end-of-season awards) and syncs players from the SWU league website. |
+| `docs/app/`  | **Static client** (plain HTML/CSS/JS) served from GitHub Pages. Calls the backend `/exec` URL directly with `fetch` — no Google sign-in, no proxy, no shared secret. |
+| `frontend/`  | **Retired** (Stage 2 cut-over) legacy Script 2 proxy. Kept for reference only. |
 
-Each project has its own `appsscript.json` manifest:
-`backend/appsscript.json` runs as `USER_DEPLOYING` with `ANYONE_ANONYMOUS` access (its
-`API_SECRET` gate handles security — see `docs/SECURITY.md`), and `frontend/appsscript.json`
-runs as `USER_ACCESSING` with `ANYONE` access (signed-in Google account required).
+The backend runs as `USER_DEPLOYING` with `ANYONE_ANONYMOUS` access; identity is enforced by
+**per-device session tokens**, not a shared secret (see `docs/SECURITY.md`).
 
 ## Quickstart
 
-1. Create both Apps Script projects and set their **Script Properties** — see
+1. Deploy the backend and bake its `/exec` URL into `docs/app/app.js` (`API_URL`) — see
    `docs/DEPLOYMENT.md`.
-2. Deploy and republish each project with clasp — see `docs/DEPLOYMENT.md`.
-3. Configure your tab structure — see `docs/DATABASE.md`.
+2. Publish `docs/` on GitHub Pages and point players at the `/app/` sub-path.
+3. Configure your tab structure and the `Sessions` sheet — see `docs/DATABASE.md`.
 
 ## Docs
 
-- [Deployment & configuration](docs/DEPLOYMENT.md) — secrets, Script Properties, clasp deploy/republish.
+- [Deployment & configuration](docs/DEPLOYMENT.md) — Script Properties, clasp deploy, GitHub Pages hosting.
 - [Database (spreadsheet structure)](docs/DATABASE.md) — tabs and columns.
 - [Security model](docs/SECURITY.md) — how voting integrity is enforced and its accepted limitation.
 - [Load reliability](docs/PERFORMANCE.md) — cold-start retries, spinner, lazy-loaded leaderboard.

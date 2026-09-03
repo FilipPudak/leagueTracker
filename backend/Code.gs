@@ -2,7 +2,8 @@
  * ============================================================================
  * SCRIPT 1: BACKEND & DATABASE ENGINE
  * Executes as: ME (USER_DEPLOYING)
- * Access: ANYONE_ANONYMOUS (anonymous OK; protected by API_SECRET)
+ * Access: ANYONE_ANONYMOUS (anonymous OK; identity secured by per-device
+ *          session tokens minted at link time — no shared static secret).
  * ============================================================================
  */
 
@@ -19,12 +20,6 @@ function getConfig(key, fallback) {
 // to be recycled.
 function getSpreadsheetId() {
   return getConfig('SPREADSHEET_ID');
-}
-
-// Secret shared with the frontend proxy (Script 2). Every request must present it
-// so that only our own web app can talk to this backend. Never exposed to browsers.
-function getApiSecret() {
-  return getConfig('API_SECRET', '');
 }
 
 const SHEETS = {
@@ -76,44 +71,35 @@ function doPost(e) {
   try {
     const payload = JSON.parse(e.postData.contents);
     action = payload.action;
-    const userEmail = String(payload.userEmail || '').toLowerCase().trim();
     // Per-request memo context shared by the data helpers so each sheet and
     // external standing is opened/fetched at most once per request. Passing
     // no context (direct helper calls from tests/tools) keeps the old
     // behavior.
     const req = { cache: {} };
 
-    // Open / token-optional actions may be called with no email at all.
-    // Everything else needs an email (legacy) or a token (new).
+    // Open / token-optional actions may be called with no identity at all.
+    // Everything else needs a valid session token (token-only model).
     const openActions = ['linkAccount', 'unlinkAccount', 'getLeaderboardData'];
     const tokenOptional = ['getAppData'];
     const token = String(payload.token || '').trim();
-    if (!userEmail && !token && openActions.indexOf(action) === -1 && tokenOptional.indexOf(action) === -1) {
-      throw new Error('User identity missing.');
-    }
 
-    // Reject any request that doesn't carry our shared secret. This prevents
-    // third parties who discover the public URL from calling the API directly.
-    if (String(payload.apiSecret) !== String(getApiSecret())) {
-      console.warn(`[API] Unauthorized attempt: action=${action || '?'} userEmail=${userEmail || 'unset'}`);
-      return createJsonResponse({ success: false, error: 'Unauthorized.' });
-    }
+    // Token-only identity: resolve the token to its linked player's email.
+    // Lazily GCs stale sessions (invalid tokens resolve to '' and re-trigger
+    // link). The legacy client-asserted userEmail path was removed at cut-over.
+    const session = token ? findSessionByToken(token, req) : null;
+    const effectiveEmail = session ? session.email : '';
 
-    // Resolve a token to its linked player's email when no explicit email was
-    // sent, so the identity-bound handlers can run unchanged. (Dual-path: the
-    // legacy client-asserted email works until Stage 2 cuts over to token-only.)
-    let identityEmail = userEmail;
-    if (token && !identityEmail) {
-      const session = findSessionByToken(token, req);
-      if (session) identityEmail = session.email;
+    const needsIdentity = openActions.indexOf(action) === -1 && tokenOptional.indexOf(action) === -1;
+    if (needsIdentity && !effectiveEmail) {
+      // Identity-bound action without a valid session token.
+      userError('Missing or invalid session. Please link your player account.');
     }
-    const effectiveEmail = identityEmail || userEmail;
 
     // Only write operations need the script lock so two concurrent voters
     // can't both pass the duplicate-check. Read-only actions run
     // concurrently, eliminating the "Database is busy" bottleneck for
     // leaderboard/stats requests that perform slow site fetches.
-    const needsLock = (action === 'linkGoogleAccount' || action === 'submitVote' ||
+    const needsLock = (action === 'submitVote' ||
                        action === 'linkAccount' || action === 'unlinkAccount');
     const lock = LockService.getScriptLock();
     if (needsLock && !lock.tryLock(10000)) {
@@ -125,8 +111,6 @@ function doPost(e) {
 
       if (action === 'getAppData') {
         result = handleGetAppData(effectiveEmail, req, token);
-      } else if (action === 'linkGoogleAccount') {
-        result = handleLinkGoogleAccount(payload.playerId, effectiveEmail, req);
       } else if (action === 'linkAccount') {
         result = handleLinkAccount(payload, req);
       } else if (action === 'unlinkAccount') {
@@ -148,7 +132,6 @@ function doPost(e) {
   } catch (err) {
     console.error('API Error:', err);
     var gen = { getAppData: "Couldn't load your league data. Please try again.",
-                linkGoogleAccount: "We couldn't link your account. Please try again.",
                 linkAccount: "We couldn't link your account. Please try again.",
                 unlinkAccount: "We couldn't unlink this device. Please try again.",
                 submitVote: "We couldn't submit your vote. Please try again.",
@@ -493,6 +476,10 @@ function handleGetAppData(userEmail, req, token) {
     data.hasVoted = submitted;
   } else {
     data.unlinkedPlayers = getUnlinkedPlayers(req);
+    // Full active roster for the link-form picker, so a returning user whose
+    // player is already claimed to their own email can re-pick and re-link.
+    // linkAccount still enforces email/player ownership on submission.
+    data.players = getSeasonPlayers(req);
   }
 
   return data;

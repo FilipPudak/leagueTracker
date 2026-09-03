@@ -13,6 +13,7 @@ header and is skipped.
 | `LeaderVotes` | `A` timestamp · `B` seasonId · `C` week · `D` voter playerId · `E` leaderId (one row per player per week; also used to enforce one submission per week) |
 | `OpponentVotes` | `A` timestamp · `B` seasonId · `C` week · `D` opponentId (de-identified tally only — no voter attribution) |
 | `Awards` | `A` seasonId · `B` award · `C` playerId. Written once at season close (final week, per `SEASON_LENGTH`). `award` ∈ `Galactic Ruler`, `Galactic Schemer`, `Galactic Ambassador`, `A New Hope`, `Bounty Hunter`. **Every award gets a row**: winner(s) when resolved, otherwise a placeholder with an empty `playerId` that is filled in later (manually for Bounty Hunter, via `backfillSeasonAwards` otherwise). Every tied winner is its own row. Once written, a row is never overwritten by the close itself. |
+| `Sessions` | `A` token (UUID, per device) · `B` playerId · `C` deviceId · `D` email (lowercased, trimmed) · `E` created timestamp. **Many sessions map to one player** (one per device). Auto-created on first use if the sheet is missing. A row is deleted when that device is unlinked, or lazily GC'd when a stale token (e.g. after an admin unclaim) is presented on a request. Players col D (email claim) is kept on unlink so the player stays claimed by their email. |
 
 The `Players` and `Leaders` **`active`** columns gate who is selectable as a vote
 option in the current season. Historical leaderboards are computed on demand from the raw

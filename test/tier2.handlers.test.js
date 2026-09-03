@@ -122,10 +122,12 @@ describe('handleGetAppData', () => {
     assert.equal(data.unlinkedPlayers.length, 0);
   });
 
-  test('unlinked user gets unlinkedPlayers and no roster', () => {
+  test('unlinked user gets the full active roster plus unlinkedPlayers', () => {
     const data = handleGetAppData('newbie@x.com');
     assert.equal(data.linked, false);
-    assert.equal(data.players.length, 0);
+    // Full active roster so a returning user can re-pick their already-claimed
+    // player; linkAccount enforces email/player ownership on submission.
+    assert.equal(data.players.length, 4);
     assert.equal(data.unlinkedPlayers.map((p) => p.id).sort().join(','), 'p3,p4');
   });
 
@@ -716,68 +718,92 @@ describe('doPost dispatch & security', () => {
     env = resetSheets(freshTables());
   });
 
-  test('routes to the correct handlers', () => {
-    const ok = doPostJson({ action: 'getAppData', userEmail: 'alice@x.com', apiSecret: SECRET });
+  // Link a player on a device and return the result, so token-based identity
+  // tests below exercise the token-only dispatch.
+  function linkCara() {
+    return doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1' });
+  }
+
+  test('routes to the correct handlers (token-based identity)', () => {
+    const link = linkCara();
+    const ok = doPostJson({ action: 'getAppData', token: link.data.token });
     assert.equal(ok.success, true);
     assert.equal(ok.data.linked, true);
+    assert.equal(ok.data.status, 'linked');
   });
 
-  test('rejects requests with a bad secret before dispatching', () => {
-    const bad = doPostJson({ action: 'getAppData', userEmail: 'alice@x.com', apiSecret: 'wrong' });
-    assert.equal(bad.success, false);
-    assert.equal(bad.error, 'Unauthorized.');
+  test('token-only: a client-asserted userEmail with no token grants no identity', () => {
+    // The legacy email path was removed at cut-over; a raw email alone must
+    // NOT resolve a player.
+    const ok = doPostJson({ action: 'getAppData', userEmail: 'alice@x.com' });
+    assert.equal(ok.data.status, 'unlinked');
+    assert.equal(ok.data.linked, false);
+  });
+
+  test('no shared secret is required after the cut-over', () => {
+    // A valid action works without any apiSecret.
+    const link = linkCara();
+    assert.equal(link.success, true);
+    assert.ok(link.data.token);
   });
 
   test('rejects an invalid action with the generic fallback message', () => {
-    const bad = doPostJson({ action: 'nope', userEmail: 'alice@x.com', apiSecret: SECRET });
+    const link = linkCara();
+    // Pass a valid token so identity gate passes and the invalid-action branch is hit.
+    const bad = doPostJson({ action: 'nope', token: link.data.token });
     assert.equal(bad.success, false);
     assert.equal(bad.error, 'Something went wrong. Please try again.');
   });
 
-  test('getAppData is token-optional (no identity returns a bootstrap list)', () => {
-    const res = doPostJson({ action: 'getAppData', userEmail: '', apiSecret: SECRET });
+  test('getAppData is token-optional (no token returns a bootstrap list)', () => {
+    const res = doPostJson({ action: 'getAppData' });
     assert.equal(res.success, true);
     assert.equal(res.data.status, 'unlinked');
     assert.deepEqual(res.data.unlinkedPlayers.map((p) => p.id).sort(), ['p3', 'p4']);
   });
 
-  test('rejects a missing user identity for identity-bound actions', () => {
-    const bad = doPostJson({ action: 'submitVote', userEmail: '', apiSecret: SECRET, leaderId: 'l1' });
+  test('rejects a missing session token for identity-bound actions', () => {
+    const bad = doPostJson({ action: 'submitVote', leaderId: 'l1' });
     assert.equal(bad.success, false);
-    assert.equal(bad.error, "We couldn't submit your vote. Please try again.");
+    assert.match(bad.error, /Missing or invalid session/i);
+  });
+
+  test('rejects an invalid (stale) token for identity-bound actions', () => {
+    const bad = doPostJson({ action: 'submitVote', token: 'does-not-exist', leaderId: 'l1' });
+    assert.equal(bad.success, false);
+    assert.match(bad.error, /Missing or invalid session/i);
   });
 
   test('maps business errors to per-action friendly messages', () => {
-    // Force a userError in submitVote (duplicate) and check the friendly message.
-    env.sheets.LeaderVotes.appendRow(['2026-01-01', 'S2', 3, 'p1', 'l1']);
-    const res = doPostJson({
-      action: 'submitVote',
-      userEmail: 'alice@x.com',
-      apiSecret: SECRET,
-      leaderId: 'l1'
-    });
+    const link = linkCara();
+    // p3 already voted this week -> duplicate business error.
+    env.sheets.LeaderVotes.appendRow(['2026-01-01', 'S2', 3, 'p3', 'l1']);
+    const res = doPostJson({ action: 'submitVote', token: link.data.token, leaderId: 'l1' });
     assert.equal(res.success, false);
     assert.equal(res.error, 'You have already submitted votes for this week.');
   });
 
   test('returns a busy error when the script lock cannot be acquired', () => {
+    const link = linkCara();
     env.state.scriptLockGranted = false;
-    const res = doPostJson({ action: 'submitVote', userEmail: 'alice@x.com', apiSecret: SECRET, leader1Id: 'l1', opponentId: 'p2' });
+    const res = doPostJson({ action: 'submitVote', token: link.data.token, leader1Id: 'l1', opponentId: 'p2' });
     assert.equal(res.success, false);
     assert.equal(res.error, 'Database is busy. Please try again.');
   });
 
   test('read actions do not acquire the script lock', () => {
-    doPostJson({ action: 'getAppData', userEmail: 'alice@x.com', apiSecret: SECRET });
+    doPostJson({ action: 'getAppData' });
     assert.equal(env.state.tryLockCalls, 0, 'getAppData should not call tryLock');
 
-    doPostJson({ action: 'getLeaderboardData', seasonId: 'S1', apiSecret: SECRET, userEmail: 'test@x.com' });
+    doPostJson({ action: 'getLeaderboardData', seasonId: 'S1' });
     assert.equal(env.state.tryLockCalls, 0, 'getLeaderboardData should not call tryLock');
   });
 
   test('write actions acquire the script lock', () => {
-    doPostJson({ action: 'submitVote', userEmail: 'alice@x.com', apiSecret: SECRET, leader1Id: 'l1', opponentId: 'p2' });
-    assert.equal(env.state.tryLockCalls, 1);
+    const link = linkCara();
+    doPostJson({ action: 'submitVote', token: link.data.token, leader1Id: 'l1', opponentId: 'p2' });
+    // linkAccount and submitVote each attempt the lock (2 total).
+    assert.equal(env.state.tryLockCalls, 2);
   });
 });
 
@@ -786,12 +812,12 @@ describe('per-request memoization', () => {
   beforeEach(() => { env = resetSheets(freshTables()); });
 
   test('getAppData opens the spreadsheet only once', () => {
-    doPostJson({ action: 'getAppData', userEmail: 'alice@x.com', apiSecret: SECRET });
+    doPostJson({ action: 'getAppData' });
     assert.equal(env.state.openCount, 1);
   });
 
   test('getLeaderboardData opens the spreadsheet only once', () => {
-    doPostJson({ action: 'getLeaderboardData', seasonId: 'S1', apiSecret: SECRET, userEmail: 'test@x.com' });
+    doPostJson({ action: 'getLeaderboardData', seasonId: 'S1' });
     assert.equal(env.state.openCount, 1);
   });
 
