@@ -16,6 +16,7 @@ const KEY_PLAYER = 'lt_playerId';
 let appState = {
   status: 'unlinked',
   linkedPlayer: null,
+  votingOpen: false,
   settings: {},
   seasons: [],
   leaderboardCache: {},
@@ -119,6 +120,7 @@ function applyBoot(boot) {
   appState.status = boot.status || 'unlinked';
   appState.settings = boot.settings || {};
   appState.linkedPlayer = boot.currentPlayer || boot.linkedPlayer || null;
+  appState.votingOpen = Boolean(boot.votingOpen);
   appState.seasons = boot.seasons || [];
 
   const seasonName = boot.seasonName || ('Season ' + (appState.settings.activeSeasonId || ''));
@@ -148,20 +150,22 @@ function applyBoot(boot) {
   });
 
   if (boot.status === 'linked') {
+    // Reset the vote card to its default visible state before deciding how to
+    // present it, so re-entering quickly never leaves a stale hidden form.
+    $('vote-form').style.display = '';
+    $('already-voted-card').style.display = 'none';
     showLinkedPresence(appState.linkedPlayer);
     showTabs(true);
     setActiveView('vote-view', 0);
-    $('linked-player-name').textContent = appState.linkedPlayer.name;
     if (boot.alreadySubmitted || boot.alreadyVoted) {
       $('vote-form').style.display = 'none';
       $('already-voted-card').style.display = 'block';
       clearStatus();
-    } else if (!boot.votingOpen) {
+    } else if (!appState.votingOpen) {
       $('vote-form').style.display = 'none';
       clearStatus();
       showStatus('Voting is currently closed for this week.', false);
     } else {
-      $('vote-form').style.display = '';
       populateVotingDropdowns(boot.leaders, boot.players, appState.linkedPlayer.id);
     }
   } else {
@@ -208,26 +212,6 @@ function populateLinkPicker(players) {
 
 /* ---------------------------------------------------------------- intents -- */
 
-function revealTabsAndVote(boot) {
-  appState.status = 'linked';
-  showLinkedPresence(boot.linkedPlayer || boot.player);
-  showTabs(true);
-  setActiveView('vote-view', 0);
-  $('linked-player-name').textContent = (boot.linkedPlayer || boot.player).name;
-  if (boot.alreadyVoted) {
-    $('vote-form').style.display = 'none';
-    $('already-voted-card').style.display = 'block';
-    clearStatus();
-  } else if (!boot.votingOpen) {
-    $('vote-form').style.display = 'none';
-    clearStatus();
-    showStatus('Voting is currently closed for this week.', false);
-  } else {
-    $('vote-form').style.display = '';
-    populateVotingDropdowns(boot.leaders, boot.players, (boot.linkedPlayer || boot.player).id);
-  }
-}
-
 function submitAccountLink() {
   const emailEl = $('link-email');
   const email = emailEl.value.trim();
@@ -239,11 +223,19 @@ function submitAccountLink() {
 
   callApi('linkAccount', { playerId: playerId, email: email })
     .then((res) => {
-      showSpinner(false);
       appState.linkedPlayer = res.linkedPlayer || res.player;
       setSession(appState.linkedPlayer, res.token || '');
-      revealTabsAndVote(res);
-      showStatus('Account linked successfully!', true);
+      // Render from the authoritative getAppData (fresh token) rather than the
+      // link response, so voting-open state and leader/player dropdowns match
+      // the backend exactly and re-populate even when voting is closed.
+      return callApi('getAppData', {});
+    })
+    .then((boot) => {
+      showSpinner(false);
+      applyBoot(boot);
+      if (appState.votingOpen) {
+        showStatus('Account linked successfully!', true);
+      }
     })
     .catch((err) => {
       showSpinner(false);
@@ -327,6 +319,10 @@ function populateVotingDropdowns(leaders, players, currentUserId) {
 let voteInFlight = false;
 
 function submitVotes() {
+  if (!appState.votingOpen) {
+    showStatus('Voting is currently closed for this week.', false);
+    return;
+  }
   const l1 = $('leader-1').value;
   const opp = $('favorite-opponent').value;
   if (!l1 || !opp) { showStatus('Please select your Leader and Favorite Opponent.', false); return; }
