@@ -65,7 +65,9 @@ function readPrefill() {
 
 /* ------------------------------------------------------------- api layer --- */
 
-async function callApi(action, payload = {}, _isRetry = false) {
+const IDEMPOTENT_WRITES = ['linkAccount', 'unlinkAccount'];
+
+async function callApi(action, payload = {}, _attempt = 0) {
   const body = Object.assign({ action: action, token: getToken(), deviceId: getDeviceId() }, payload);
   let res;
   try {
@@ -83,19 +85,41 @@ async function callApi(action, payload = {}, _isRetry = false) {
     json = await res.json();
   } catch (err) {
     // Apps Script web apps return an HTML interstitial on a cold-start redirect
-    // BEFORE the real JSON. That body often isn't JSON even though the backend
-    // already ran. Reads are idempotent, so we retry them once to ride out the
-    // cold start. Writes are NOT auto-resent: a resend could double-execute the
-    // write (e.g. minting a second session token or double-submitting), so we
-    // surface a retry prompt instead and rely on the app's boot warm-up.
-    const isWrite = ['linkAccount', 'unlinkAccount', 'submitVote'].indexOf(action) !== -1;
-    if (isWrite) {
+    // BEFORE the real JSON, even though the backend handler already ran for that
+    // request. So the retry lands on a warm server.
+    //
+    // Reads and idempotent writes (link/unlink) are safe to auto-resend here:
+    //   - reads are idempotent by nature;
+    //   - linkAccount reuses the existing token via resolveDeviceAccountToken
+    //     (newest-wins, locked, and the Sessions sheet has a header), so a retry
+    //     never mints a second token;
+    //   - unlinkAccount deletes by (playerId, deviceId), so a retry deletes nothing
+    //     extra if the first already ran.
+    // submitVote is NOT auto-resent: if the first attempt recorded, a resend would
+    // hit the duplicate guard and surface a confusing "already submitted" instead
+    // of a real confirmation, so the user confirms that one manually.
+    const isIdempotent = IDEMPOTENT_WRITES.indexOf(action) !== -1;
+    const isVote = action === 'submitVote';
+
+    if (isVote) {
+      // Manual retry only: surface the warm-up error and let the user re-tap.
       const e = new Error('The server is still warming up. Please click again.');
       e.userMessage = 'The server is still warming up. Please try again.';
       throw e;
     }
-    if (!_isRetry) {
-      return callApi(action, payload, true);
+
+    if (isIdempotent) {
+      if (_attempt < 1) {
+        return callApi(action, payload, _attempt + 1);
+      }
+      const e = new Error('The server is still warming up. Please click again.');
+      e.userMessage = 'The server is still warming up. Please try again.';
+      throw e;
+    }
+
+    // Plain read: auto-retry once (existing behavior).
+    if (_attempt === 0) {
+      return callApi(action, payload, 1);
     }
     throw new Error('The server returned an unexpected response. Please try again.');
   }
