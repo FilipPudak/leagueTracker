@@ -80,8 +80,17 @@ async function callApi(action, payload = {}, _isRetry = false) {
   } catch (err) {
     // Apps Script web apps return an HTML interstitial on a cold-start redirect
     // BEFORE the real JSON. That body often isn't JSON even though the backend
-    // already ran (e.g. token minted). Retry once to ride out the cold start.
-    if (!_isRetry && action !== 'getAppData') {
+    // already ran. Reads are idempotent, so we retry them once to ride out the
+    // cold start. Writes are NOT auto-resent: a resend could double-execute the
+    // write (e.g. minting a second session token or double-submitting), so we
+    // surface a retry prompt instead and rely on the app's boot warm-up.
+    const isWrite = ['linkAccount', 'unlinkAccount', 'submitVote'].indexOf(action) !== -1;
+    if (isWrite) {
+      const e = new Error('The server is still warming up. Please click again.');
+      e.userMessage = 'The server is still warming up. Please try again.';
+      throw e;
+    }
+    if (!_isRetry) {
       return callApi(action, payload, true);
     }
     throw new Error('The server returned an unexpected response. Please try again.');

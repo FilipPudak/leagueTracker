@@ -353,20 +353,6 @@ function findSessionByToken(token, req) {
   return null;
 }
 
-function findSessionByPlayerAndDevice(playerId, deviceId, req) {
-  if (!deviceId || !playerId) return null;
-  const sh = getSessionsSheet(req);
-  if (sh.getLastRow() <= 1) return null;
-  const rows = sh.getDataRange().getValues().slice(1);
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i];
-    if (String(r[1]) === String(playerId) && String(r[2]) === String(deviceId)) {
-      return { token: String(r[0]), playerId: String(r[1]), deviceId: String(r[2]), email: String(r[3] || '') };
-    }
-  }
-  return null;
-}
-
 function insertSession(playerId, deviceId, email, req) {
   const token = mintToken();
   getSessionsSheet(req).appendRow([token, String(playerId), String(deviceId || ''), String(email || '').toLowerCase().trim(), formatISODate(new Date())]);
@@ -387,23 +373,39 @@ function deleteSessionByToken(token, req) {
   return false;
 }
 
-// Removes every Sessions row for (playerId, deviceId) whose token differs from
-// `keepToken`, leaving exactly one active token per device. Safe: rows with a
-// different deviceId (legit multi-device logins) are untouched.
-function pruneDuplicateDeviceSessions(playerId, deviceId, keepToken, req) {
-  if (!deviceId || !playerId || !keepToken) return 0;
+// Returns a single authoritative token for (playerId, deviceId), preferring the
+// NEWEST Sessions row (highest row index). If none exists, mints one. Any other
+// rows for the same (playerId, deviceId) are collapsed so a browser never holds
+// more than one active session. Rows with a different deviceId (legit multi-device
+// logins) are untouched. The returned token is the one the client must persist.
+function resolveDeviceAccountToken(playerId, deviceId, email, req) {
+  if (!deviceId || !playerId) return insertSession(playerId, deviceId, email, req);
   const sh = getSessionsSheet(req);
-  if (sh.getLastRow() <= 1) return 0;
   const rows = sh.getDataRange().getValues();
-  let removed = 0;
-  for (let i = rows.length - 1; i >= 1; i--) {
+  let keep = null;
+  for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
-    if (String(r[1]) === String(playerId) && String(r[2]) === String(deviceId) && String(r[0]) !== String(keepToken)) {
-      sh.deleteRow(i + 1);
-      removed++;
+    if (String(r[1]) === String(playerId) && String(r[2]) === String(deviceId)) {
+      keep = i; // last match wins => newest row kept
     }
   }
-  return removed;
+  let token;
+  if (keep === null) {
+    token = insertSession(playerId, deviceId, email, req);
+  } else {
+    token = String(rows[keep][0]);
+    // Collapse duplicates: delete any other match but the kept (newest) row.
+    for (let i = rows.length - 1; i >= 1; i--) {
+      const r = rows[i];
+      if (i !== keep &&
+          String(r[1]) === String(playerId) &&
+          String(r[2]) === String(deviceId) &&
+          String(r[0]) !== String(token)) {
+        sh.deleteRow(i + 1);
+      }
+    }
+  }
+  return token;
 }
 
 function hasSubmittedThisWeek(playerId, seasonId, weekVal, req) {
@@ -584,18 +586,14 @@ function handleLinkAccount(payload, req) {
   const activeSeasonId = String(settings.ACTIVE_SEASON_ID || '');
   const currentWeek = parseWeek(settings.CURRENT_WEEK);
 
-  // Reuse an existing token for the same (player, device); otherwise mint one.
-  let token = '';
-  if (deviceId) {
-    const existing = findSessionByPlayerAndDevice(player.id, deviceId, req);
-    token = existing ? existing.token : insertSession(player.id, deviceId, email, req);
-    // A cold-start double-link can leave a duplicate/superseded row for the same
-    // (player, device). Keep only the most recent active token for this device so
-    // a single browser never accrues multiple sessions.
-    pruneDuplicateDeviceSessions(player.id, deviceId, token, req);
-  } else {
-    token = insertSession(player.id, '', email, req);
-  }
+  // Resolve to a single authoritative token per (player, device), keeping the
+  // NEWEST row and collapsing any duplicate/superseded rows for the same device.
+  // Returns that kept token so the client always stores the surviving one. A
+  // cold-start double-link (or leftover rows from before the dedupe existed) can
+  // otherwise leave a browser with multiple sessions; this converges to one.
+  const token = deviceId
+    ? resolveDeviceAccountToken(player.id, deviceId, email, req)
+    : insertSession(player.id, '', email, req);
 
   return {
     success: true,

@@ -862,16 +862,23 @@ describe('token layer (linkAccount / unlinkAccount)', () => {
     assert.equal(a.data.token, b.data.token);
   });
 
-  test('linkAccount prunes a duplicate session row for the same (player, deviceId)', () => {
+  test('linkAccount collapses a duplicate row for the same (player, deviceId), newest wins', () => {
     const a = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
-    // Simulate a cold-start double-link leaving a superseded row for the same device.
-    env.sheets.Sessions.rows.push([a.data.token + '-dup', 'p3', 'D1', 'cara@x.com', 'x']);
+    // Simulate a pre-existing leftover row (still the SAME device): minted later, so
+    // it sits lower in the sheet and is the "newest" row for this (player, device).
+    const leftover = a.data.token + '-older';
+    env.sheets.Sessions.rows.push([leftover, 'p3', 'D1', 'cara@x.com', 'x']);
     const b = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
-    assert.equal(a.data.token, b.data.token);
-    // Exactly one active row remains for this (player, device): the reused token.
+    // Newest-wins keeps the LAST (lower) matching row, i.e. the leftover, and returns
+    // that as the authoritative token.
+    assert.equal(b.data.token, leftover);
+    // Exactly one active row remains for this (player, device), and it's the kept newest.
     const rows = env.sheets.Sessions.rows.slice(1).filter((r) => String(r[1]) === 'p3' && String(r[2]) === 'D1');
     assert.equal(rows.length, 1);
-    assert.equal(rows[0][0], a.data.token);
+    assert.equal(rows[0][0], leftover);
+    // The kept token actually resolves (surviving session is valid).
+    const check = doPostJson({ action: 'getAppData', token: leftover, apiSecret: SECRET });
+    assert.equal(check.data.status, 'linked');
   });
 
   test('linkAccount does not touch a different deviceid (multi-device is kept)', () => {
