@@ -122,6 +122,9 @@ function applyBoot(boot) {
   appState.linkedPlayer = boot.currentPlayer || boot.linkedPlayer || null;
   appState.votingOpen = Boolean(boot.votingOpen);
   appState.seasons = boot.seasons || [];
+  appState.seasonName = boot.seasonName;
+  appState.week = boot.week;
+  appState.seasonId = boot.seasonId;
 
   const seasonName = boot.seasonName || ('Season ' + (appState.settings.activeSeasonId || ''));
   $('app-subtitle').textContent = seasonName + ' • Week ' + (boot.week || 1);
@@ -225,12 +228,24 @@ function submitAccountLink() {
     .then((res) => {
       appState.linkedPlayer = res.linkedPlayer || res.player;
       setSession(appState.linkedPlayer, res.token || '');
-      // Render from the authoritative getAppData (fresh token) rather than the
-      // link response, so voting-open state and leader/player dropdowns match
-      // the backend exactly and re-populate even when voting is closed.
-      return callApi('getAppData', {});
-    })
-    .then((boot) => {
+      // Render from the authoritative linkAccount response (which already
+      // persisted the session + Players col D write server-side) plus the static
+      // state carried from the initial getAppData boot. Doing an extra getAppData
+      // read right here races Apps Script read-after-write staleness and can
+      // report the fresh token as invalid ("session expired"). So we avoid it.
+      const boot = {
+        status: 'linked',
+        votingOpen: res.votingOpen,
+        alreadySubmitted: res.alreadyVoted,
+        linkedPlayer: res.linkedPlayer || res.player,
+        leaders: res.leaders,
+        players: res.players,
+        settings: appState.settings,
+        seasons: appState.seasons,
+        seasonName: appState.seasonName,
+        week: appState.week,
+        seasonId: appState.seasonId
+      };
       showSpinner(false);
       applyBoot(boot);
       if (appState.votingOpen) {

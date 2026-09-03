@@ -862,6 +862,29 @@ describe('token layer (linkAccount / unlinkAccount)', () => {
     assert.equal(a.data.token, b.data.token);
   });
 
+  test('linkAccount prunes a duplicate session row for the same (player, deviceId)', () => {
+    const a = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
+    // Simulate a cold-start double-link leaving a superseded row for the same device.
+    env.sheets.Sessions.rows.push([a.data.token + '-dup', 'p3', 'D1', 'cara@x.com', 'x']);
+    const b = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
+    assert.equal(a.data.token, b.data.token);
+    // Exactly one active row remains for this (player, device): the reused token.
+    const rows = env.sheets.Sessions.rows.slice(1).filter((r) => String(r[1]) === 'p3' && String(r[2]) === 'D1');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0][0], a.data.token);
+  });
+
+  test('linkAccount does not touch a different deviceid (multi-device is kept)', () => {
+    const a = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
+    const b = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D2', apiSecret: SECRET });
+    // Re-link D1: D2's session must be untouched.
+    const c = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
+    assert.equal(a.data.token, c.data.token);
+    const d2rows = env.sheets.Sessions.rows.slice(1).filter((r) => String(r[2]) === 'D2');
+    assert.equal(d2rows.length, 1);
+    assert.equal(d2rows[0][0], b.data.token);
+  });
+
   test('linkAccount mints a separate token for a new deviceId (multi-device)', () => {
     const a = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1', apiSecret: SECRET });
     const b = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D2', apiSecret: SECRET });

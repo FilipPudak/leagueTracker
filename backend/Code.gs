@@ -387,6 +387,25 @@ function deleteSessionByToken(token, req) {
   return false;
 }
 
+// Removes every Sessions row for (playerId, deviceId) whose token differs from
+// `keepToken`, leaving exactly one active token per device. Safe: rows with a
+// different deviceId (legit multi-device logins) are untouched.
+function pruneDuplicateDeviceSessions(playerId, deviceId, keepToken, req) {
+  if (!deviceId || !playerId || !keepToken) return 0;
+  const sh = getSessionsSheet(req);
+  if (sh.getLastRow() <= 1) return 0;
+  const rows = sh.getDataRange().getValues();
+  let removed = 0;
+  for (let i = rows.length - 1; i >= 1; i--) {
+    const r = rows[i];
+    if (String(r[1]) === String(playerId) && String(r[2]) === String(deviceId) && String(r[0]) !== String(keepToken)) {
+      sh.deleteRow(i + 1);
+      removed++;
+    }
+  }
+  return removed;
+}
+
 function hasSubmittedThisWeek(playerId, seasonId, weekVal, req) {
   const ss = getSpreadsheetCached(req);
   const weekNum = parseWeek(weekVal);
@@ -570,6 +589,10 @@ function handleLinkAccount(payload, req) {
   if (deviceId) {
     const existing = findSessionByPlayerAndDevice(player.id, deviceId, req);
     token = existing ? existing.token : insertSession(player.id, deviceId, email, req);
+    // A cold-start double-link can leave a duplicate/superseded row for the same
+    // (player, device). Keep only the most recent active token for this device so
+    // a single browser never accrues multiple sessions.
+    pruneDuplicateDeviceSessions(player.id, deviceId, token, req);
   } else {
     token = insertSession(player.id, '', email, req);
   }
