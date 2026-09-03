@@ -208,6 +208,11 @@
     .modal-box h3 { margin: 0 0 8px; font-family: 'Orbitron', sans-serif; color: #38bdf8; }
     .modal-box p { font-size: 0.9rem; color: #94a3b8; margin: 0 0 16px; }
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .site-footer {
+      margin-top: 32px; padding: 16px 20px; text-align: center;
+      font-size: 0.75rem; color: #475569; border-top: 1px solid rgba(71, 85, 105, 0.25);
+      font-family: monospace;
+    }
   </style>
 </head>
 <body>
@@ -356,6 +361,10 @@
       </div>
     </div>
   </div>
+
+  <footer class="site-footer">
+    <span>v<span id="site-version">dev</span></span>
+  </footer>
 
   <script src="app.js"></script>
 </body>

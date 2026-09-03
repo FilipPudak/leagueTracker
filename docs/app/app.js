@@ -13,6 +13,10 @@ const KEY_DEVICE = 'lt_deviceId';
 const KEY_EMAIL = 'lt_email';
 const KEY_PLAYER = 'lt_playerId';
 
+// Semantic version of the client build. Bump at every deployment so the deployed
+// version is visible in the footer (avoids debugging a stale cache).
+const APP_VERSION = '1.0.0';
+
 let appState = {
   status: 'unlinked',
   linkedPlayer: null,
@@ -114,6 +118,12 @@ function showStatus(msg, isSuccess) {
   box.style.display = 'block';
 }
 function clearStatus() { $('status-box').style.display = 'none'; }
+
+// Show the build version in the footer so we can tell which commit Pages is serving.
+function applyVersion() {
+  const el = $('site-version');
+  if (el) el.textContent = APP_VERSION;
+}
 
 // Highlight the given view panel and the matching tab button together.
 function setActiveView(viewId, tabIndex) {
@@ -542,4 +552,4 @@ async function fetchInitialAppData() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => { fetchInitialAppData(); });
+document.addEventListener('DOMContentLoaded', () => { applyVersion(); fetchInitialAppData(); });
