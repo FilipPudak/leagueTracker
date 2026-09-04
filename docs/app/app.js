@@ -384,6 +384,9 @@ function switchTab(tabId) {
       clearStatus();
       showSpinner(false);
       setActiveView('vote-view', 0);
+      if (!appState.votingOpen && $('already-voted-card').style.display !== 'block') {
+        showStatus('Voting is currently closed for this week.', false);
+      }
     } else {
       // Unlinked: show the link view and de-highlight every tab so the active
       // highlight always matches the visible panel (never a misleading "Vote").
