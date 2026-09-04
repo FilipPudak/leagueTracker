@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.0.3';
 
 // How long a loaded leaderboard/stats payload stays fresh before a re-entry
 // refetches it. Flicking between tabs is sub-second, so a tiny TTL is enough to
@@ -30,9 +30,13 @@ let appState = {
   settings: {},
   seasons: [],
   leaderboardCache: {},
-  myseasonCache: {},
+  mystatsCache: {},
   leaderboardToken: 0,
-  myseasonToken: 0,
+  mystatsToken: 0,
+  leaderboardInFlight: false,
+  leaderboardInFlightSeason: null,
+  mystatsInFlight: false,
+  mystatsInFlightSeason: null,
   lastView: 'vote-view'
 };
 
@@ -389,16 +393,16 @@ function switchTab(tabId) {
     }
   } else if (tabId === 'leaderboard-view') {
     clearStatus();
+    showSpinner(false);
     setActiveView('leaderboard-view', 1);
     appState.lastView = 'leaderboard-view';
-    appState.leaderboardToken++;
     loadLeaderboardData();
   } else if (tabId === 'myseason-view') {
     if (appState.linkedPlayer) {
       clearStatus();
+      showSpinner(false);
       setActiveView('myseason-view', 2);
       appState.lastView = 'myseason-view';
-      appState.myseasonToken++;
       loadMySeasonStats();
     } else {
       setActiveView('link-view', 2);
@@ -464,24 +468,35 @@ function submitVotes() {
 
 function loadLeaderboardData() {
   const selectedSeasonId = $('season-filter').value;
-  const cached = appState.leaderboardCache[selectedSeasonId];
   if (isFreshCache(appState.leaderboardCache, selectedSeasonId)) {
-    renderLeaderboard(cached.data);
+    renderLeaderboard(appState.leaderboardCache[selectedSeasonId].data);
+    return;
+  }
+
+  // In-flight for same season → don't fire duplicate, just ensure spinner.
+  if (appState.leaderboardInFlight && appState.leaderboardInFlightSeason === selectedSeasonId) {
+    showSpinner(true, 'leaderboard');
     return;
   }
 
   const token = ++appState.leaderboardToken;
+  appState.leaderboardInFlight = true;
+  appState.leaderboardInFlightSeason = selectedSeasonId;
   showSpinner(true, 'leaderboard');
   callApi('getLeaderboardData', { seasonId: selectedSeasonId })
     .then((res) => {
       if (token !== appState.leaderboardToken) return;
-      showSpinner(false);
+      appState.leaderboardInFlight = false;
+      appState.leaderboardInFlightSeason = null;
+      showSpinner(false, 'leaderboard');
       appState.leaderboardCache[selectedSeasonId] = { data: res, ts: Date.now() };
       renderLeaderboard(res);
     })
     .catch((err) => {
       if (token !== appState.leaderboardToken) return;
-      showSpinner(false);
+      appState.leaderboardInFlight = false;
+      appState.leaderboardInFlightSeason = null;
+      showSpinner(false, 'leaderboard');
       showStatus(err.userMessage || err.message || 'Failed to load leaderboard.', false);
     });
 }
@@ -517,24 +532,35 @@ function renderLeaderboardSection(sectionId, containerId, res, field) {
 function loadMySeasonStats() {
   if (!appState.linkedPlayer) return;
   const selectedSeasonId = $('myseason-season-filter').value;
-  const cached = appState.myseasonCache[selectedSeasonId];
-  if (isFreshCache(appState.myseasonCache, selectedSeasonId)) {
-    renderMySeasonStats(cached.data);
+  if (isFreshCache(appState.mystatsCache, selectedSeasonId)) {
+    renderMySeasonStats(appState.mystatsCache[selectedSeasonId].data);
     return;
   }
 
-  const token = ++appState.myseasonToken;
-  showSpinner(true, 'myseason');
+  // In-flight for same season → don't fire duplicate, just ensure spinner.
+  if (appState.mystatsInFlight && appState.mystatsInFlightSeason === selectedSeasonId) {
+    showSpinner(true, 'mystats');
+    return;
+  }
+
+  const token = ++appState.mystatsToken;
+  appState.mystatsInFlight = true;
+  appState.mystatsInFlightSeason = selectedSeasonId;
+  showSpinner(true, 'mystats');
   callApi('getMySeasonStats', { seasonId: selectedSeasonId })
     .then((res) => {
-      if (token !== appState.myseasonToken) return;
-      showSpinner(false);
-      appState.myseasonCache[selectedSeasonId] = { data: res, ts: Date.now() };
+      if (token !== appState.mystatsToken) return;
+      appState.mystatsInFlight = false;
+      appState.mystatsInFlightSeason = null;
+      showSpinner(false, 'mystats');
+      appState.mystatsCache[selectedSeasonId] = { data: res, ts: Date.now() };
       renderMySeasonStats(res);
     })
     .catch((err) => {
-      if (token !== appState.myseasonToken) return;
-      showSpinner(false);
+      if (token !== appState.mystatsToken) return;
+      appState.mystatsInFlight = false;
+      appState.mystatsInFlightSeason = null;
+      showSpinner(false, 'mystats');
       showStatus(err.userMessage || err.message || 'Failed to load your stats.', false);
     });
 }
@@ -617,6 +643,14 @@ function renderStatsList(containerId, items, config) {
 let bootRetry = true;
 
 async function fetchInitialAppData() {
+  // Cancel any in-flight view loads from before the re-boot so a stale
+  // in-flight flag can't block the next load after re-linking.
+  appState.leaderboardInFlight = false;
+  appState.leaderboardInFlightSeason = null;
+  appState.mystatsInFlight = false;
+  appState.mystatsInFlightSeason = null;
+  appState.leaderboardToken = 0;
+  appState.mystatsToken = 0;
   showSpinner(true); clearStatus();
   try {
     const boot = await callApi('getAppData', {});
