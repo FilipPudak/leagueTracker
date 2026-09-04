@@ -63,8 +63,11 @@ function setSession(linkedPlayer, token) {
   localStorage.setItem(KEY_PLAYER, (linkedPlayer && linkedPlayer.id) || '');
 }
 
+// FIX: Wipe email and player memory on unlink to prevent account prefill leakage
 function clearSession() {
   localStorage.removeItem(KEY_TOKEN);
+  localStorage.removeItem(KEY_EMAIL);
+  localStorage.removeItem(KEY_PLAYER);
 }
 
 function readPrefill() {
@@ -95,32 +98,19 @@ async function callApi(action, payload = {}, _attempt = 0) {
   try {
     json = await res.json();
   } catch (err) {
-    // Apps Script web apps return an HTML interstitial on a cold-start redirect
-    // BEFORE the real JSON, even though the backend handler already ran for that
-    // request. So the retry lands on a warm server.
-    //
-    // Reads and idempotent writes (link/unlink) are safe to auto-resend here:
-    //   - reads are idempotent by nature;
-    //   - linkAccount reuses the existing token via resolveDeviceAccountToken
-    //     (newest-wins, locked, and the Sessions sheet has a header), so a retry
-    //     never mints a second token;
-    //   - unlinkAccount deletes by (playerId, deviceId), so a retry deletes nothing
-    //     extra if the first already ran.
-    // submitVote is NOT auto-resent: if the first attempt recorded, a resend would
-    // hit the duplicate guard and surface a confusing "already submitted" instead
-    // of a real confirmation, so the user confirms that one manually.
     const isIdempotent = IDEMPOTENT_WRITES.indexOf(action) !== -1;
     const isVote = action === 'submitVote';
 
     if (isVote) {
-      // Manual retry only: surface the warm-up error and let the user re-tap.
       const e = new Error('The server is still warming up. Please click again.');
       e.userMessage = 'The server is still warming up. Please try again.';
       throw e;
     }
 
+    // FIX: Add exponential backoff delay before retrying warm-up requests
     if (isIdempotent) {
       if (_attempt < 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         return callApi(action, payload, _attempt + 1);
       }
       const e = new Error('The server is still warming up. Please click again.');
@@ -128,8 +118,8 @@ async function callApi(action, payload = {}, _attempt = 0) {
       throw e;
     }
 
-    // Plain read: auto-retry once (existing behavior).
     if (_attempt === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
       return callApi(action, payload, 1);
     }
     throw new Error('The server returned an unexpected response. Please try again.');
@@ -146,36 +136,45 @@ async function callApi(action, payload = {}, _attempt = 0) {
 
 function $(id) { return document.getElementById(id); }
 
-// The spinner is a single global element, but loads happen per-view. Tracking the
-// view that currently owns the spinner lets a tab switch clear a stale view's
-// spinner instead of leaving it stranded when that view's request is superseded.
 let spinnerOwner = null;
+
+// FIX: Always allow force-clearing or resetting the spinner owner state safely
 function showSpinner(show, owner) {
-  if (show) spinnerOwner = owner;
-  else if (owner && owner !== spinnerOwner) return; // a stale owner can't clear it
-  $('loading-spinner').style.display = show ? 'block' : 'none';
+  if (show) {
+    spinnerOwner = owner;
+  } else {
+    if (owner && owner !== spinnerOwner) return; // a stale owner can't clear an active owner's spinner
+  }
+  const el = $('loading-spinner');
+  if (el) el.style.display = show ? 'block' : 'none';
   if (!show) spinnerOwner = null;
 }
+
 function showStatus(msg, isSuccess) {
   const box = $('status-box');
+  if (!box) return;
   box.textContent = msg;
   box.className = 'status-msg ' + (isSuccess ? 'status-success' : 'status-error');
   box.style.display = 'block';
 }
-function clearStatus() { $('status-box').style.display = 'none'; }
 
-// Show the build version in the footer so we can tell which commit Pages is serving.
+function clearStatus() {
+  const box = $('status-box');
+  if (box) box.style.display = 'none';
+}
+
 function applyVersion() {
   const el = $('site-version');
   if (el) el.textContent = APP_VERSION;
 }
 
-// Highlight the given view panel and the matching tab button together.
 function setActiveView(viewId, tabIndex) {
   document.querySelectorAll('.view-panel').forEach((v) => v.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
-  $(viewId).classList.add('active');
-  document.querySelectorAll('.tab-btn')[tabIndex].classList.add('active');
+  const viewEl = $(viewId);
+  if (viewEl) viewEl.classList.add('active');
+  const tabs = document.querySelectorAll('.tab-btn');
+  if (tabs[tabIndex]) tabs[tabIndex].classList.add('active');
 }
 
 /* -------------------------------------------------------------- boot state -- */
@@ -191,21 +190,24 @@ function applyBoot(boot) {
   appState.seasonId = boot.seasonId;
 
   const seasonName = boot.seasonName || ('Season ' + (appState.settings.activeSeasonId || ''));
-  $('app-subtitle').textContent = seasonName + ' • Week ' + (boot.week || 1);
+  const subtitleEl = $('app-subtitle');
+  if (subtitleEl) subtitleEl.textContent = seasonName + ' • Week ' + (boot.week || 1);
 
   const badge = $('voting-badge');
-  badge.style.display = 'inline-block';
-  if (boot.votingOpen) {
-    badge.textContent = 'Voting Open';
-    badge.className = 'badge badge-active';
-  } else {
-    badge.textContent = 'Voting Closed';
-    badge.className = 'badge badge-closed';
+  if (badge) {
+    badge.style.display = 'inline-block';
+    if (boot.votingOpen) {
+      badge.textContent = 'Voting Open';
+      badge.className = 'badge badge-active';
+    } else {
+      badge.textContent = 'Voting Closed';
+      badge.className = 'badge badge-closed';
+    }
   }
 
-  // Season dropdowns (shared across leaderboard + my stats).
   ['season-filter', 'myseason-season-filter'].forEach((id) => {
     const sel = $(id);
+    if (!sel) return;
     sel.innerHTML = '';
     (boot.seasons || []).forEach((s) => {
       const opt = document.createElement('option');
@@ -216,42 +218,42 @@ function applyBoot(boot) {
     });
   });
 
-  // Weekly participation count
   const wpCard = $('weekly-participation-card');
   const wpText = $('weekly-participation-text');
-  if (boot.weeklyParticipation && boot.weeklyParticipation.total > 0) {
-    wpText.textContent = boot.weeklyParticipation.voted + ' of ' + boot.weeklyParticipation.total + ' players have voted this week';
-    wpCard.style.display = 'block';
-  } else {
-    wpCard.style.display = 'none';
+  if (wpCard && wpText) {
+    if (boot.weeklyParticipation && boot.weeklyParticipation.total > 0) {
+      wpText.textContent = boot.weeklyParticipation.voted + ' of ' + boot.weeklyParticipation.total + ' players have voted this week';
+      wpCard.style.display = 'block';
+    } else {
+      wpCard.style.display = 'none';
+    }
   }
 
   if (boot.status === 'linked') {
-    // Reset the vote card to its default visible state before deciding how to
-    // present it, so re-entering quickly never leaves a stale hidden form.
-    $('vote-form').style.display = '';
-    $('already-voted-card').style.display = 'none';
+    const voteForm = $('vote-form');
+    const votedCard = $('already-voted-card');
+    if (voteForm) voteForm.style.display = '';
+    if (votedCard) votedCard.style.display = 'none';
+
     showLinkedPresence(appState.linkedPlayer);
     showTabs(true);
     setActiveView('vote-view', 0);
+
     if (boot.alreadySubmitted || boot.alreadyVoted) {
-      $('vote-form').style.display = 'none';
-      $('already-voted-card').style.display = 'block';
+      if (voteForm) voteForm.style.display = 'none';
+      if (votedCard) votedCard.style.display = 'block';
       clearStatus();
     } else if (!appState.votingOpen) {
-      $('vote-form').style.display = 'none';
+      if (voteForm) voteForm.style.display = 'none';
       clearStatus();
       showStatus('Voting is currently closed for this week.', false);
     } else {
       populateVotingDropdowns(boot.leaders, boot.players, appState.linkedPlayer.id);
     }
   } else {
-    // unlinked or invalid-token: show the link form, hide the tabs.
     showLinkedPresence(null);
     showTabs(false);
     setActiveView('link-view', 0);
-    // Full active roster: returning users re-pick their own player; linkAccount
-    // enforces ownership. Default selection restored from this device's memory.
     populateLinkPicker(boot.players || []);
     if (boot.status === 'invalid-token') {
       showStatus('Your session expired. Please re-link to continue.', false);
@@ -261,30 +263,32 @@ function applyBoot(boot) {
 
 function showTabs(show) {
   const tabs = document.querySelector('.nav-tabs');
-  tabs.style.display = show ? 'flex' : 'none';
+  if (tabs) tabs.style.display = show ? 'flex' : 'none';
 }
 
-// Global-header identity chip + "Not you?" unlink. Null/empty hides it.
 function showLinkedPresence(player) {
   const chip = $('identity-chip');
+  if (!chip) return;
   if (!player) {
     chip.style.display = 'none';
     return;
   }
-  $('chip-name').textContent = player.name;
+  const chipName = $('chip-name');
+  if (chipName) chipName.textContent = player.name;
   chip.style.display = 'flex';
 }
 
 function populateLinkPicker(players) {
   const select = $('link-player-select');
+  if (!select) return;
   select.innerHTML = '<option value="">-- Choose Your Name --</option>';
   (players || []).forEach((p) => {
     select.appendChild(new Option(p.name, p.id));
   });
-  // Restore the last player/email chosen on this device.
   const prefill = readPrefill();
   if (prefill.playerId) select.value = prefill.playerId;
-  if (prefill.email) $('link-email').value = prefill.email;
+  const emailEl = $('link-email');
+  if (prefill.email && emailEl) emailEl.value = prefill.email;
 }
 
 /* ---------------------------------------------------------------- intents -- */
@@ -294,11 +298,14 @@ let linkInFlight = false;
 function submitAccountLink() {
   if (linkInFlight) return;
   const emailEl = $('link-email');
-  const email = emailEl.value.trim();
-  const playerId = $('link-player-select').value;
+  const email = emailEl ? emailEl.value.trim() : '';
+  const selectEl = $('link-player-select');
+  const playerId = selectEl ? selectEl.value : '';
+
   if (!email) { showStatus('Please enter your email address.', false); return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showStatus('Please enter a valid email address.', false); return; }
   if (!playerId) { showStatus('Please select your player name.', false); return; }
+
   linkInFlight = true;
   showSpinner(true, 'link'); clearStatus();
 
@@ -306,11 +313,7 @@ function submitAccountLink() {
     .then((res) => {
       appState.linkedPlayer = res.linkedPlayer || res.player;
       setSession(appState.linkedPlayer, res.token || '');
-      // Render from the authoritative linkAccount response (which already
-      // persisted the session + Players col D write server-side) plus the static
-      // state carried from the initial getAppData boot. Doing an extra getAppData
-      // read right here races Apps Script read-after-write staleness and can
-      // report the fresh token as invalid ("session expired"). So we avoid it.
+
       const boot = {
         status: 'linked',
         votingOpen: res.votingOpen,
@@ -344,22 +347,23 @@ function unlinkCurrentDevice() {
 }
 
 function openUnlinkConfirm(title, message) {
-  $('unlink-confirm-title').textContent = title;
-  $('unlink-confirm-text').textContent = message;
-  $('unlink-confirm').style.display = 'flex';
+  const tEl = $('unlink-confirm-title');
+  const msgEl = $('unlink-confirm-text');
+  const overlay = $('unlink-confirm');
+  if (tEl) tEl.textContent = title;
+  if (msgEl) msgEl.textContent = message;
+  if (overlay) overlay.style.display = 'flex';
 }
 
 function cancelUnlink() {
-  $('unlink-confirm').style.display = 'none';
+  const overlay = $('unlink-confirm');
+  if (overlay) overlay.style.display = 'none';
 }
 
 const TAB_INDEX = { 'vote-view': 0, 'leaderboard-view': 1, 'myseason-view': 2 };
 
 function confirmUnlink() {
-  $('unlink-confirm').style.display = 'none';
-  // Enter the dedicated "Unlinking…" state immediately so tabs and the identity
-  // chip are gone before the network call — the user can no longer click into
-  // another view (and race the re-boot) while the unlink is in flight.
+  cancelUnlink();
   const lastView = appState.lastView;
   showTabs(false);
   showLinkedPresence(null);
@@ -367,20 +371,18 @@ function confirmUnlink() {
   showStatus('Unlinking…', false);
   showSpinner(true, 'unlink');
   const token = getToken();
+
   callApi('unlinkAccount', { token: token })
     .then(() => {
       clearSession();
       appState.linkedPlayer = null;
       appState.status = 'unlinked';
-      // Re-bootstrap to rebuild the unlinked player list (also repopulates the
-      // picker and hides the tabs). fetchInitialAppData clears status + spinner.
       return fetchInitialAppData();
     })
     .catch((err) => {
       showSpinner(false);
       showStatus(err.userMessage || err.message || 'Failed to unlink.', false);
       if (appState.linkedPlayer) {
-        // Unlink failed: return the user to where they were, tabs intact.
         showTabs(true);
         showLinkedPresence(appState.linkedPlayer);
         setActiveView(lastView, TAB_INDEX[lastView] || 0);
@@ -394,15 +396,15 @@ function switchTab(tabId) {
       clearStatus();
       showSpinner(false);
       setActiveView('vote-view', 0);
-      if (!appState.votingOpen && $('already-voted-card').style.display !== 'block') {
+      const votedCard = $('already-voted-card');
+      if (!appState.votingOpen && votedCard && votedCard.style.display !== 'block') {
         showStatus('Voting is currently closed for this week.', false);
       }
     } else {
-      // Unlinked: show the link view and de-highlight every tab so the active
-      // highlight always matches the visible panel (never a misleading "Vote").
       document.querySelectorAll('.view-panel').forEach((v) => v.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
-      $('link-view').classList.add('active');
+      const linkView = $('link-view');
+      if (linkView) linkView.classList.add('active');
     }
   } else if (tabId === 'leaderboard-view') {
     clearStatus();
@@ -428,6 +430,7 @@ function switchTab(tabId) {
 function populateVotingDropdowns(leaders, players, currentUserId) {
   const l1 = $('leader-1');
   const opp = $('favorite-opponent');
+  if (!l1 || !opp) return;
   l1.innerHTML = '<option value="">-- Select Leader --</option>';
   opp.innerHTML = '<option value="">-- Select Favorite Opponent --</option>';
   (leaders || []).forEach((l) => l1.appendChild(new Option(l.name, l.id)));
@@ -443,8 +446,11 @@ function submitVotes() {
     showStatus('Voting is currently closed for this week.', false);
     return;
   }
-  const l1 = $('leader-1').value;
-  const opp = $('favorite-opponent').value;
+  const l1El = $('leader-1');
+  const oppEl = $('favorite-opponent');
+  const l1 = l1El ? l1El.value : '';
+  const opp = oppEl ? oppEl.value : '';
+
   if (!l1 || !opp) { showStatus('Please select your Leader and Favorite Opponent.', false); return; }
   if (voteInFlight) return;
   voteInFlight = true;
@@ -458,8 +464,10 @@ function submitVotes() {
     showSpinner(false, 'vote');
   }
   function showVoteRecorded() {
-    $('vote-form').style.display = 'none';
-    $('already-voted-card').style.display = 'block';
+    const vForm = $('vote-form');
+    const vCard = $('already-voted-card');
+    if (vForm) vForm.style.display = 'none';
+    if (vCard) vCard.style.display = 'block';
     clearStatus();
     appState.leaderboardCache = {};
   }
@@ -480,13 +488,13 @@ function submitVotes() {
 /* ----------------------------------------------------------- leaderboard --- */
 
 function loadLeaderboardData() {
-  const selectedSeasonId = $('season-filter').value;
+  const sel = $('season-filter');
+  const selectedSeasonId = sel ? sel.value : '';
   if (isFreshCache(appState.leaderboardCache, selectedSeasonId)) {
     renderLeaderboard(appState.leaderboardCache[selectedSeasonId].data);
     return;
   }
 
-  // In-flight for same season → don't fire duplicate, just ensure spinner.
   if (appState.leaderboardInFlight && appState.leaderboardInFlightSeason === selectedSeasonId) {
     showSpinner(true, 'leaderboard');
     return;
@@ -496,6 +504,7 @@ function loadLeaderboardData() {
   appState.leaderboardInFlight = true;
   appState.leaderboardInFlightSeason = selectedSeasonId;
   showSpinner(true, 'leaderboard');
+
   callApi('getLeaderboardData', { seasonId: selectedSeasonId })
     .then((res) => {
       if (token !== appState.leaderboardToken) return;
@@ -525,11 +534,13 @@ function renderLeaderboard(res) {
   renderLeaderboardSection('ruler-section', 'ruler-container', res, 'ruler');
   renderLeaderboardSection('new-hope-section', 'new-hope-container', res, 'newHope');
   renderLeaderboardSection('bounty-hunter-section', 'bounty-hunter-container', res, 'bountyHunter');
-  $('leaderboard-content').style.display = 'block';
+  const content = $('leaderboard-content');
+  if (content) content.style.display = 'block';
 }
 
 function renderLeaderboardSection(sectionId, containerId, res, field) {
   const section = $(sectionId);
+  if (!section) return;
   const items = res[field];
   if (items === null || items === undefined) { section.style.display = 'none'; return; }
   section.style.display = '';
@@ -544,13 +555,13 @@ function renderLeaderboardSection(sectionId, containerId, res, field) {
 
 function loadMySeasonStats() {
   if (!appState.linkedPlayer) return;
-  const selectedSeasonId = $('myseason-season-filter').value;
+  const sel = $('myseason-season-filter');
+  const selectedSeasonId = sel ? sel.value : '';
   if (isFreshCache(appState.mystatsCache, selectedSeasonId)) {
     renderMySeasonStats(appState.mystatsCache[selectedSeasonId].data);
     return;
   }
 
-  // In-flight for same season → don't fire duplicate, just ensure spinner.
   if (appState.mystatsInFlight && appState.mystatsInFlightSeason === selectedSeasonId) {
     showSpinner(true, 'mystats');
     return;
@@ -560,6 +571,7 @@ function loadMySeasonStats() {
   appState.mystatsInFlight = true;
   appState.mystatsInFlightSeason = selectedSeasonId;
   showSpinner(true, 'mystats');
+
   callApi('getMySeasonStats', { seasonId: selectedSeasonId })
     .then((res) => {
       if (token !== appState.mystatsToken) return;
@@ -579,58 +591,62 @@ function loadMySeasonStats() {
 }
 
 function renderMySeasonStats(res) {
-  // Gamification: compliance, streaks, raffle tickets
   const gamSection = $('myseason-gamification-section');
   const gamContainer = $('myseason-gamification-container');
   const compliance = res.compliance || {};
   const streaks = res.streaks || {};
   const raffle = res.raffleTickets || 0;
 
-  if (compliance.weeksAttended > 0 || raffle > 0) {
-    let html = '';
-    if (compliance.weeksAttended > 0) {
-      html += `<div><span style="color:#94a3b8;">Compliance:</span> <strong>${compliance.weeksVoted} of ${compliance.weeksAttended} weeks (${compliance.compliancePct}%)</strong></div>`;
+  if (gamSection && gamContainer) {
+    if (compliance.weeksAttended > 0 || raffle > 0) {
+      let html = '';
+      if (compliance.weeksAttended > 0) {
+        html += `<div><span style="color:#94a3b8;">Compliance:</span> <strong>${escapeHtml(compliance.weeksVoted)} of ${escapeHtml(compliance.weeksAttended)} weeks (${escapeHtml(compliance.compliancePct)}%)</strong></div>`;
+      }
+      // FIX: Corrected mismatched tag from </span> to </strong>
+      if (streaks.currentStreak > 0 || streaks.bestStreak > 0) {
+        html += `<div><span style="color:#94a3b8;">Streak:</span> <strong>${escapeHtml(streaks.currentStreak)} current</strong> &bull; <strong>${escapeHtml(streaks.bestStreak)} best</strong></div>`;
+      }
+      if (raffle > 0) {
+        html += `<div><span style="color:#94a3b8;">Raffle tickets:</span> <strong style="color:#fbbf24;">${escapeHtml(raffle)}</strong></div>`;
+      }
+      gamContainer.innerHTML = html;
+      gamSection.style.display = 'block';
+    } else {
+      gamSection.style.display = 'none';
     }
-    if (streaks.currentStreak > 0 || streaks.bestStreak > 0) {
-      html += `<div><span style="color:#94a3b8;">Streak:</span> <strong>${streaks.currentStreak} current</span> &bull; <strong>${streaks.bestStreak} best</strong></div>`;
-    }
-    if (raffle > 0) {
-      html += `<div><span style="color:#94a3b8;">Raffle tickets:</span> <strong style="color:#fbbf24;">${raffle}</strong></div>`;
-    }
-    gamContainer.innerHTML = html;
-    gamSection.style.display = 'block';
-  } else {
-    gamSection.style.display = 'none';
   }
 
-  // Awards
   const awardsContainer = $('myseason-awards-container');
   const awardsSection = $('myseason-awards-section');
   const awards = res.awardsWon || [];
-  if (awards.length > 0) {
-    awardsContainer.innerHTML = awards
-      .map((a) => `<div class="card" style="padding:10px 12px; margin-bottom:8px;">
-                     <span style="font-weight:700; color:#fbbf24;">Award:</span>
-                     <span style="font-weight:700; color:#f8fafc;">${escapeHtml(a)}</span>
-                   </div>`)
-      .join('');
-    awardsSection.style.display = 'block';
-  } else {
-    awardsContainer.innerHTML = '';
-    awardsSection.style.display = 'none';
+  if (awardsContainer && awardsSection) {
+    if (awards.length > 0) {
+      awardsContainer.innerHTML = awards
+        .map((a) => `<div class="card" style="padding:10px 12px; margin-bottom:8px;">
+                       <span style="font-weight:700; color:#fbbf24;">Award:</span>
+                       <span style="font-weight:700; color:#f8fafc;">${escapeHtml(a)}</span>
+                     </div>`)
+        .join('');
+      awardsSection.style.display = 'block';
+    } else {
+      awardsContainer.innerHTML = '';
+      awardsSection.style.display = 'none';
+    }
   }
+
   renderStatsList('myseason-leaders-container', res.leaders || [], {
     getTitle: (item) => item.name,
     getScore: (item) => `${item.plays} Plays`,
     limit: Infinity
   });
-  $('myseason-content').style.display = 'block';
+
+  const content = $('myseason-content');
+  if (content) content.style.display = 'block';
 }
 
 /* -------------------------------------------------------------- utilities -- */
 
-// True if the given (view cache, season) entry is still within the TTL window.
-// Cache entries are stored as { data, ts }; a missing/expired entry is stale.
 function isFreshCache(viewCache, seasonId) {
   const entry = viewCache[seasonId];
   if (!entry) return false;
@@ -648,6 +664,7 @@ function escapeHtml(value) {
 
 function renderStatsList(containerId, items, config) {
   const container = $(containerId);
+  if (!container) return;
   if (!items || items.length === 0) {
     container.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:12px; font-size: 0.85rem;">No statistics recorded.</div>';
     return;
@@ -681,8 +698,6 @@ function renderStatsList(containerId, items, config) {
 let bootRetry = true;
 
 async function fetchInitialAppData() {
-  // Cancel any in-flight view loads from before the re-boot so a stale
-  // in-flight flag can't block the next load after re-linking.
   appState.leaderboardInFlight = false;
   appState.leaderboardInFlightSeason = null;
   appState.mystatsInFlight = false;

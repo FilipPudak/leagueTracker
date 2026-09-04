@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Star Wars Unlimited League Voting</title>
+  <!-- FIX: Removed user-scalable=no & maximum-scale=1.0 to comply with accessibility zoom standards -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Star Wars Unlimited League Stockholm</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,12 +35,10 @@
         radial-gradient(1px 1px at 700px 820px, #ffffff, rgba(0,0,0,0)),
         radial-gradient(1.5px 1.5px at 150px 900px, #ffffff, rgba(0,0,0,0));
       background-repeat: repeat;
-      /* Large tiles per layer so the star pattern does not visibly repeat/tile */
       background-size: 100% 100%, 1000px 1000px, 1100px 900px, 900px 1000px, 1200px 800px, 1000px 1100px, 900px 900px, 950px 1050px, 1150px 850px, 1050px 950px, 900px 1000px, 1100px 1100px, 1000px 900px, 950px 950px;
       color: #f8fafc; display: flex; justify-content: center; min-height: 100vh;
     }
 
-    /* Holonet Command Terminal Card */
     .app-container {
       width: 100%; max-width: 520px; 
       background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.98)); 
@@ -51,7 +50,6 @@
       overflow: hidden;
     }
 
-    /* Lightsaber Energy Line Accent on Top */
     .app-container::before {
       content: '';
       position: absolute;
@@ -72,7 +70,6 @@
     .header-logo {
       width: 32px;
       height: 32px;
-      /* Converts the native black SVG into your Holonet cyan (#38bdf8) with a glow */
       filter: invert(65%) sepia(85%) saturate(1800%) hue-rotate(165deg) brightness(100%) drop-shadow(0 0 6px rgba(56, 189, 248, 0.8));
       flex-shrink: 0;
     }
@@ -95,7 +92,6 @@
     .badge-active { background-color: rgba(5, 150, 105, 0.2); color: #34d399; border: 1px solid #059669; box-shadow: 0 0 8px rgba(5, 150, 105, 0.4); }
     .badge-closed { background-color: rgba(220, 38, 38, 0.2); color: #f87171; border: 1px solid #dc2626; box-shadow: 0 0 8px rgba(220, 38, 38, 0.4); }
 
-    /* Global-header identity chip (shows only when linked) */
     .identity-chip {
       display: none;
       align-items: center;
@@ -110,10 +106,12 @@
     }
     .identity-chip .chip-label { color: #94a3b8; font-family: 'Orbitron', sans-serif; font-size: 0.65rem; letter-spacing: 1px; }
     .identity-chip .chip-name { color: #38bdf8; font-weight: 700; }
-    .identity-chip .not-you { color: #64748b; font-size: 0.75rem; cursor: pointer; margin-left: 4px; }
-    .identity-chip .not-you:hover { color: #f87171; text-decoration: underline; }
+    .identity-chip .not-you { 
+      background: none; border: none; padding: 0; color: #64748b; font-size: 0.75rem; 
+      cursor: pointer; margin-left: 4px; font-family: inherit;
+    }
+    .identity-chip .not-you:hover, .identity-chip .not-you:focus { color: #f87171; text-decoration: underline; outline: none; }
 
-    /* Tactical Nav Tabs */
     .nav-tabs { display: flex; gap: 8px; margin-bottom: 20px; background-color: #090d16; padding: 4px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05); }
     .tab-btn { 
       flex: 1; padding: 10px 0; border: none; background: transparent; color: #64748b; 
@@ -173,7 +171,6 @@
     .loader { border: 3px solid #1e293b; border-top: 3px solid #38bdf8; border-radius: 50%; width: 28px; height: 28px; animation: spin 0.8s linear infinite; margin: 20px auto; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-    /* UNIFIED STATS LIST SYSTEM */
     .stats-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
     .stats-row {
       display: flex; align-items: center; justify-content: space-between;
@@ -199,7 +196,6 @@
 
     #leaderboard-view h3 { font-family: 'Orbitron', sans-serif; letter-spacing: 0.5px; }
 
-    /* INLINE UNLINK CONFIRM OVERLAY */
     .modal-overlay {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(5, 8, 17, 0.7); backdrop-filter: blur(2px);
@@ -222,7 +218,7 @@
     .footer-version { opacity: 0.8; }
     .footer-discord {
       display: inline-flex; align-items: center; gap: 6px;
-      color: #5865f2; text-decoration: none; font-family: 'Inter', sans-serif;
+      color: #5865f2; text-decoration: none; font-family: sans-serif;
       font-weight: 600; font-size: 0.78rem; transition: color 0.15s;
     }
     .footer-discord:hover { color: #7983f5; }
@@ -233,36 +229,35 @@
   <div class="app-container">
     <div class="header">
       <div class="header-content">
-      <!-- OFFICIAL REBEL ALLIANCE EMBLEM (bundled locally; also serves as the tab favicon) -->
-      <img 
-        class="header-logo" 
-        src="rebel-alliance.svg" 
-        alt="Rebel Alliance Logo" 
-      />
+        <img 
+          class="header-logo" 
+          src="rebel-alliance.svg" 
+          alt="Rebel Alliance Logo" 
+        />
         <h1 id="app-title">SWU League Voting</h1>
       </div>
       <div class="subtitle" id="app-subtitle">Loading season information...</div>
       <div id="voting-badge" class="badge badge-active" style="display: none;">Voting Open</div>
 
-      <!-- GLOBAL-HEADER IDENTITY (shown only when linked) -->
       <div id="identity-chip" class="identity-chip">
         <div style="display:flex; align-items:center; gap:6px;">
           <span class="chip-label">Voting as</span>
           <span class="chip-name" id="chip-name">—</span>
-          <span class="not-you" onclick="unlinkCurrentDevice()">Not you?</span>
+          <!-- FIX: Replaced non-semantic span with a proper accessible button -->
+          <button type="button" class="not-you" onclick="unlinkCurrentDevice()">Not you?</button>
         </div>
       </div>
     </div>
 
     <div class="nav-tabs" style="display:none;">
-      <button class="tab-btn active" onclick="switchTab('vote-view')">Vote</button>
-      <button class="tab-btn" onclick="switchTab('leaderboard-view')">Leaderboard</button>
-      <button class="tab-btn" onclick="switchTab('myseason-view')">My Stats</button>
+      <button type="button" class="tab-btn active" onclick="switchTab('vote-view')">Vote</button>
+      <button type="button" class="tab-btn" onclick="switchTab('leaderboard-view')">Leaderboard</button>
+      <button type="button" class="tab-btn" onclick="switchTab('myseason-view')">My Stats</button>
     </div>
 
     <div id="status-box" class="status-msg"></div>
     <div id="retry-load" style="display:none; text-align:center; margin-bottom:16px;">
-      <button class="btn-submit" style="width:auto; padding:0 24px; margin-top:0;" onclick="fetchInitialAppData()">Retry</button>
+      <button type="button" class="btn-submit" style="width:auto; padding:0 24px; margin-top:0;" onclick="fetchInitialAppData()">Retry</button>
     </div>
     <div id="loading-spinner" class="loader"></div>
 
@@ -280,7 +275,7 @@
         <label for="link-player-select">Select Your Name</label>
         <select id="link-player-select"><option value="">-- Choose Your Name --</option></select>
       </div>
-      <button class="btn-submit" onclick="submitAccountLink()">Link Account</button>
+      <button type="button" class="btn-submit" onclick="submitAccountLink()">Link Account</button>
     </div>
 
     <!-- VOTE PANEL -->
@@ -381,14 +376,13 @@
     </footer>
   </div>
 
-  <!-- INLINE UNLINK CONFIRM OVERLAY -->
   <div id="unlink-confirm" class="modal-overlay">
     <div class="modal-box">
       <h3 id="unlink-confirm-title">Unlink?</h3>
       <p id="unlink-confirm-text">This device will be disconnected.</p>
       <div class="modal-actions">
-        <button class="btn-ghost" onclick="cancelUnlink()">Cancel</button>
-        <button class="btn-danger" onclick="confirmUnlink()">Unlink Device</button>
+        <button type="button" class="btn-ghost" onclick="cancelUnlink()">Cancel</button>
+        <button type="button" class="btn-danger" onclick="confirmUnlink()">Unlink Device</button>
       </div>
     </div>
   </div>
