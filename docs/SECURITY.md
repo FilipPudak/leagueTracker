@@ -14,6 +14,9 @@ Identity for voting is established by a **per-device session token** minted at l
   already-claimed identity on a new device re-links cleanly.
 - **One vote per player per week** — enforced under a script lock
   (`hasSubmittedThisWeek` + `LockService`), so concurrent requests cannot both pass the check.
+- **Session TTL** — sessions expire after 90 days of inactivity. The `LAST_ACTIVE`
+  timestamp is refreshed on each successful vote and link, so active weekly voters
+  never expire. An expired session is lazily deleted on next use.
 - **Admin lifecycle** — week advancement (`advanceLeagueWeek`), season start
   (`startNewSeason`), and player sync (`syncPlayersFromWebsite`) are not exposed via the
   public API; they run only via time-driven triggers or manual invocation.
@@ -37,6 +40,6 @@ handed a valid session token. Mitigations already in place:
 - Unlink/revoke story: user can unlink a device ("Not you?"); admin can unclaim a player.
 
 **Deferred upgrade:** if competitive integrity or public security review ever matters, replace
-the asserted email with Google-verified identity (e.g. the frontend sends an OAuth token and the
+the asserted email with Google-verified identity (e.g. the static client sends an OAuth token and the
 backend resolves it against `https://www.googleapis.com/oauth2/v3/userinfo`). See the local
 `docs/phase2-token-verification.md` note (git-ignored).

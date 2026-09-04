@@ -85,7 +85,7 @@ function resetSheets(tables, opts = {}) {
       return sheets[name] || null;
     },
     insertSheet(name) {
-      const sh = makeSheet([['HEADER']]);
+      const sh = makeSheet([]);
       sheets[name] = sh;
       return sh;
     },

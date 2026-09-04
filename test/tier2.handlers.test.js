@@ -77,16 +77,16 @@ describe('data retrieval helpers', () => {
     assert.deepEqual(unlinked, ['p3', 'p4']);
   });
 
-  test('findPlayerByGoogleEmail matches case-insensitively and flags active', () => {
-    const p = findPlayerByGoogleEmail('  ALICE@X.COM ');
+  test('findPlayerByEmail matches case-insensitively and flags active', () => {
+    const p = findPlayerByEmail('  ALICE@X.COM ');
     assert.equal(p.id, 'p1');
     assert.equal(p.name, 'Alice');
     assert.equal(p.active, true);
-    const inactive = findPlayerByGoogleEmail('old@x.com');
+    const inactive = findPlayerByEmail('old@x.com');
     assert.equal(inactive.id, 'p5');
     assert.equal(inactive.active, false);
-    assert.equal(findPlayerByGoogleEmail('missing@x.com'), null);
-    assert.equal(findPlayerByGoogleEmail(''), null);
+    assert.equal(findPlayerByEmail('missing@x.com'), null);
+    assert.equal(findPlayerByEmail(''), null);
   });
 
   test('hasSubmittedThisWeek respects season and week (via LeaderVotes)', () => {
@@ -140,14 +140,14 @@ describe('handleGetAppData', () => {
   });
 });
 
-describe('handleLinkGoogleAccount', () => {
+describe('linkPlayerToEmail', () => {
   let env;
   beforeEach(() => {
     env = resetSheets(freshTables());
   });
 
   test('links an unlinked player to an email', () => {
-    const res = handleLinkGoogleAccount('p3', 'cara@x.com');
+    const res = linkPlayerToEmail('p3', 'cara@x.com');
     assert.equal(res.success, true);
     // The Players sheet email column (col 4) should be updated for p3.
     const playerSheet = env.sheets.Players;
@@ -161,7 +161,7 @@ describe('handleLinkGoogleAccount', () => {
   test('rejects relinking an email that is already taken by another player', () => {
     let msg;
     try {
-      handleLinkGoogleAccount('p3', 'alice@x.com');
+      linkPlayerToEmail('p3', 'alice@x.com');
     } catch (err) {
       msg = err.userMessage;
     }
@@ -171,7 +171,7 @@ describe('handleLinkGoogleAccount', () => {
   test('rejects linking a player that is already linked', () => {
     let msg;
     try {
-      handleLinkGoogleAccount('p1', 'someone@x.com');
+      linkPlayerToEmail('p1', 'someone@x.com');
     } catch (err) {
       msg = err.userMessage;
     }
@@ -179,17 +179,17 @@ describe('handleLinkGoogleAccount', () => {
   });
 
   test('is a no-op (returns existing) when the same player re-links the same email', () => {
-    const res = handleLinkGoogleAccount('p1', 'alice@x.com');
+    const res = linkPlayerToEmail('p1', 'alice@x.com');
     assert.equal(res.player.id, 'p1');
   });
 
   test('throws when playerId or email is missing', () => {
-    assert.throws(() => handleLinkGoogleAccount('', 'x@x.com'), /Missing Player Selection/);
-    assert.throws(() => handleLinkGoogleAccount('p3', ''), /Missing Player Selection/);
+    assert.throws(() => linkPlayerToEmail('', 'x@x.com'), /Missing Player Selection/);
+    assert.throws(() => linkPlayerToEmail('p3', ''), /Missing Player Selection/);
   });
 
   test('returns votingOpen in the response (open when voting is open)', () => {
-    const res = handleLinkGoogleAccount('p3', 'cara@x.com');
+    const res = linkPlayerToEmail('p3', 'cara@x.com');
     assert.equal(res.success, true);
     assert.equal(res.votingOpen, true);
   });
@@ -198,7 +198,7 @@ describe('handleLinkGoogleAccount', () => {
     const tables = freshTables();
     tables.Settings[3] = ['VOTING_OPEN', 'FALSE'];
     resetSheets(tables);
-    const res = handleLinkGoogleAccount('p3', 'cara@x.com');
+    const res = linkPlayerToEmail('p3', 'cara@x.com');
     assert.equal(res.success, true);
     assert.equal(res.votingOpen, false);
   });
@@ -207,7 +207,7 @@ describe('handleLinkGoogleAccount', () => {
     const tables = freshTables();
     tables.Settings[3] = ['VOTING_OPEN', 'FALSE'];
     resetSheets(tables);
-    const res = handleLinkGoogleAccount('p1', 'alice@x.com');
+    const res = linkPlayerToEmail('p1', 'alice@x.com');
     assert.equal(res.linkedPlayer.id, 'p1');
     assert.equal(res.votingOpen, false);
   });
@@ -684,6 +684,18 @@ describe('handleGetMySeasonStats', () => {
     assert.deepEqual(res.awardsWon, ['Galactic Schemer']);
   });
 
+  test('Ruler award shows only the rank-1 winner (single-winner tiebreak)', () => {
+    // Two players tied at max score (67 pts): p1 (dataIndex 0) and p2 (dataIndex 1).
+    // Only p1 should see Ruler as an award won; p2 should not.
+    env.sheets.Awards.appendRow(['S1', 'Galactic Ruler', 'p1', 67]);
+    env.sheets.Awards.appendRow(['S1', 'Galactic Ruler', 'p2', 67]);
+    const p1Res = handleGetMySeasonStats('S1', 'alice@x.com');
+    assert.deepEqual(p1Res.awardsWon, ['Galactic Ruler']);
+    // p2 (Bob, bob@x.com) must NOT see Ruler.
+    const p2Res = handleGetMySeasonStats('S1', 'bob@x.com');
+    assert.deepEqual(p2Res.awardsWon, []);
+  });
+
   test('Bounty Hunter appears once its placeholder playerId is filled in manually', () => {
     // The placeholder is written with an empty playerId at close (never matches);
     // once the user fills it in, the linked player sees it as an award won.
@@ -956,7 +968,7 @@ describe('token layer (linkAccount / unlinkAccount)', () => {
     const valid = doPostJson({ action: 'getAppData', token: b.data.token, apiSecret: SECRET });
     assert.equal(valid.data.status, 'linked');
     // col D is preserved (player is NOT unclaimed): email still maps to p3.
-    const stillLinked = findPlayerByGoogleEmail('cara@x.com');
+    const stillLinked = findPlayerByEmail('cara@x.com');
     assert.equal(stillLinked.id, 'p3');
   });
 
@@ -1001,5 +1013,42 @@ describe('token layer (linkAccount / unlinkAccount)', () => {
     // The auto-created sheet now resolves the session by token.
     const found = findSessionByToken(res.data.token, { cache: {} });
     assert.equal(found.playerId, 'p3');
+  });
+
+  test('expired session (LAST_ACTIVE > 90 days ago) is rejected and lazily deleted', () => {
+    const link = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1' });
+    // Backdate LAST_ACTIVE to 91 days ago using full ISO.
+    const d = new Date();
+    d.setDate(d.getDate() - 91);
+    env.sheets.Sessions.rows[1][5] = d.toISOString();
+    const res = doPostJson({ action: 'getAppData', token: link.data.token });
+    assert.equal(res.data.status, 'invalid-token');
+    // The expired row was lazily deleted.
+    const remaining = env.sheets.Sessions.rows.slice(1).filter(r => String(r[0]) === link.data.token);
+    assert.equal(remaining.length, 0);
+  });
+
+  test('session with null LAST_ACTIVE falls back to CREATED for TTL check', () => {
+    const link = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1' });
+    // Simulate an old session row with null LAST_ACTIVE (pre-migration).
+    env.sheets.Sessions.rows[1][5] = null;
+    // CREATED is today (set by insertSession), so session should still be valid.
+    const res = doPostJson({ action: 'getAppData', token: link.data.token });
+    assert.equal(res.data.status, 'linked');
+  });
+
+  test('submitVote refreshes the session LAST_ACTIVE timestamp', () => {
+    const link = doPostJson({ action: 'linkAccount', email: 'cara@x.com', playerId: 'p3', deviceId: 'D1' });
+    // Backdate LAST_ACTIVE to 80 days ago (within TTL, but close to expiry).
+    const old = new Date();
+    old.setDate(old.getDate() - 80);
+    env.sheets.Sessions.rows[1][5] = old.toISOString();
+    // Vote should succeed and refresh LAST_ACTIVE.
+    const vote = doPostJson({ action: 'submitVote', token: link.data.token, leaderId: 'l1', opponentId: 'p1' });
+    assert.equal(vote.success, true);
+    // LAST_ACTIVE should now be a recent ISO timestamp.
+    const session = env.sheets.Sessions.rows[1];
+    const age = Date.now() - new Date(session[5]).getTime();
+    assert.ok(age < 5000, 'LAST_ACTIVE should be refreshed to near-now');
   });
 });

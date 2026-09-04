@@ -51,8 +51,8 @@ function basicTables() {
       ['SEASON_ID', 'AWARD', 'PLAYER_ID', 'SCORE']
     ],
     Sessions: [
-      // token, playerId, deviceId, email, created
-      ['TOKEN', 'PLAYER_ID', 'DEVICE_ID', 'EMAIL', 'CREATED']
+      // token, playerId, deviceId, email, created, lastActive
+      ['TOKEN', 'PLAYER_ID', 'DEVICE_ID', 'EMAIL', 'CREATED', 'LAST_ACTIVE']
     ]
   };
 }

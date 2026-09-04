@@ -15,13 +15,6 @@ function getConfig(key, fallback) {
   return val || fallback;
 }
 
-// Config is read lazily (not at load time) so rotating these Script Properties
-// takes effect immediately instead of waiting for a warm Apps Script instance
-// to be recycled.
-function getSpreadsheetId() {
-  return getConfig('SPREADSHEET_ID');
-}
-
 const SHEETS = {
   SETTINGS: 'Settings',
   PLAYERS: 'Players',
@@ -32,6 +25,8 @@ const SHEETS = {
   AWARDS: 'Awards',
   SESSIONS: 'Sessions'
 };
+
+var SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
 
 function getSpreadsheet() {
   const spreadsheetId = getConfig('SPREADSHEET_ID');
@@ -62,7 +57,7 @@ function reqCached(req, key, compute) {
 }
 
 /**
- * Web App Endpoint: Receives proxy API requests from Script 2.
+ * Web App Endpoint: Receives proxy API requests from the static client.
  */
 function userError(msg) { const e = new Error(msg); e.userMessage = msg; throw e; }
 
@@ -88,6 +83,7 @@ function doPost(e) {
     // link). The legacy client-asserted userEmail path was removed at cut-over.
     const session = token ? findSessionByToken(token, req) : null;
     const effectiveEmail = session ? session.email : '';
+    if (session && session._rowIndex) req._sessionRow = session._rowIndex;
 
     const needsIdentity = openActions.indexOf(action) === -1 && tokenOptional.indexOf(action) === -1;
     if (needsIdentity && !effectiveEmail) {
@@ -281,7 +277,7 @@ function getSeasonLeaders(req) {
   });
 }
 
-function findPlayerByGoogleEmail(email, req) {
+function findPlayerByEmail(email, req) {
   if (!email) return null;
   return reqCached(req, 'email-' + String(email).toLowerCase().trim(), () => {
     const ss = getSpreadsheetCached(req);
@@ -315,7 +311,7 @@ function getSessionsSheet(req) {
   let sh = ss.getSheetByName(SHEETS.SESSIONS);
   if (!sh) {
     sh = ss.insertSheet(SHEETS.SESSIONS);
-    sh.appendRow(['TOKEN', 'PLAYER_ID', 'DEVICE_ID', 'EMAIL', 'CREATED']);
+    sh.appendRow(['TOKEN', 'PLAYER_ID', 'DEVICE_ID', 'EMAIL', 'CREATED', 'LAST_ACTIVE']);
   }
   return sh;
 }
@@ -336,18 +332,25 @@ function findSessionByToken(token, req) {
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     if (String(r[0]) === String(token)) {
+      // TTL expiry: LAST_ACTIVE (col 5) is full ISO for new sessions, null
+      // for legacy. Fall back to CREATED (col 4, date-only) for pre-migration.
+      const lastActive = parseSessionDate(r[5]) || parseSessionDate(r[4]);
+      if (lastActive && Date.now() - lastActive.getTime() > SESSION_TTL_MS) {
+        deleteSessionByToken(token, req);
+        return null;
+      }
       const playerId = String(r[1]);
       const email = String(r[3] || '').toLowerCase().trim();
       const player = reqCached(req, 'email-' + email, () => {
         if (!email) return null;
-        return findPlayerByGoogleEmail(email, req);
+        return findPlayerByEmail(email, req);
       });
       // Admin unclaimed / email cleared -> drop the stale session.
       if (!player || String(player.id) !== playerId) {
         deleteSessionByToken(token, req);
         return null;
       }
-      return { token: String(r[0]), playerId: playerId, deviceId: String(r[2]), email: email };
+      return { token: String(r[0]), playerId: playerId, deviceId: String(r[2]), email: email, _rowIndex: i + 2 };
     }
   }
   return null;
@@ -355,8 +358,15 @@ function findSessionByToken(token, req) {
 
 function insertSession(playerId, deviceId, email, req) {
   const token = mintToken();
-  getSessionsSheet(req).appendRow([token, String(playerId), String(deviceId || ''), String(email || '').toLowerCase().trim(), formatISODate(new Date())]);
+  getSessionsSheet(req).appendRow([token, String(playerId), String(deviceId || ''), String(email || '').toLowerCase().trim(), formatISODate(new Date()), new Date().toISOString()]);
   return token;
+}
+
+// Refreshes the LAST_ACTIVE timestamp for a session, extending its TTL.
+// rowIndex is the 1-based sheet row from findSessionByToken._rowIndex.
+function touchSessionTimestamp(rowIndex, req) {
+  if (!rowIndex) return;
+  getSessionsSheet(req).getRange(rowIndex, 6).setValue(new Date().toISOString());
 }
 
 function deleteSessionByToken(token, req) {
@@ -466,7 +476,7 @@ function isVotingOpen(settings) {
 function handleGetAppData(userEmail, req, token) {
   const settings = getSettings(req);
   const activeSeasonId = String(settings.ACTIVE_SEASON_ID || '');
-  const linkedPlayer = findPlayerByGoogleEmail(userEmail, req);
+  const linkedPlayer = findPlayerByEmail(userEmail, req);
   console.info(`[AppData] userEmail=${userEmail} linked=${Boolean(linkedPlayer)}`);
   const currentWeek = parseWeek(settings.CURRENT_WEEK);
   const votingOpen = isVotingOpen(settings);
@@ -526,7 +536,7 @@ function handleGetAppData(userEmail, req, token) {
   return data;
 }
 
-function handleLinkGoogleAccount(playerId, email, req) {
+function linkPlayerToEmail(playerId, email, req) {
   if (!playerId || !email) {
     userError('Missing Player Selection or User Email.');
   }
@@ -536,14 +546,14 @@ function handleLinkGoogleAccount(playerId, email, req) {
   const sheet = ss.getSheetByName(SHEETS.PLAYERS);
   const rows = sheet.getDataRange().getValues();
 
-  const existing = findPlayerByGoogleEmail(email, req);
+  const existing = findPlayerByEmail(email, req);
   if (existing) {
     if (existing.id === String(playerId)) {
       console.info(`[Link] already-linked email=${email} playerId=${playerId}`);
       return { player: existing, linkedPlayer: existing, votingOpen: isVotingOpen(getSettings(req)) };
     }
     console.warn(`[Link] REJECTED email-taking email=${email} attemptedPlayerId=${playerId} takenBy=${existing.id} (${existing.name})`);
-    userError('Google account already linked to ' + existing.name);
+    userError('Email already linked to ' + existing.name);
   }
 
   for (let i = 1; i < rows.length; i++) {
@@ -561,6 +571,13 @@ function handleLinkGoogleAccount(playerId, email, req) {
         email: email.toLowerCase().trim(),
         active: String(rows[i][4] || 'TRUE').toUpperCase() === 'TRUE'
       };
+      // Seed the per-request cache so findSessionByToken (called later in
+      // handleLinkAccount) resolves the player we just linked instead of
+      // seeing the stale null cached by the findPlayerByEmail call
+      // above (which ran before the email was written to the sheet).
+      if (req && req.cache) {
+        req.cache['email-' + email.toLowerCase().trim()] = playerObj;
+      }
       console.info(`[Link] LINKED email=${email} playerId=${playerId}`);
 
       const settings = getSettings(req);
@@ -596,7 +613,7 @@ function handleLinkAccount(payload, req) {
 
   // Reuse the existing validation + Players col D write. This returns the unified
   // linked-player shape on both the fresh-link and already-linked paths.
-  const linkRes = handleLinkGoogleAccount(playerId, email, req);
+  const linkRes = linkPlayerToEmail(playerId, email, req);
   const player = linkRes.linkedPlayer || linkRes.player;
   if (!player) {
     userError('Could not resolve the player after linking.');
@@ -614,6 +631,13 @@ function handleLinkAccount(payload, req) {
   const token = deviceId
     ? resolveDeviceAccountToken(player.id, deviceId, email, req)
     : insertSession(player.id, '', email, req);
+
+  if (req._sessionRow) {
+    touchSessionTimestamp(req._sessionRow, req);
+  } else {
+    const freshSession = findSessionByToken(token, req);
+    if (freshSession && freshSession._rowIndex) touchSessionTimestamp(freshSession._rowIndex, req);
+  }
 
   return {
     success: true,
@@ -662,7 +686,7 @@ function handleSubmitVote(payload, email, req) {
     userError('Voting is currently closed for this week.');
   }
 
-  const player = findPlayerByGoogleEmail(email, req);
+  const player = findPlayerByEmail(email, req);
   if (!player || (player.active !== undefined && !player.active)) {
     console.warn(`[Vote] REJECTED unknown/inactive email=${email} playerId=${player ? player.id : 'none'}`);
     userError('Identity unlinked or inactive. Please link your player account.');
@@ -710,12 +734,16 @@ function handleSubmitVote(payload, email, req) {
     }
 
     console.info(`[Vote] RECORDED email=${email} playerId=${player.id} season=${seasonId} week=${week} leader=${leader1Id || 'none'} opponent=${opponentId || 'none'}`);
+    if (req && req._sessionRow) touchSessionTimestamp(req._sessionRow, req);
     return { success: true, recorded: true, message: 'Votes successfully recorded!' };
 
   } catch (err) {
-    // Rollback entries on failure, deleting the exact rows we inserted
-    if (opponentVoteRow) try { ss.getSheetByName(SHEETS.OPPONENT_VOTES).deleteRow(opponentVoteRow); } catch (e) {}
-    if (leaderVoteRow) try { ss.getSheetByName(SHEETS.LEADER_VOTES).deleteRow(leaderVoteRow); } catch (e) {}
+    // Rollback entries on failure, deleting the exact rows we inserted.
+    // If rollback itself fails the partial state is left as-is: the
+    // LeaderVote row is the canonical dedup record, so an orphaned
+    // OpponentVote row is harmless (it tallies but never gates submissions).
+    if (opponentVoteRow) try { ss.getSheetByName(SHEETS.OPPONENT_VOTES).deleteRow(opponentVoteRow); } catch (e) { /* best-effort */ }
+    if (leaderVoteRow) try { ss.getSheetByName(SHEETS.LEADER_VOTES).deleteRow(leaderVoteRow); } catch (e) { /* best-effort */ }
     throw err;
   }
 }
@@ -1166,7 +1194,7 @@ function handleGetLeaderboardData(requestedSeasonId, req) {
 }
 
 function handleGetMySeasonStats(requestedSeasonId, userEmail, req) {
-  const linkedPlayer = findPlayerByGoogleEmail(userEmail, req);
+  const linkedPlayer = findPlayerByEmail(userEmail, req);
   if (!linkedPlayer) {
     userError('Link your account first.');
   }
@@ -1392,6 +1420,17 @@ function fetchSeasonStandings(seasonNumber, roundNumber, req) {
 // ISO-string rows instead of a raw Date object.
 function formatISODate(date) {
   return Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
+// Parses session timestamps. Full ISO strings (with 'T') are unambiguous.
+// Legacy date-only strings (from CREATED) are parsed as Europe/Berlin
+// midnight to match the timezone they were stored in.
+function parseSessionDate(str) {
+  if (!str) return null;
+  if (String(str).indexOf('T') !== -1) return new Date(str);
+  return new Date(Utilities.formatDate(
+    new Date(str + 'T00:00:00'), Session.getScriptTimeZone(), "yyyy-MM-dd'T'HH:mm:ss'Z'"
+  ));
 }
 
 function startNewSeason() {
