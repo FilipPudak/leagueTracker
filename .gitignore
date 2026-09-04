@@ -9,3 +9,12 @@ docs/phase2-*
 
 # AI assistant workspace
 .opencode/
+
+# Node dependencies
+node_modules/
+
+# Wrangler cache
+.wrangler/
+
+# Temporary data files
+tmp/

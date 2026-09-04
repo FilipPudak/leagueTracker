@@ -1,0 +1,13 @@
+name = "league-tracker"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[env]
+# D1 database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "league-tracker"
+database_id = "ccf38d5e-1639-4eb3-8447-9f3644127e4b"
+
+[triggers]
+crons = ["30 8 * * 1", "0 9 * * 1"]

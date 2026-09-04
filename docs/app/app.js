@@ -4,8 +4,8 @@
  * No Google sign-in, no shared secret: identity is a token minted at link time.
  * ============================================================================ */
 
-// Backend deployment URL (must point at a token-only /exec deployment).
-const API_URL = 'https://script.google.com/macros/s/AKfycbwNYQ4BSs6CTIG0KTMXf-e7FyjZhYLSFKOgdnOxYcWm54c4OzNWB0VZ_ltv7fB7wUcH/exec';
+// Backend deployment URL (Cloudflare Worker with D1 database).
+const API_URL = 'https://league-tracker.filip-pudak.workers.dev';
 
 // localStorage keys for the per-device session.
 const KEY_TOKEN = 'lt_token';
@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '1.0.3';
+const APP_VERSION = '2.0.0';
 
 // How long a loaded leaderboard/stats payload stays fresh before a re-entry
 // refetches it. Flicking between tabs is sub-second, so a tiny TTL is enough to
@@ -215,6 +215,16 @@ function applyBoot(boot) {
       sel.appendChild(opt);
     });
   });
+
+  // Weekly participation count
+  const wpCard = $('weekly-participation-card');
+  const wpText = $('weekly-participation-text');
+  if (boot.weeklyParticipation && boot.weeklyParticipation.total > 0) {
+    wpText.textContent = boot.weeklyParticipation.voted + ' of ' + boot.weeklyParticipation.total + ' players have voted this week';
+    wpCard.style.display = 'block';
+  } else {
+    wpCard.style.display = 'none';
+  }
 
   if (boot.status === 'linked') {
     // Reset the vote card to its default visible state before deciding how to
@@ -569,6 +579,31 @@ function loadMySeasonStats() {
 }
 
 function renderMySeasonStats(res) {
+  // Gamification: compliance, streaks, raffle tickets
+  const gamSection = $('myseason-gamification-section');
+  const gamContainer = $('myseason-gamification-container');
+  const compliance = res.compliance || {};
+  const streaks = res.streaks || {};
+  const raffle = res.raffleTickets || 0;
+
+  if (compliance.weeksAttended > 0 || raffle > 0) {
+    let html = '';
+    if (compliance.weeksAttended > 0) {
+      html += `<div><span style="color:#94a3b8;">Compliance:</span> <strong>${compliance.weeksVoted} of ${compliance.weeksAttended} weeks (${compliance.compliancePct}%)</strong></div>`;
+    }
+    if (streaks.currentStreak > 0 || streaks.bestStreak > 0) {
+      html += `<div><span style="color:#94a3b8;">Streak:</span> <strong>${streaks.currentStreak} current</span> &bull; <strong>${streaks.bestStreak} best</strong></div>`;
+    }
+    if (raffle > 0) {
+      html += `<div><span style="color:#94a3b8;">Raffle tickets:</span> <strong style="color:#fbbf24;">${raffle}</strong></div>`;
+    }
+    gamContainer.innerHTML = html;
+    gamSection.style.display = 'block';
+  } else {
+    gamSection.style.display = 'none';
+  }
+
+  // Awards
   const awardsContainer = $('myseason-awards-container');
   const awardsSection = $('myseason-awards-section');
   const awards = res.awardsWon || [];
