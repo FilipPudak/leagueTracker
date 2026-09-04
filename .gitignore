@@ -6,3 +6,6 @@
 
 # Private design notes (Phase 2 and beyond) - keep out of the public repo
 docs/phase2-*
+
+# AI assistant workspace
+.opencode/

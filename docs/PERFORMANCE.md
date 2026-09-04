@@ -1,7 +1,7 @@
 # Load reliability
 
-To keep the web app usable during the slow, multi-hop startup (browser → frontend script
-→ URL fetch → backend script → spreadsheet), the frontend handles transient failures
+To keep the web app usable during the slow, multi-hop startup (browser → static client
+(fetch) → backend script → spreadsheet), the client handles transient failures
 gracefully:
 
 - A short spinner is shown while the initial `getAppData` call is in flight.

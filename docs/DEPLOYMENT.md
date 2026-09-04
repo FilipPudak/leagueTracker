@@ -42,10 +42,4 @@ Apps Script editor → Project Settings → Script Properties). Not committed to
 - The app lives at `https://FilipPudak.github.io/leagueTracker/app/`.
 - Any push to `main` that changes `docs/app/*` republishes the client automatically.
 
-## Retired at Stage 2 cut-over
-
-The legacy Script 2 proxy (`frontend/`) and its `API_URL` / `API_SECRET` Script Properties are
-no longer used — the static client talks directly to the backend with a token. See
-`docs/phase2-onboarding-plan.md` for the cut-over details.
-
 See <https://github.com/google/clasp> for full clasp docs.
