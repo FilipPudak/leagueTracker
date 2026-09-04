@@ -15,7 +15,13 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
+
+// How long a loaded leaderboard/stats payload stays fresh before a re-entry
+// refetches it. Flicking between tabs is sub-second, so a tiny TTL is enough to
+// avoid refetch-spam (and repeated slow SWU standings fetches) while genuine
+// returns still get fresh data. Value is seconds.
+const CACHE_TTL_SECONDS = 15;
 
 let appState = {
   status: 'unlinked',
@@ -26,7 +32,8 @@ let appState = {
   leaderboardCache: {},
   myseasonCache: {},
   leaderboardToken: 0,
-  myseasonToken: 0
+  myseasonToken: 0,
+  lastView: 'vote-view'
 };
 
 /* ---------------------------------------------------------------- session -- */
@@ -134,7 +141,17 @@ async function callApi(action, payload = {}, _attempt = 0) {
 /* ------------------------------------------------------------- dom helpers -- */
 
 function $(id) { return document.getElementById(id); }
-function showSpinner(show) { $('loading-spinner').style.display = show ? 'block' : 'none'; }
+
+// The spinner is a single global element, but loads happen per-view. Tracking the
+// view that currently owns the spinner lets a tab switch clear a stale view's
+// spinner instead of leaving it stranded when that view's request is superseded.
+let spinnerOwner = null;
+function showSpinner(show, owner) {
+  if (show) spinnerOwner = owner;
+  else if (owner && owner !== spinnerOwner) return; // a stale owner can't clear it
+  $('loading-spinner').style.display = show ? 'block' : 'none';
+  if (!show) spinnerOwner = null;
+}
 function showStatus(msg, isSuccess) {
   const box = $('status-box');
   box.textContent = msg;
@@ -258,14 +275,18 @@ function populateLinkPicker(players) {
 
 /* ---------------------------------------------------------------- intents -- */
 
+let linkInFlight = false;
+
 function submitAccountLink() {
+  if (linkInFlight) return;
   const emailEl = $('link-email');
   const email = emailEl.value.trim();
   const playerId = $('link-player-select').value;
   if (!email) { showStatus('Please enter your email address.', false); return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showStatus('Please enter a valid email address.', false); return; }
   if (!playerId) { showStatus('Please select your player name.', false); return; }
-  showSpinner(true); clearStatus();
+  linkInFlight = true;
+  showSpinner(true, 'link'); clearStatus();
 
   callApi('linkAccount', { playerId: playerId, email: email })
     .then((res) => {
@@ -290,6 +311,7 @@ function submitAccountLink() {
         seasonId: appState.seasonId
       };
       showSpinner(false);
+      linkInFlight = false;
       applyBoot(boot);
       if (appState.votingOpen) {
         showStatus('Account linked successfully!', true);
@@ -297,6 +319,7 @@ function submitAccountLink() {
     })
     .catch((err) => {
       showSpinner(false);
+      linkInFlight = false;
       showStatus(err.userMessage || err.message || 'Failed to link account.', false);
     });
 }
@@ -316,44 +339,66 @@ function cancelUnlink() {
   $('unlink-confirm').style.display = 'none';
 }
 
+const TAB_INDEX = { 'vote-view': 0, 'leaderboard-view': 1, 'myseason-view': 2 };
+
 function confirmUnlink() {
   $('unlink-confirm').style.display = 'none';
+  // Enter the dedicated "Unlinking…" state immediately so tabs and the identity
+  // chip are gone before the network call — the user can no longer click into
+  // another view (and race the re-boot) while the unlink is in flight.
+  const lastView = appState.lastView;
+  showTabs(false);
+  showLinkedPresence(null);
+  clearStatus();
+  showStatus('Unlinking…', false);
+  showSpinner(true, 'unlink');
   const token = getToken();
-  showSpinner(true); clearStatus();
   callApi('unlinkAccount', { token: token })
     .then(() => {
-      showSpinner(false);
       clearSession();
       appState.linkedPlayer = null;
       appState.status = 'unlinked';
-      showTabs(false);
-      setActiveView('link-view', 0);
-      populateLinkPicker([]); // refresh after unlink
-      // Re-bootstrap to rebuild the unlinked player list.
+      // Re-bootstrap to rebuild the unlinked player list (also repopulates the
+      // picker and hides the tabs). fetchInitialAppData clears status + spinner.
       return fetchInitialAppData();
     })
     .catch((err) => {
       showSpinner(false);
       showStatus(err.userMessage || err.message || 'Failed to unlink.', false);
+      if (appState.linkedPlayer) {
+        // Unlink failed: return the user to where they were, tabs intact.
+        showTabs(true);
+        showLinkedPresence(appState.linkedPlayer);
+        setActiveView(lastView, TAB_INDEX[lastView] || 0);
+      }
     });
 }
 
 function switchTab(tabId) {
   if (tabId === 'vote-view') {
-    if (appState.linkedPlayer) { clearStatus(); setActiveView('vote-view', 0); }
-    else setActiveView('link-view', 0);
+    if (appState.linkedPlayer) {
+      clearStatus();
+      showSpinner(false);
+      setActiveView('vote-view', 0);
+    } else {
+      // Unlinked: show the link view and de-highlight every tab so the active
+      // highlight always matches the visible panel (never a misleading "Vote").
+      document.querySelectorAll('.view-panel').forEach((v) => v.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+      $('link-view').classList.add('active');
+    }
   } else if (tabId === 'leaderboard-view') {
     clearStatus();
     setActiveView('leaderboard-view', 1);
+    appState.lastView = 'leaderboard-view';
     appState.leaderboardToken++;
-    appState.leaderboardCache = {};
     loadLeaderboardData();
   } else if (tabId === 'myseason-view') {
     if (appState.linkedPlayer) {
       clearStatus();
       setActiveView('myseason-view', 2);
+      appState.lastView = 'myseason-view';
       appState.myseasonToken++;
-      appState.myseasonCache = {};
       loadMySeasonStats();
     } else {
       setActiveView('link-view', 2);
@@ -388,12 +433,12 @@ function submitVotes() {
   voteInFlight = true;
   const btn = $('btn-vote-submit');
   if (btn) btn.disabled = true;
-  showSpinner(true); clearStatus();
+  showSpinner(true, 'vote'); clearStatus();
 
   function endFlight() {
     voteInFlight = false;
     if (btn) btn.disabled = false;
-    showSpinner(false);
+    showSpinner(false, 'vote');
   }
   function showVoteRecorded() {
     $('vote-form').style.display = 'none';
@@ -420,15 +465,18 @@ function submitVotes() {
 function loadLeaderboardData() {
   const selectedSeasonId = $('season-filter').value;
   const cached = appState.leaderboardCache[selectedSeasonId];
-  if (cached) { renderLeaderboard(cached); return; }
+  if (isFreshCache(appState.leaderboardCache, selectedSeasonId)) {
+    renderLeaderboard(cached.data);
+    return;
+  }
 
   const token = ++appState.leaderboardToken;
-  showSpinner(true);
+  showSpinner(true, 'leaderboard');
   callApi('getLeaderboardData', { seasonId: selectedSeasonId })
     .then((res) => {
       if (token !== appState.leaderboardToken) return;
       showSpinner(false);
-      appState.leaderboardCache[selectedSeasonId] = res;
+      appState.leaderboardCache[selectedSeasonId] = { data: res, ts: Date.now() };
       renderLeaderboard(res);
     })
     .catch((err) => {
@@ -470,15 +518,18 @@ function loadMySeasonStats() {
   if (!appState.linkedPlayer) return;
   const selectedSeasonId = $('myseason-season-filter').value;
   const cached = appState.myseasonCache[selectedSeasonId];
-  if (cached) { renderMySeasonStats(cached); return; }
+  if (isFreshCache(appState.myseasonCache, selectedSeasonId)) {
+    renderMySeasonStats(cached.data);
+    return;
+  }
 
   const token = ++appState.myseasonToken;
-  showSpinner(true);
+  showSpinner(true, 'myseason');
   callApi('getMySeasonStats', { seasonId: selectedSeasonId })
     .then((res) => {
       if (token !== appState.myseasonToken) return;
       showSpinner(false);
-      appState.myseasonCache[selectedSeasonId] = res;
+      appState.myseasonCache[selectedSeasonId] = { data: res, ts: Date.now() };
       renderMySeasonStats(res);
     })
     .catch((err) => {
@@ -513,6 +564,14 @@ function renderMySeasonStats(res) {
 }
 
 /* -------------------------------------------------------------- utilities -- */
+
+// True if the given (view cache, season) entry is still within the TTL window.
+// Cache entries are stored as { data, ts }; a missing/expired entry is stale.
+function isFreshCache(viewCache, seasonId) {
+  const entry = viewCache[seasonId];
+  if (!entry) return false;
+  return (Date.now() - entry.ts) < (CACHE_TTL_SECONDS * 1000);
+}
 
 function escapeHtml(value) {
   return String(value == null ? '' : value)
