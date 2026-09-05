@@ -3,6 +3,13 @@ import { getSettings, updateSetting } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, writePodiumBlock, assignStandardRanks } from '../lib/awards.js';
 import { fetchSeasonStandings } from '../lib/scraping.js';
 
+async function findPlayerByMelee(DB, meleeName) {
+  const row = await DB.prepare(
+    'SELECT id FROM players WHERE LOWER(melee_name) = LOWER(?)'
+  ).bind(meleeName).first();
+  return row ? row.id : null;
+}
+
 export async function advanceWeek(env) {
   const { DB } = env;
   console.log('[AdvanceWeek] Starting weekly advance...');
@@ -39,7 +46,11 @@ export async function advanceWeek(env) {
     if (finalStandings) {
       // Galactic Ruler: rank 1
       const rank1 = finalStandings.filter(s => s.rank === 1);
-      const rulerEntries = rank1.map(s => ({ playerId: s.username, score: s.rank, name: s.name }));
+      const rulerEntries = [];
+      for (const s of rank1) {
+        const resolvedId = await findPlayerByMelee(DB, s.username);
+        if (resolvedId) rulerEntries.push({ playerId: resolvedId, score: s.points, name: s.name });
+      }
       if (rulerEntries.length > 0) {
         await writePodiumBlock(DB, activeSeasonId, 'Galactic Ruler', rulerEntries.slice(0, 3));
       }
@@ -60,10 +71,14 @@ export async function advanceWeek(env) {
           .slice(0, 3);
 
         if (climbers.length > 0) {
-          await writePodiumBlock(DB, activeSeasonId, 'A New Hope', climbers.map(c => ({
-            playerId: c.username,
-            score: c.climb,
-          })));
+          const hopeEntries = [];
+          for (const c of climbers) {
+            const resolvedId = await findPlayerByMelee(DB, c.username);
+            if (resolvedId) hopeEntries.push({ playerId: resolvedId, score: c.climb, name: c.name });
+          }
+          if (hopeEntries.length > 0) {
+            await writePodiumBlock(DB, activeSeasonId, 'A New Hope', hopeEntries.slice(0, 3));
+          }
         }
       }
     }

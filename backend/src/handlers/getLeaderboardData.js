@@ -1,14 +1,18 @@
-import { getSetting } from '../db/queries.js';
-import { getAwardsForSeason, getMostPlayedLeaders } from '../db/queries.js';
+import { getSettings, getAwardsForSeason, getMostPlayedLeaders } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, assignStandardRanks } from '../lib/awards.js';
 import { getSeasonParticipation } from '../lib/participation.js';
 import { fetchSeasonStandings } from '../lib/scraping.js';
+
+const AMBASSADOR_CALLSIGNS = [
+  'Gold Leader', 'Green Leader', 'Red Leader',
+  'Blade Eleven', 'Rogue One', 'Phoenix Leader',
+];
 
 export async function handleGetLeaderboardData(body, env) {
   const { DB } = env;
   const { seasonId: requestedSeasonId } = body;
 
-  const settings = await getSettingsCached(DB);
+  const settings = await getSettings(DB);
   const activeSeasonId = settings.ACTIVE_SEASON_ID ? Number(settings.ACTIVE_SEASON_ID) : null;
   const currentWeek = settings.CURRENT_WEEK ? parseInt(settings.CURRENT_WEEK.replace(/\D/g, ''), 10) : 1;
   const votingOpen = settings.VOTING_OPEN === 'TRUE';
@@ -23,8 +27,13 @@ export async function handleGetLeaderboardData(body, env) {
   }
 
   const isActiveSeason = seasonId === activeSeasonId;
+  const isLive = votingOpen && isActiveSeason;
 
-  // Get stored awards (if season is closed)
+  // Batch-resolve player IDs → names and melee names → IDs
+  const nameMap = await buildPlayerNameMap(DB);
+  const meleeIdMap = await buildMeleeIdMap(DB);
+
+  // Get stored awards
   const awards = await getAwardsForSeason(DB, seasonId);
   const awardsMap = {};
   for (const a of (awards.results || [])) {
@@ -66,8 +75,8 @@ export async function handleGetLeaderboardData(body, env) {
     if (standings) {
       const top3 = standings.filter(s => s.rank <= 3);
       ruler = assignStandardRanks(top3.map(s => ({
-        playerId: findPlayerByMelee(DB, s.username),
-        score: s.rank,
+        playerId: meleeIdMap.get(s.username?.toLowerCase()) || null,
+        score: s.points || 0,
         name: s.name,
       })));
     }
@@ -104,11 +113,32 @@ export async function handleGetLeaderboardData(body, env) {
     newHope = assignStandardRanks(newHope);
   }
 
-  // Bounty Hunter: stored only
-  const bountyHunter = awardsMap['Bounty Hunter'] || null;
+  // Bounty Hunter: stored only, hidden while voting is live
+  const bountyHunter = isLive ? null : (awardsMap['Bounty Hunter'] || null);
 
   // Season participation aggregate
   const participation = await getSeasonParticipation(DB, seasonId);
+
+  // Resolve player names on all award lists
+  schemer = resolveNames(schemer, nameMap);
+  ambassador = resolveNames(ambassador, nameMap);
+  ruler = resolveNames(ruler, nameMap);
+  newHope = resolveNames(newHope, nameMap);
+  const bountyHunterNamed = resolveNames(bountyHunter, nameMap);
+
+  // Mask Ambassador names with callsigns while voting is live (privacy)
+  if (isLive && ambassador) {
+    ambassador.forEach((entry, i) => {
+      entry.name = AMBASSADOR_CALLSIGNS[i] || `Vanguard-${i + 1}`;
+    });
+  }
+
+  // Format scores to match GAS display
+  schemer = formatScore(schemer, (e) => `${e.score} Leaders`);
+  ambassador = formatScore(ambassador, (e) => `${e.score} Votes`);
+  ruler = formatScore(ruler, (e) => `${e.score} Pts`);
+  newHope = formatScore(newHope, (e) => `+${e.score} Climb`);
+  const bountyHunterFormatted = formatScore(bountyHunterNamed, (e) => e.score ? `${e.score} 💀` : null);
 
   return {
     leaderLeaderboard: mostPlayedLeaders,
@@ -116,25 +146,41 @@ export async function handleGetLeaderboardData(body, env) {
     ambassador,
     ruler,
     newHope,
-    bountyHunter,
+    bountyHunter: bountyHunterFormatted,
     participation,
   };
 }
 
-// Helper: get settings cached
-async function getSettingsCached(DB) {
-  const rows = await DB.prepare('SELECT key, value FROM settings').all();
-  const settings = {};
-  for (const row of rows.results) {
-    settings[row.key] = row.value;
+async function buildPlayerNameMap(DB) {
+  const rows = await DB.prepare('SELECT id, name FROM players').all();
+  const map = {};
+  for (const r of (rows.results || [])) {
+    map[r.id] = r.name;
   }
-  return settings;
+  return map;
 }
 
-// Helper: find player ID by melee name (for SWU site matching)
-async function findPlayerByMelee(DB, meleeName) {
-  const row = await DB.prepare(
-    'SELECT id FROM players WHERE LOWER(melee_name) = LOWER(?)'
-  ).bind(meleeName).first();
-  return row ? row.id : null;
+async function buildMeleeIdMap(DB) {
+  const rows = await DB.prepare('SELECT id, melee_name FROM players WHERE melee_name IS NOT NULL').all();
+  const map = new Map();
+  for (const r of (rows.results || [])) {
+    map.set(r.melee_name.toLowerCase(), r.id);
+  }
+  return map;
+}
+
+function resolveNames(items, nameMap) {
+  if (!items || items.length === 0) return items;
+  return items.map(item => ({
+    ...item,
+    name: item.name || nameMap[item.playerId] || item.playerId || 'Unknown',
+  }));
+}
+
+function formatScore(items, formatter) {
+  if (!items || items.length === 0) return items;
+  return items.map(item => ({
+    ...item,
+    score: formatter(item),
+  }));
 }

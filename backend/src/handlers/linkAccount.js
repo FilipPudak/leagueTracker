@@ -81,7 +81,7 @@ export async function handleLinkAccount(body, env) {
 
   return {
     token,
-    linkedPlayer: { id: player.id, name: player.email ? player.name : player.name, email: email.trim().toLowerCase() },
+    linkedPlayer: { id: player.id, name: player.name, email: email.trim().toLowerCase() },
     votingOpen,
     alreadyVoted,
     leaders: (leaders.results || []).map(l => ({ id: l.id, name: l.name, set: l.set })),

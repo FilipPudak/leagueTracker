@@ -64,7 +64,7 @@ export async function syncPlayers(env) {
     const standings = await fetchSeasonStandings(activeSeasonId, currentWeek);
     if (standings) {
       const players = await getAllActivePlayers(DB);
-      const playerMap = new Map((players || []).map(p => [p.melee_name?.toLowerCase(), p]));
+      const playerMap = new Map((players.results || []).map(p => [p.melee_name?.toLowerCase(), p]));
 
       let attendanceCount = 0;
       for (const entry of standings) {

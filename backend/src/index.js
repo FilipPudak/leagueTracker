@@ -4,6 +4,7 @@ import { handleUnlinkAccount } from './handlers/unlinkAccount.js';
 import { handleSubmitVote } from './handlers/submitVote.js';
 import { handleGetLeaderboardData } from './handlers/getLeaderboardData.js';
 import { handleGetMySeasonStats } from './handlers/getMySeasonStats.js';
+import { enableFetchCache, disableFetchCache } from './lib/scraping.js';
 
 export default {
   async fetch(request, env) {
@@ -47,18 +48,21 @@ export default {
 
     const handler = handlers[action];
     if (!handler) {
-      return new Response(JSON.stringify({ success: false, error: 'Unknown action: ' + action }), {
+      return new Response(JSON.stringify({ success: false, error: 'Unknown action.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     try {
+      enableFetchCache();
       const result = await handler(body, env);
+      disableFetchCache();
       return new Response(JSON.stringify({ success: true, data: result }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     } catch (err) {
+      disableFetchCache();
       const status = err.status || 500;
       return new Response(JSON.stringify({ success: false, error: err.message || 'Server error' }), {
         status,
@@ -69,16 +73,21 @@ export default {
 
   // Cron trigger handlers
   async scheduled(event, env) {
-    const cron = event.cron;
+    enableFetchCache();
+    try {
+      const cron = event.cron;
 
-    if (cron === '30 8 * * 1') {
-      // syncPlayers: Monday 08:30
-      const { syncPlayers } = await import('./triggers/syncPlayers.js');
-      await syncPlayers(env);
-    } else if (cron === '0 9 * * 1') {
-      // advanceWeek: Monday 09:00
-      const { advanceWeek } = await import('./triggers/advanceWeek.js');
-      await advanceWeek(env);
+      if (cron === '30 8 * * 1') {
+        // syncPlayers: Monday 08:30
+        const { syncPlayers } = await import('./triggers/syncPlayers.js');
+        await syncPlayers(env);
+      } else if (cron === '0 9 * * 1') {
+        // advanceWeek: Monday 09:00
+        const { advanceWeek } = await import('./triggers/advanceWeek.js');
+        await advanceWeek(env);
+      }
+    } finally {
+      disableFetchCache();
     }
   },
 };

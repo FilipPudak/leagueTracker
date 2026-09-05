@@ -54,14 +54,6 @@ export async function getMaxSeasonId(db) {
   return row ? row.max_id || 0 : 0;
 }
 
-// Vote helpers
-export async function hasSubmittedThisWeek(db, seasonId, week, playerId) {
-  const row = await db.prepare(
-    'SELECT 1 FROM leader_votes WHERE season_id = ? AND week = ? AND player_id = ?'
-  ).bind(seasonId, week, playerId).first();
-  return !!row;
-}
-
 // Session helpers
 export async function getSessionByToken(db, token) {
   if (!token) return null;

@@ -14,17 +14,24 @@ export function assignStandardRanks(items) {
   const sorted = [...items].sort((a, b) => (b.score || 0) - (a.score || 0));
   let rank = 1;
   let prevScore = null;
-  let skip = 0;
   for (let i = 0; i < sorted.length; i++) {
     if (sorted[i].score !== prevScore) {
       rank = i + 1;
       prevScore = sorted[i].score;
-    } else {
-      skip++;
     }
     sorted[i].displayRank = rank;
   }
   return sorted;
+}
+
+// Take top 3 with tie-aware boundary: if 4+ players share the 3rd-place score,
+// keep all tied at that level (up to a reasonable cap). Matches GAS behavior.
+function tieAwareTop3(items) {
+  if (!items || items.length === 0) return [];
+  const sorted = [...items].sort((a, b) => (b.score || 0) - (a.score || 0));
+  if (sorted.length <= 3) return sorted;
+  const thirdScore = sorted[2].score;
+  return sorted.filter(e => e.score >= thirdScore);
 }
 
 // Compute Schemer award: most distinct leaders played
@@ -35,13 +42,13 @@ export async function computeSchemer(db, seasonId) {
     WHERE season_id = ?
     GROUP BY player_id
     ORDER BY distinct_leaders DESC
-    LIMIT 3
   `).bind(seasonId).all();
 
-  return (rows.results || []).map(r => ({
+  const all = (rows.results || []).map(r => ({
     playerId: r.player_id,
     score: r.distinct_leaders,
   }));
+  return tieAwareTop3(all);
 }
 
 // Compute Ambassador award: most favorite-opponent votes
@@ -52,13 +59,13 @@ export async function computeAmbassador(db, seasonId) {
     WHERE season_id = ?
     GROUP BY opponent_id
     ORDER BY votes DESC
-    LIMIT 3
   `).bind(seasonId).all();
 
-  return (rows.results || []).map(r => ({
+  const all = (rows.results || []).map(r => ({
     playerId: r.player_id,
     score: r.votes,
   }));
+  return tieAwareTop3(all);
 }
 
 // Write a podium block (3 rows) for an award

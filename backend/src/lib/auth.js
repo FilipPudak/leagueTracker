@@ -55,7 +55,3 @@ export async function deleteSessionsByPlayerAndDevice(db, playerId, deviceId) {
     'DELETE FROM sessions WHERE player_id = ? AND device_id = ?'
   ).bind(playerId, deviceId).run();
 }
-
-export async function deleteSessionByToken(db, token) {
-  await db.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
-}

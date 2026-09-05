@@ -117,6 +117,7 @@ export async function getSeasonParticipation(db, seasonId) {
 
   const totalPlayers = total?.count || 0;
   const playersWithAttendance = row?.players_with_attendance || 0;
+  const playersWhoVoted = row?.players_who_voted || 0;
 
   // Participation = % of active players who have attendance data (showed up)
   // and of those, how many voted at least once
@@ -124,5 +125,5 @@ export async function getSeasonParticipation(db, seasonId) {
     ? Math.round((playersWithAttendance / totalPlayers) * 1000) / 10
     : 0;
 
-  return { participationPct, totalPlayers };
+  return { participationPct, totalPlayers, playersWhoVoted };
 }

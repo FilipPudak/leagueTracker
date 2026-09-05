@@ -1,5 +1,28 @@
-// SWU league site scraping
+// SWU league site scraping with per-request fetch cache
 const BASE_URL = 'https://stockholm.sw-unlimited.com/';
+
+// Per-request cache: Map<url, Promise<string>>
+let _fetchCache = null;
+
+export function enableFetchCache() {
+  _fetchCache = new Map();
+}
+
+export function disableFetchCache() {
+  _fetchCache = null;
+}
+
+async function cachedFetch(url) {
+  if (_fetchCache && _fetchCache.has(url)) {
+    return _fetchCache.get(url);
+  }
+  const promise = fetch(url).then(r => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.text();
+  });
+  if (_fetchCache) _fetchCache.set(url, promise);
+  return promise;
+}
 
 // Parse standings from SWU site HTML
 // Returns [{ username, name, rank, points }, ...] or null
@@ -8,9 +31,7 @@ export async function fetchSeasonStandings(seasonNumber, roundNumber) {
 
   let html;
   try {
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    html = await response.text();
+    html = await cachedFetch(url);
   } catch (err) {
     console.error(`[Scraping] Failed to fetch standings ${url}: ${err}`);
     return null;
@@ -54,9 +75,7 @@ export async function fetchSeasonStandings(seasonNumber, roundNumber) {
 export async function fetchPlayerList() {
   let html;
   try {
-    const response = await fetch(BASE_URL);
-    if (!response.ok) return null;
-    html = await response.text();
+    html = await cachedFetch(BASE_URL);
   } catch (err) {
     console.error(`[Scraping] Failed to fetch player list: ${err}`);
     return null;

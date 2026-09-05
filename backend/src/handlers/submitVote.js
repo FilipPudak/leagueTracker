@@ -59,17 +59,32 @@ export async function handleSubmitVote(body, env) {
     throw err;
   }
 
+  // Prevent self-voting
+  if (String(voteData.opponentId) === String(playerId)) {
+    const err = new Error("You can't select yourself as your favorite opponent.");
+    err.status = 400;
+    throw err;
+  }
+
   const now = new Date().toISOString();
 
-  // Insert leader vote
-  await DB.prepare(
-    'INSERT INTO leader_votes (timestamp, season_id, week, player_id, leader_id) VALUES (?, ?, ?, ?, ?)'
-  ).bind(now, seasonId, week, playerId, voteData.leader1Id).run();
+  // Insert both votes atomically; catch constraint violation for duplicate guard
+  try {
+    await DB.prepare(
+      'INSERT INTO leader_votes (timestamp, season_id, week, player_id, leader_id) VALUES (?, ?, ?, ?, ?)'
+    ).bind(now, seasonId, week, playerId, voteData.leader1Id).run();
 
-  // Insert opponent vote (de-identified)
-  await DB.prepare(
-    'INSERT INTO opponent_votes (timestamp, season_id, week, opponent_id) VALUES (?, ?, ?, ?)'
-  ).bind(now, seasonId, week, voteData.opponentId).run();
+    await DB.prepare(
+      'INSERT INTO opponent_votes (timestamp, season_id, week, opponent_id) VALUES (?, ?, ?, ?)'
+    ).bind(now, seasonId, week, voteData.opponentId).run();
+  } catch (e) {
+    if (e.message && e.message.includes('UNIQUE constraint')) {
+      const err = new Error('You have already submitted votes for this week.');
+      err.status = 409;
+      throw err;
+    }
+    throw e;
+  }
 
   // Return raffle tickets and participation
   const raffleTickets = await getRaffleTickets(DB, seasonId, playerId);
