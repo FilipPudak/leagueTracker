@@ -1,5 +1,5 @@
 // Weekly advance: increment week, reopen voting, close season at final week
-import { getSettings, updateSetting } from '../db/queries.js';
+import { getSettings, updateSetting, isVotingOpen } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, writePodiumBlock, assignStandardRanks } from '../lib/awards.js';
 import { fetchSeasonStandings } from '../lib/scraping.js';
 
@@ -15,7 +15,7 @@ export async function advanceWeek(env) {
   console.log('[AdvanceWeek] Starting weekly advance...');
 
   const settings = await getSettings(DB);
-  const votingOpen = settings.VOTING_OPEN === 'TRUE';
+  const votingOpen = isVotingOpen(settings.VOTING_OPEN);
   const activeSeasonId = settings.ACTIVE_SEASON_ID ? Number(settings.ACTIVE_SEASON_ID) : null;
   const currentWeek = settings.CURRENT_WEEK ? parseInt(settings.CURRENT_WEEK.replace(/\D/g, ''), 10) : 1;
   const seasonLength = settings.SEASON_LENGTH ? Number(settings.SEASON_LENGTH) : 11;
@@ -28,11 +28,8 @@ export async function advanceWeek(env) {
   const nextWeek = currentWeek + 1;
 
   if (nextWeek > seasonLength) {
-    // Season ended — close voting and materialize all awards
+    // Season ended — materialize all awards BEFORE closing voting
     console.log('[AdvanceWeek] Season ended. Materializing awards...');
-
-    await updateSetting(DB, 'VOTING_OPEN', 'FALSE');
-    await updateSetting(DB, 'CURRENT_WEEK', 'Season Ended');
 
     // Vote-based awards
     const schemer = await computeSchemer(DB, activeSeasonId);
@@ -52,7 +49,7 @@ export async function advanceWeek(env) {
         if (resolvedId) rulerEntries.push({ playerId: resolvedId, score: s.points, name: s.name });
       }
       if (rulerEntries.length > 0) {
-        await writePodiumBlock(DB, activeSeasonId, 'Galactic Ruler', rulerEntries.slice(0, 3));
+        await writePodiumBlock(DB, activeSeasonId, 'Galactic Ruler', rulerEntries.slice(0, 1));
       }
 
       // A New Hope: biggest climb from mid-season to final
@@ -92,6 +89,10 @@ export async function advanceWeek(env) {
         "INSERT INTO awards (season_id, award_name, player_id, score) VALUES (?, 'Bounty Hunter', '', NULL)"
       ).bind(activeSeasonId).run();
     }
+
+    // Close voting AFTER all awards are written
+    await updateSetting(DB, 'VOTING_OPEN', 'FALSE');
+    await updateSetting(DB, 'CURRENT_WEEK', 'Season Ended');
 
     console.log('[AdvanceWeek] Season closed and awards materialized.');
   } else {

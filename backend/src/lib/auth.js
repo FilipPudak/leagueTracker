@@ -15,6 +15,16 @@ export async function findSessionByToken(db, token) {
     await db.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
     return null;
   }
+
+  // Verify player still exists and is active
+  const player = await db.prepare(
+    'SELECT id, active FROM players WHERE id = ?'
+  ).bind(row.player_id).first();
+  if (!player || player.active !== 1) {
+    await db.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
+    return null;
+  }
+
   return row;
 }
 

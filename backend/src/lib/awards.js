@@ -73,6 +73,14 @@ export async function writePodiumBlock(db, seasonId, awardName, entries) {
   // entries is array of { playerId, score } — up to 3
   const top3 = entries.slice(0, 3);
 
+  // If no entries, check if block already exists — preserve manual data
+  if (top3.length === 0) {
+    const existing = await db.prepare(
+      "SELECT 1 FROM awards WHERE season_id = ? AND award_name = ? AND player_id != ''"
+    ).bind(seasonId, awardName).first();
+    if (existing) return;
+  }
+
   // Delete existing entries for this award/season (idempotent)
   await db.prepare(
     'DELETE FROM awards WHERE season_id = ? AND award_name = ?'

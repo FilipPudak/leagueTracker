@@ -207,4 +207,25 @@ describe('deleteSessionsByPlayerAndDevice', () => {
     assert.ok(deleteCall.sql.includes('sessions'));
     assert.deepEqual(deleteCall.params, ['P001', 'dev-alice']);
   });
+
+  it('returns null and deletes session when player is deactivated', async () => {
+    const tables = basicTables();
+    tables.players = tables.players.map(p =>
+      p.id === 'P001' ? { ...p, active: 0 } : p
+    );
+    const db = createMockDb(tables);
+    const result = await findSessionByToken(db, 'test-token-alice');
+    assert.equal(result, null);
+    const store = db.getStore();
+    const deletedSession = store.sessions.find(s => s.token === 'test-token-alice');
+    assert.equal(deletedSession, undefined);
+  });
+
+  it('returns null and deletes session when player is deleted', async () => {
+    const tables = basicTables();
+    tables.players = tables.players.filter(p => p.id !== 'P001');
+    const db = createMockDb(tables);
+    const result = await findSessionByToken(db, 'test-token-alice');
+    assert.equal(result, null);
+  });
 });

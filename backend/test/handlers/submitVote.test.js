@@ -158,21 +158,15 @@ describe('handleSubmitVote', () => {
     );
   });
 
-  it('missing opponentId → 400', async () => {
-    await assert.rejects(
-      () =>
-        handleSubmitVote(
-          {
-            token: 'test-token-alice',
-            voteData: { leader1Id: '1' },
-          },
-          env
-        ),
-      (err) => {
-        assert.equal(err.status, 400);
-        return true;
-      }
+  it('missing opponentId still succeeds with leader only', async () => {
+    const result = await handleSubmitVote(
+      {
+        token: 'test-token-alice',
+        voteData: { leader1Id: '1' },
+      },
+      env
     );
+    assert.equal(typeof result.raffleTickets, 'number');
   });
 
   it('UNIQUE constraint violation caught → 409', async () => {
@@ -260,5 +254,38 @@ describe('handleSubmitVote', () => {
     );
     const after = DB.getStore().sessions.find(s => s.token === 'test-token-alice');
     assert.ok(after.last_active >= beforeActive, 'session timestamp updated');
+  });
+
+  it('accepts leaderId as field alias', async () => {
+    const result = await handleSubmitVote(
+      {
+        token: 'test-token-alice',
+        voteData: { leaderId: '1', opponentId: 'P002' },
+      },
+      env
+    );
+    assert.equal(typeof result.raffleTickets, 'number');
+  });
+
+  it('accepts favoriteOpponentId as field alias', async () => {
+    const result = await handleSubmitVote(
+      {
+        token: 'test-token-alice',
+        voteData: { leader1Id: '1', favoriteOpponentId: 'P002' },
+      },
+      env
+    );
+    assert.equal(typeof result.raffleTickets, 'number');
+  });
+
+  it('self-voting check applies only when opponentId provided', async () => {
+    const result = await handleSubmitVote(
+      {
+        token: 'test-token-alice',
+        voteData: { leader1Id: '1' },
+      },
+      env
+    );
+    assert.ok(result);
   });
 });

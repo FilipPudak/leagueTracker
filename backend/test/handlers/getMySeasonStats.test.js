@@ -48,14 +48,10 @@ describe('handleGetMySeasonStats', () => {
     );
   });
 
-  it('no seasonId → 400', async () => {
-    await assert.rejects(
-      () => handleGetMySeasonStats({ token: 'test-token-alice' }, env),
-      (err) => {
-        assert.equal(err.status, 400);
-        return true;
-      }
-    );
+  it('no seasonId falls back to active season', async () => {
+    const result = await handleGetMySeasonStats({ token: 'test-token-alice' }, env);
+    assert.ok(result.awardsWon);
+    assert.ok(result.leaders);
   });
 
   it('returns correct leader play counts', async () => {
@@ -109,5 +105,15 @@ describe('handleGetMySeasonStats', () => {
       env
     );
     assert.equal(result.raffleTickets, 2, 'Alice voted in weeks 1 and 2');
+  });
+
+  it('falls back to active season when no seasonId provided', async () => {
+    const result = await handleGetMySeasonStats(
+      { token: 'test-token-alice' },
+      env
+    );
+    assert.ok(result.awardsWon);
+    assert.ok(result.leaders);
+    assert.ok(result.compliance);
   });
 });

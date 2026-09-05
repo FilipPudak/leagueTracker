@@ -1,5 +1,5 @@
 import { findSessionByToken, touchSessionTimestamp } from '../lib/auth.js';
-import { getAwardsForSeason, getMostPlayedLeaders } from '../db/queries.js';
+import { getSetting, getAwardsForSeason, getMostPlayedLeaders } from '../db/queries.js';
 import { getCompliance, getStreaks, getRaffleTickets } from '../lib/participation.js';
 import { assignStandardRanks } from '../lib/awards.js';
 
@@ -23,10 +23,15 @@ export async function handleGetMySeasonStats(body, env) {
   await touchSessionTimestamp(DB, token);
 
   const playerId = session.player_id;
-  const sid = seasonId ? Number(seasonId) : null;
+  let sid = seasonId ? Number(seasonId) : null;
 
   if (!sid) {
-    const err = new Error('Season ID required.');
+    const activeSeasonId = await getSetting(DB, 'ACTIVE_SEASON_ID');
+    sid = activeSeasonId ? parseInt(String(activeSeasonId).replace(/\D/g, ''), 10) : null;
+  }
+
+  if (!sid) {
+    const err = new Error('No active season.');
     err.status = 400;
     throw err;
   }

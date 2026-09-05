@@ -1,4 +1,4 @@
-import { getPlayerById, getPlayerByEmail, getAllActivePlayers, getAllActiveLeaders, getAllSeasons, getSetting, updateSetting } from '../db/queries.js';
+import { getPlayerById, getPlayerByEmail, getAllActivePlayers, getAllActiveLeaders, getAllSeasons, getSetting, updateSetting, isVotingOpen } from '../db/queries.js';
 import { createSession, findSessionByPlayerAndDevice } from '../lib/auth.js';
 import { getWeeklyParticipation } from '../lib/participation.js';
 
@@ -54,7 +54,7 @@ export async function handleLinkAccount(body, env) {
 
   // Get current state
   const settings = await getSetting(DB, 'VOTING_OPEN');
-  const votingOpen = settings === 'TRUE';
+  const votingOpen = isVotingOpen(settings);
   const activeSeasonId = await getSetting(DB, 'ACTIVE_SEASON_ID');
   const currentWeek = await getSetting(DB, 'CURRENT_WEEK');
   const weekNum = currentWeek ? parseInt(currentWeek.replace(/\D/g, ''), 10) : 1;

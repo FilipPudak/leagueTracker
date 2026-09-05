@@ -198,13 +198,29 @@ describe('writePodiumBlock', () => {
     assert.equal(awardRows[2].score, null);
   });
 
-  it('handles empty entries array', async () => {
+  it('handles empty entries array — preserves existing data when block exists', async () => {
     const db = createMockDb(basicTables());
+    const store = db.getStore();
+    const existingCount = store.awards.filter(
+      r => r.award_name === 'Galactic Schemer' && r.season_id === 6
+    ).length;
+
     await writePodiumBlock(db, 6, 'Galactic Schemer', []);
+
+    const awardRows = store.awards.filter(
+      r => r.award_name === 'Galactic Schemer' && r.season_id === 6
+    );
+    assert.equal(awardRows.length, existingCount);
+  });
+
+  it('handles empty entries array — writes skeleton when no block exists', async () => {
+    const tables = emptyTables();
+    const db = createMockDb(tables);
+    await writePodiumBlock(db, 6, 'Bounty Hunter', []);
 
     const store = db.getStore();
     const awardRows = store.awards.filter(
-      r => r.award_name === 'Galactic Schemer' && r.season_id === 6
+      r => r.award_name === 'Bounty Hunter' && r.season_id === 6
     );
     assert.equal(awardRows.length, 3);
     assert.equal(awardRows[0].player_id, '');

@@ -19,6 +19,12 @@ export async function updateSetting(db, key, value) {
   ).bind(key, String(value)).run();
 }
 
+export function isVotingOpen(settingValue) {
+  if (!settingValue) return false;
+  const v = String(settingValue).trim().toUpperCase();
+  return v === 'TRUE' || v === 'YES' || v === '1';
+}
+
 // Player helpers
 export async function getPlayerById(db, id) {
   return db.prepare('SELECT * FROM players WHERE id = ?').bind(id).first();

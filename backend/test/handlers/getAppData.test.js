@@ -89,4 +89,27 @@ describe('handleGetAppData', () => {
     const result = await handleGetAppData({ token: 'test-token-bob' }, env);
     assert.equal(result.alreadySubmitted, false);
   });
+
+  it('returns currentPlayer alias for linkedPlayer', async () => {
+    const result = await handleGetAppData({ token: 'test-token-alice' }, env);
+    assert.deepEqual(result.currentPlayer, result.linkedPlayer);
+  });
+
+  it('returns alreadyVoted alias for alreadySubmitted', async () => {
+    const result = await handleGetAppData({ token: 'test-token-alice' }, env);
+    assert.equal(result.alreadyVoted, result.alreadySubmitted);
+  });
+
+  it('returns unlinkedPlayers when user is unlinked', async () => {
+    const result = await handleGetAppData({}, env);
+    assert.ok(Array.isArray(result.unlinkedPlayers));
+    assert.ok(result.unlinkedPlayers.length > 0);
+    assert.ok(result.unlinkedPlayers[0].id);
+    assert.ok(result.unlinkedPlayers[0].name);
+  });
+
+  it('returns empty unlinkedPlayers when user is linked', async () => {
+    const result = await handleGetAppData({ token: 'test-token-alice' }, env);
+    assert.deepEqual(result.unlinkedPlayers, []);
+  });
 });

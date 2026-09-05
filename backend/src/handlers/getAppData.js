@@ -1,4 +1,5 @@
 import { getSettings, getPlayerById, getAllActivePlayers, getAllActiveLeaders, getAllSeasons } from '../db/queries.js';
+import { isVotingOpen } from '../db/queries.js';
 import { findSessionByToken, touchSessionTimestamp } from '../lib/auth.js';
 import { getWeeklyParticipation } from '../lib/participation.js';
 
@@ -10,7 +11,7 @@ export async function handleGetAppData(body, env) {
   const rawSeasonId = settings.ACTIVE_SEASON_ID || '';
   const activeSeasonId = rawSeasonId ? parseInt(String(rawSeasonId).replace(/\D/g, ''), 10) : null;
   const currentWeek = settings.CURRENT_WEEK ? parseInt(settings.CURRENT_WEEK.replace(/\D/g, ''), 10) : 1;
-  const votingOpen = settings.VOTING_OPEN === 'TRUE';
+  const votingOpen = isVotingOpen(settings.VOTING_OPEN);
 
   const seasons = await getAllSeasons(DB);
   const players = await getAllActivePlayers(DB);
@@ -50,19 +51,31 @@ export async function handleGetAppData(body, env) {
     weeklyParticipation = await getWeeklyParticipation(DB, activeSeasonId, currentWeek);
   }
 
+  // Unlinked players for the link form picker
+  let unlinkedPlayers = [];
+  if (status === 'unlinked') {
+    const allPlayers = await DB.prepare(
+      "SELECT id, name FROM players WHERE active = 1 AND (email IS NULL OR email = '') ORDER BY name"
+    ).all();
+    unlinkedPlayers = allPlayers.results || [];
+  }
+
   return {
     status,
     linkedPlayer,
+    currentPlayer: linkedPlayer,
     votingOpen,
     settings,
     seasons: seasons.results || [],
     players: (players.results || []).map(p => ({ id: p.id, name: p.name })),
+    unlinkedPlayers,
     leaders: (leaders.results || []).map(l => ({ id: l.id, name: l.name, set: l.set })),
     activeSeasonId,
     seasonName: seasons.results?.find(s => s.id === activeSeasonId)?.name,
     week: currentWeek,
     seasonId: activeSeasonId,
     alreadySubmitted,
+    alreadyVoted: alreadySubmitted,
     weeklyParticipation,
   };
 }

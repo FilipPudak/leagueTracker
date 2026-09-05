@@ -15,6 +15,7 @@ import {
   getAwardsForSeason,
   getMostPlayedLeaders,
   getMaxSeasonId,
+  isVotingOpen,
 } from '../../src/db/queries.js';
 
 describe('db/queries', () => {
@@ -143,5 +144,17 @@ describe('db/queries', () => {
   it('getMaxSeasonId returns highest season ID', async () => {
     const maxId = await getMaxSeasonId(db);
     assert.equal(maxId, 6, 'highest season is 6');
+  });
+
+  describe('isVotingOpen', () => {
+    it('accepts TRUE', () => assert.equal(isVotingOpen('TRUE'), true));
+    it('accepts YES', () => assert.equal(isVotingOpen('YES'), true));
+    it('accepts 1', () => assert.equal(isVotingOpen('1'), true));
+    it('accepts true (boolean)', () => assert.equal(isVotingOpen(true), true));
+    it('accepts case-insensitive True', () => assert.equal(isVotingOpen('True'), true));
+    it('rejects FALSE', () => assert.equal(isVotingOpen('FALSE'), false));
+    it('rejects empty string', () => assert.equal(isVotingOpen(''), false));
+    it('rejects null', () => assert.equal(isVotingOpen(null), false));
+    it('rejects undefined', () => assert.equal(isVotingOpen(undefined), false));
   });
 });

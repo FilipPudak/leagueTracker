@@ -1,4 +1,5 @@
 import { getSettings, getAwardsForSeason, getMostPlayedLeaders } from '../db/queries.js';
+import { isVotingOpen } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, assignStandardRanks } from '../lib/awards.js';
 import { getSeasonParticipation } from '../lib/participation.js';
 import { fetchSeasonStandings } from '../lib/scraping.js';
@@ -15,7 +16,7 @@ export async function handleGetLeaderboardData(body, env) {
   const settings = await getSettings(DB);
   const activeSeasonId = settings.ACTIVE_SEASON_ID ? Number(settings.ACTIVE_SEASON_ID) : null;
   const currentWeek = settings.CURRENT_WEEK ? parseInt(settings.CURRENT_WEEK.replace(/\D/g, ''), 10) : 1;
-  const votingOpen = settings.VOTING_OPEN === 'TRUE';
+  const votingOpen = isVotingOpen(settings.VOTING_OPEN);
   const seasonLength = settings.SEASON_LENGTH ? Number(settings.SEASON_LENGTH) : 11;
 
   const seasonId = requestedSeasonId ? Number(requestedSeasonId) : activeSeasonId;
@@ -140,7 +141,14 @@ export async function handleGetLeaderboardData(body, env) {
   newHope = formatScore(newHope, (e) => `+${e.score} Climb`);
   const bountyHunterFormatted = formatScore(bountyHunterNamed, (e) => e.score ? `${e.score} 💀` : null);
 
+  // Season name
+  const seasons = await DB.prepare('SELECT id, name FROM seasons').all();
+  const seasonName = (seasons.results || []).find(s => s.id === seasonId)?.name || null;
+
   return {
+    seasonId,
+    seasonName,
+    isActiveSeason,
     leaderLeaderboard: mostPlayedLeaders,
     schemer,
     ambassador,

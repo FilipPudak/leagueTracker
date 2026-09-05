@@ -1,10 +1,10 @@
-import { getSetting } from '../db/queries.js';
+import { getSetting, isVotingOpen } from '../db/queries.js';
 import { findSessionByToken, touchSessionTimestamp } from '../lib/auth.js';
 import { getRaffleTickets, getWeeklyParticipation } from '../lib/participation.js';
 
 export async function handleSubmitVote(body, env) {
   const { DB } = env;
-  const { token, voteData, deviceId } = body;
+  const { token, voteData: rawVoteData, deviceId } = body;
 
   if (!token) {
     const err = new Error('Session expired. Please re-link to continue.');
@@ -24,9 +24,9 @@ export async function handleSubmitVote(body, env) {
   const playerId = session.player_id;
   const activeSeasonId = await getSetting(DB, 'ACTIVE_SEASON_ID');
   const currentWeek = await getSetting(DB, 'CURRENT_WEEK');
-  const votingOpen = await getSetting(DB, 'VOTING_OPEN');
+  const votingOpenVal = await getSetting(DB, 'VOTING_OPEN');
 
-  if (votingOpen !== 'TRUE') {
+  if (!isVotingOpen(votingOpenVal)) {
     const err = new Error('Voting is currently closed for this week.');
     err.status = 403;
     throw err;
@@ -41,6 +41,24 @@ export async function handleSubmitVote(body, env) {
   const seasonId = Number(activeSeasonId);
   const week = parseInt(currentWeek.replace(/\D/g, ''), 10);
 
+  // Normalize vote data: accept multiple field name variants
+  const voteData = rawVoteData || {};
+  const leader1Id = voteData.leader1Id || voteData.leaderId || voteData.leader;
+  const opponentId = voteData.opponentId || voteData.favoriteOpponentId || voteData.opponent;
+
+  if (!leader1Id) {
+    const err = new Error('Please select your Leader.');
+    err.status = 400;
+    throw err;
+  }
+
+  // Prevent self-voting (only if opponent is provided)
+  if (opponentId && String(opponentId) === String(playerId)) {
+    const err = new Error("You can't select yourself as your favorite opponent.");
+    err.status = 400;
+    throw err;
+  }
+
   // Check for duplicate vote
   const existing = await DB.prepare(
     'SELECT 1 FROM leader_votes WHERE season_id = ? AND week = ? AND player_id = ?'
@@ -52,31 +70,19 @@ export async function handleSubmitVote(body, env) {
     throw err;
   }
 
-  // Validate vote data
-  if (!voteData || !voteData.leader1Id || !voteData.opponentId) {
-    const err = new Error('Please select your Leader and Favorite Opponent.');
-    err.status = 400;
-    throw err;
-  }
-
-  // Prevent self-voting
-  if (String(voteData.opponentId) === String(playerId)) {
-    const err = new Error("You can't select yourself as your favorite opponent.");
-    err.status = 400;
-    throw err;
-  }
-
   const now = new Date().toISOString();
 
-  // Insert both votes atomically; catch constraint violation for duplicate guard
+  // Insert votes; catch constraint violation for duplicate guard
   try {
     await DB.prepare(
       'INSERT INTO leader_votes (timestamp, season_id, week, player_id, leader_id) VALUES (?, ?, ?, ?, ?)'
-    ).bind(now, seasonId, week, playerId, voteData.leader1Id).run();
+    ).bind(now, seasonId, week, playerId, leader1Id).run();
 
-    await DB.prepare(
-      'INSERT INTO opponent_votes (timestamp, season_id, week, opponent_id) VALUES (?, ?, ?, ?)'
-    ).bind(now, seasonId, week, voteData.opponentId).run();
+    if (opponentId) {
+      await DB.prepare(
+        'INSERT INTO opponent_votes (timestamp, season_id, week, opponent_id) VALUES (?, ?, ?, ?)'
+      ).bind(now, seasonId, week, opponentId).run();
+    }
   } catch (e) {
     if (e.message && e.message.includes('UNIQUE constraint')) {
       const err = new Error('You have already submitted votes for this week.');

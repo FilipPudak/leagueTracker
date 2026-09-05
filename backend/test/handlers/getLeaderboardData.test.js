@@ -251,4 +251,21 @@ describe('handleGetLeaderboardData', () => {
       assert.ok(/^\d+ .*$/.test(result.bountyHunter[0].score), `bountyHunter format: ${result.bountyHunter[0].score}`);
     }
   });
+
+  it('response includes seasonId, seasonName, isActiveSeason', async () => {
+    const result = await handleGetLeaderboardData({ seasonId: 6 }, env);
+    assert.equal(result.seasonId, 6);
+    assert.equal(typeof result.seasonName, 'string');
+    assert.equal(typeof result.isActiveSeason, 'boolean');
+  });
+
+  it('isActiveSeason true when requesting active season', async () => {
+    const result = await handleGetLeaderboardData({ seasonId: 6 }, env);
+    assert.equal(result.isActiveSeason, true);
+  });
+
+  it('isActiveSeason false when requesting historical season', async () => {
+    const result = await handleGetLeaderboardData({ seasonId: 5 }, env);
+    assert.equal(result.isActiveSeason, false);
+  });
 });

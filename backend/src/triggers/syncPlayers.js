@@ -1,14 +1,22 @@
 // Weekly sync: scrape SWU site → update players, attendance, awards
 import { getSettings, updateSetting, getAllActivePlayers } from '../db/queries.js';
+import { isVotingOpen } from '../db/queries.js';
 import { fetchPlayerList, fetchSeasonStandings } from '../lib/scraping.js';
 import { computeSchemer, computeAmbassador, writePodiumBlock, assignStandardRanks } from '../lib/awards.js';
+
+async function findPlayerByMelee(DB, meleeName) {
+  const row = await DB.prepare(
+    'SELECT id FROM players WHERE LOWER(melee_name) = LOWER(?)'
+  ).bind(meleeName).first();
+  return row ? row.id : null;
+}
 
 export async function syncPlayers(env) {
   const { DB } = env;
   console.log('[SyncPlayers] Starting weekly sync...');
 
   const settings = await getSettings(DB);
-  const votingOpen = settings.VOTING_OPEN === 'TRUE';
+  const votingOpen = isVotingOpen(settings.VOTING_OPEN);
   const activeSeasonId = settings.ACTIVE_SEASON_ID ? Number(settings.ACTIVE_SEASON_ID) : null;
   const currentWeek = settings.CURRENT_WEEK ? parseInt(settings.CURRENT_WEEK.replace(/\D/g, ''), 10) : 1;
   const seasonLength = settings.SEASON_LENGTH ? Number(settings.SEASON_LENGTH) : 11;
@@ -80,7 +88,7 @@ export async function syncPlayers(env) {
     }
   }
 
-  // 3. Refresh active season award podium (vote-based awards)
+  // 3. Refresh active season award podium (all awards)
   const schemer = await computeSchemer(DB, activeSeasonId);
   if (schemer.length > 0) {
     await writePodiumBlock(DB, activeSeasonId, 'Galactic Schemer', schemer);
@@ -89,6 +97,46 @@ export async function syncPlayers(env) {
   const ambassador = await computeAmbassador(DB, activeSeasonId);
   if (ambassador.length > 0) {
     await writePodiumBlock(DB, activeSeasonId, 'Galactic Ambassador', ambassador);
+  }
+
+  // Site-based awards (Galactic Ruler, A New Hope)
+  const standings = await fetchSeasonStandings(activeSeasonId, currentWeek);
+  if (standings) {
+    const rank1 = standings.filter(s => s.rank === 1);
+    const rulerEntries = [];
+    for (const s of rank1) {
+      const resolvedId = await findPlayerByMelee(DB, s.username);
+      if (resolvedId) rulerEntries.push({ playerId: resolvedId, score: s.points, name: s.name });
+    }
+    if (rulerEntries.length > 0) {
+      await writePodiumBlock(DB, activeSeasonId, 'Galactic Ruler', rulerEntries.slice(0, 1));
+    }
+
+    const midRound = Math.floor(seasonLength / 2);
+    const midStandings = await fetchSeasonStandings(activeSeasonId, midRound);
+    if (midStandings) {
+      const midMap = new Map(midStandings.map(s => [s.username, s.rank]));
+      const climbers = standings
+        .map(s => ({
+          username: s.username,
+          name: s.name,
+          climb: (midMap.get(s.username) || 0) - s.rank,
+        }))
+        .filter(c => c.climb > 0)
+        .sort((a, b) => b.climb - a.climb)
+        .slice(0, 3);
+
+      if (climbers.length > 0) {
+        const hopeEntries = [];
+        for (const c of climbers) {
+          const resolvedId = await findPlayerByMelee(DB, c.username);
+          if (resolvedId) hopeEntries.push({ playerId: resolvedId, score: c.climb, name: c.name });
+        }
+        if (hopeEntries.length > 0) {
+          await writePodiumBlock(DB, activeSeasonId, 'A New Hope', hopeEntries.slice(0, 3));
+        }
+      }
+    }
   }
 
   console.log('[SyncPlayers] Sync complete.');
