@@ -417,6 +417,15 @@ function executeInsert(sql, params, store) {
     if (existing) return { success: true, changes: 0 };
   }
 
+  const isReplace = sql.toUpperCase().includes('INSERT OR REPLACE');
+  if (isReplace && store[table]) {
+    const pkCol = cols[0];
+    const pkVal = row[pkCol];
+    if (pkVal !== undefined) {
+      store[table] = store[table].filter(r => String(r[pkCol]) !== String(pkVal));
+    }
+  }
+
   if (!store[table]) store[table] = [];
   store[table].push(row);
 

@@ -51,6 +51,11 @@ db.prepare(sql).all()                     // no bind
 Every handler: `export async function handleXxx(body, env)` where `env = { DB }`.
 Router wraps in `{ success: true, data: result }` or `{ success: false, error: msg }`.
 
+## Admin Actions
+- `startNewSeason` — requires `adminToken` in request body matching `env.ADMIN_SECRET`
+- Trigger manually via Cloudflare Workers dashboard (Preview tab → POST with JSON body)
+- `ADMIN_SECRET` is an encrypted env var in `wrangler.toml`
+
 ## Known Patterns / Pitfalls
 - `getAllActivePlayers(DB)` returns a D1 result object `{results: [...]}`, NOT an array. Always use `.results` before `.map()`.
 - `crypto.randomUUID()` is a Workers global, mocked in tests via `mock-crypto.js`
@@ -64,9 +69,9 @@ Router wraps in `{ success: true, data: result }` or `{ success: false, error: m
 - **Mock Fetch**: `backend/test/helpers/mock-fetch.js` — URL-to-response mapping
 - **Mock Crypto**: `backend/test/helpers/mock-crypto.js` — sequential UUID stubs
 - **Fixtures**: `backend/test/helpers/fixtures.js` — `basicTables()`, `emptyTables()`, `closedVotingTables()`
-- **190 Worker tests** across: lib, handlers, queries, triggers, router
+- **218 Worker tests** across: lib, handlers, queries, triggers, router
 - **110 GAS tests** in root `test/` directory
-- **Total: 300 tests, all green**
+- **Total: 328 tests, all green**
 
 ## Git Conventions
 - Commit messages: `type: description` (e.g. `fix:`, `feat:`, `test:`, `chore:`)

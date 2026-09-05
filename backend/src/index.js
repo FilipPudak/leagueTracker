@@ -4,6 +4,7 @@ import { handleUnlinkAccount } from './handlers/unlinkAccount.js';
 import { handleSubmitVote } from './handlers/submitVote.js';
 import { handleGetLeaderboardData } from './handlers/getLeaderboardData.js';
 import { handleGetMySeasonStats } from './handlers/getMySeasonStats.js';
+import { handleStartNewSeason } from './handlers/startNewSeason.js';
 import { enableFetchCache, disableFetchCache } from './lib/scraping.js';
 
 export default {
@@ -44,6 +45,7 @@ export default {
       submitVote: handleSubmitVote,
       getLeaderboardData: handleGetLeaderboardData,
       getMySeasonStats: handleGetMySeasonStats,
+      startNewSeason: handleStartNewSeason,
     };
 
     const handler = handlers[action];
