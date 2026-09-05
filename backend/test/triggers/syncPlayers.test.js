@@ -147,4 +147,28 @@ describe('triggers/syncPlayers', () => {
       'Fetched season standings for season 6 week 3'
     );
   });
+
+  it('refreshes awards after sync (Schemer + Ambassador)', async () => {
+    const store = db.getStore();
+    store.awards = [];
+    globalThis.fetch = makeFetchHandler();
+
+    await syncPlayers({ DB: db });
+
+    const schemer = store.awards.filter(a => a.award_name === 'Galactic Schemer');
+    const ambassador = store.awards.filter(a => a.award_name === 'Galactic Ambassador');
+    assert.ok(schemer.length > 0, 'Schemer awards written');
+    assert.ok(ambassador.length > 0, 'Ambassador awards written');
+  });
+
+  it('new player IDs do not overlap existing ones', async () => {
+    globalThis.fetch = makeFetchHandler();
+
+    await syncPlayers({ DB: db });
+
+    const store = db.getStore();
+    const ids = store.players.map(p => p.id);
+    const uniqueIds = new Set(ids);
+    assert.equal(ids.length, uniqueIds.size, 'all player IDs are unique');
+  });
 });

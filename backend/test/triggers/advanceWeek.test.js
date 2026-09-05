@@ -116,4 +116,46 @@ describe('triggers/advanceWeek', () => {
     await advanceWeek({ DB: db });
     assert.equal(fetchCount, 0, 'No fetches when voting is closed');
   });
+
+  it('season end: New Hope climbers resolved from standings', async () => {
+    db.getStore().settings.find(s => s.key === 'CURRENT_WEEK').value = '11';
+    db.getStore().awards = [];
+    globalThis.fetch = makeStandingsFetch();
+
+    await advanceWeek({ DB: db });
+
+    const store = db.getStore();
+    const hope = store.awards.filter(a => a.award_name === 'A New Hope');
+    assert.ok(hope.length > 0, 'A New Hope awards were written');
+    assert.ok(hope[0].player_id, 'player_id resolved');
+    assert.equal(typeof hope[0].score, 'number');
+  });
+
+  it('season end: Bounty Hunter placeholder inserted when none exists', async () => {
+    db.getStore().settings.find(s => s.key === 'CURRENT_WEEK').value = '11';
+    db.getStore().awards = [];
+    globalThis.fetch = makeStandingsFetch();
+
+    await advanceWeek({ DB: db });
+
+    const store = db.getStore();
+    const bh = store.awards.filter(a => a.award_name === 'Bounty Hunter');
+    assert.equal(bh.length, 1, 'Bounty Hunter placeholder inserted');
+    assert.equal(bh[0].player_id, '', 'empty player_id placeholder');
+  });
+
+  it('season end: Bounty Hunter placeholder not duplicated if exists', async () => {
+    db.getStore().settings.find(s => s.key === 'CURRENT_WEEK').value = '11';
+    db.getStore().awards = [
+      { season_id: 6, award_name: 'Bounty Hunter', player_id: 'P002', score: 8 },
+    ];
+    globalThis.fetch = makeStandingsFetch();
+
+    await advanceWeek({ DB: db });
+
+    const store = db.getStore();
+    const bh = store.awards.filter(a => a.award_name === 'Bounty Hunter');
+    assert.equal(bh.length, 1, 'no duplicate BH');
+    assert.equal(bh[0].player_id, 'P002', 'existing BH preserved');
+  });
 });

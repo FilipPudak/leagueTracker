@@ -82,4 +82,32 @@ describe('handleGetMySeasonStats', () => {
     assert.ok(result.awardsWon.includes('Galactic Ambassador'));
     assert.ok(result.awardsWon.includes('Galactic Ruler'));
   });
+
+  it('compliance has correct structure', async () => {
+    const result = await handleGetMySeasonStats(
+      { token: 'test-token-alice', seasonId: 6 },
+      env
+    );
+    assert.equal(typeof result.compliance.weeksVoted, 'number');
+    assert.equal(typeof result.compliance.weeksAttended, 'number');
+    assert.equal(typeof result.compliance.compliancePct, 'number');
+  });
+
+  it('streaks has currentStreak and bestStreak', async () => {
+    const result = await handleGetMySeasonStats(
+      { token: 'test-token-alice', seasonId: 6 },
+      env
+    );
+    assert.equal(typeof result.streaks.currentStreak, 'number');
+    assert.equal(typeof result.streaks.bestStreak, 'number');
+    assert.ok(result.streaks.bestStreak >= result.streaks.currentStreak);
+  });
+
+  it('raffleTickets match vote count', async () => {
+    const result = await handleGetMySeasonStats(
+      { token: 'test-token-alice', seasonId: 6 },
+      env
+    );
+    assert.equal(result.raffleTickets, 2, 'Alice voted in weeks 1 and 2');
+  });
 });

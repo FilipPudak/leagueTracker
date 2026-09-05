@@ -14,6 +14,7 @@ import {
   getSessionByToken,
   getAwardsForSeason,
   getMostPlayedLeaders,
+  getMaxSeasonId,
 } from '../../src/db/queries.js';
 
 describe('db/queries', () => {
@@ -137,5 +138,10 @@ describe('db/queries', () => {
   it('getMostPlayedLeaders runs without error and returns array', async () => {
     const { results } = await getMostPlayedLeaders(db, 6);
     assert.ok(Array.isArray(results));
+  });
+
+  it('getMaxSeasonId returns highest season ID', async () => {
+    const maxId = await getMaxSeasonId(db);
+    assert.equal(maxId, 6, 'highest season is 6');
   });
 });

@@ -157,4 +157,108 @@ describe('handleSubmitVote', () => {
       }
     );
   });
+
+  it('missing opponentId → 400', async () => {
+    await assert.rejects(
+      () =>
+        handleSubmitVote(
+          {
+            token: 'test-token-alice',
+            voteData: { leader1Id: '1' },
+          },
+          env
+        ),
+      (err) => {
+        assert.equal(err.status, 400);
+        return true;
+      }
+    );
+  });
+
+  it('UNIQUE constraint violation caught → 409', async () => {
+    const tables = submitVoteTables();
+    const db = createMockDb(tables);
+    const origPrepare = db.prepare.bind(db);
+    db.prepare = function(sql) {
+      const stmt = origPrepare(sql);
+      if (sql.includes('INSERT INTO leader_votes')) {
+        const failRun = async function() {
+          throw new Error('UNIQUE constraint failed');
+        };
+        stmt.run = failRun;
+        const origBind = stmt.bind.bind(stmt);
+        stmt.bind = function(...params) {
+          const bound = origBind(...params);
+          bound.run = failRun;
+          return bound;
+        };
+      }
+      return stmt;
+    };
+    await assert.rejects(
+      () =>
+        handleSubmitVote(
+          {
+            token: 'test-token-alice',
+            voteData: { leader1Id: '1', opponentId: 'P002' },
+          },
+          { DB: db }
+        ),
+      (err) => {
+        assert.equal(err.status, 409);
+        return true;
+      }
+    );
+  });
+
+  it('no active season setting → 400', async () => {
+    const tables = submitVoteTables();
+    tables.settings = tables.settings.filter(s => s.key !== 'ACTIVE_SEASON_ID');
+    const db = createMockDb(tables);
+    await assert.rejects(
+      () =>
+        handleSubmitVote(
+          {
+            token: 'test-token-alice',
+            voteData: { leader1Id: '1', opponentId: 'P002' },
+          },
+          { DB: db }
+        ),
+      (err) => {
+        assert.equal(err.status, 400);
+        return true;
+      }
+    );
+  });
+
+  it('both leader_votes and opponent_votes rows inserted', async () => {
+    await handleSubmitVote(
+      {
+        token: 'test-token-alice',
+        voteData: { leader1Id: '1', opponentId: 'P002' },
+        deviceId: 'dev-alice',
+      },
+      env
+    );
+    const store = DB.getStore();
+    const lv = store.leader_votes.filter(r => r.player_id === 'P001' && r.season_id === 6 && r.week === 3);
+    const ov = store.opponent_votes.filter(r => r.season_id === 6 && r.week === 3 && r.opponent_id === 'P002');
+    assert.equal(lv.length, 1, 'leader_votes row inserted');
+    assert.equal(ov.length, 1, 'opponent_votes row inserted');
+  });
+
+  it('session timestamp touched on success', async () => {
+    const before = DB.getStore().sessions.find(s => s.token === 'test-token-alice');
+    const beforeActive = before.last_active;
+    await handleSubmitVote(
+      {
+        token: 'test-token-alice',
+        voteData: { leader1Id: '1', opponentId: 'P002' },
+        deviceId: 'dev-alice',
+      },
+      env
+    );
+    const after = DB.getStore().sessions.find(s => s.token === 'test-token-alice');
+    assert.ok(after.last_active >= beforeActive, 'session timestamp updated');
+  });
 });

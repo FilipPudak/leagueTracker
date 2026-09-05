@@ -211,8 +211,29 @@ function executeSelect(sql, params, store) {
 
   // Handle GROUP BY (must be checked before standalone COUNT)
   if (hasGroupBy) {
-    const groupMatch = sql.match(/GROUP\s+BY\s+([\w.",\s]+)/i);
-    const groupCols = groupMatch[1].split(',').map(c => c.trim().split('.').pop().replace(/"/g, '').toLowerCase());
+    const groupMatch = sql.match(/GROUP\s+BY\s+([\w.",]+(?:\s*,\s*[\w.",]+)*)/i);
+      const groupCols = groupMatch[1].split(',').map(c => c.trim().split('.').pop().replace(/"/g, '').toLowerCase());
+
+    // Parse SELECT column aliases for non-aggregate columns
+    const selectClause = sql.match(/SELECT\s+(.+?)\s+FROM/i);
+    const colAliases = {};
+    let countColAlias = 'count';
+    if (selectClause && selectClause[1].trim() !== '*') {
+      const colParts = selectClause[1].split(',').map(c => c.trim());
+      for (const part of colParts) {
+        const asParts = part.split(/\s+AS\s+/i);
+        if (asParts.length === 2) {
+          const src = asParts[0].trim().split('.').pop().replace(/"/g, '').toLowerCase();
+          const alias = asParts[1].trim().toLowerCase();
+          if (/\bCOUNT\b|\bSUM\b|\bAVG\b|\bMIN\b|\bMAX\b/.test(part.toUpperCase())) {
+            countColAlias = alias;
+          } else {
+            colAliases[src] = alias;
+          }
+        }
+      }
+    }
+
     const groups = new Map();
     for (const row of store[table].filter(r => matchWhere(r, where, params))) {
       const key = groupCols.map(c => row[c]).join('||');
@@ -224,24 +245,22 @@ function executeSelect(sql, params, store) {
     for (const [, groupRows] of groups) {
       if (upper.includes('COUNT(DISTINCT')) {
         const distMatch = upper.match(/COUNT\(DISTINCT\s+(\w+(?:\.\w+)?)\)/i);
-        const aliasMatch = upper.match(/AS\s+(\w+)/i);
         const col = distMatch[1].split('.').pop().replace(/"/g, '');
-        const alias = aliasMatch ? aliasMatch[1].toLowerCase() : 'count';
         const uniqueVals = new Set(groupRows.map(r => r[col]));
         const row = {};
         for (const gc of groupCols) {
-          row[gc] = groupRows[0][gc];
+          const outCol = colAliases[gc] || gc;
+          row[outCol] = groupRows[0][gc];
         }
-        row[alias] = uniqueVals.size;
+        row[countColAlias] = uniqueVals.size;
         rows.push(row);
       } else if (hasCount) {
-        const aliasMatch = upper.match(/AS\s+(\w+)/i);
-        const alias = aliasMatch ? aliasMatch[1].toLowerCase() : 'count';
         const row = {};
         for (const gc of groupCols) {
-          row[gc] = groupRows[0][gc];
+          const outCol = colAliases[gc] || gc;
+          row[outCol] = groupRows[0][gc];
         }
-        row[alias] = groupRows.length;
+        row[countColAlias] = groupRows.length;
         rows.push(row);
       } else {
         rows.push(groupRows[0]);
@@ -296,6 +315,21 @@ function executeSelect(sql, params, store) {
     return { table, rows: [{ count: countRow.count }] };
   }
 
+  // Handle MAX()
+  if (hasMax) {
+    const maxMatch = upper.match(/MAX\((\w+(?:\.\w+)?)\)/);
+    if (maxMatch) {
+      const col = maxMatch[1].split('.').pop().replace(/"/g, '').toLowerCase();
+      const aliasMatch = upper.match(/AS\s+(\w+)/i);
+      const alias = aliasMatch ? aliasMatch[1].toLowerCase() : 'max_id';
+      const maxVal = rows.reduce((m, r) => {
+        const v = typeof r[col] === 'string' ? parseInt(r[col].replace(/\D/g, ''), 10) : r[col];
+        return v > m ? v : m;
+      }, 0);
+      return { table, rows: [{ [alias]: maxVal || 0 }] };
+    }
+  }
+
   // Handle SELECT specific columns vs SELECT *
   const selectMatch = sql.match(/SELECT\s+(.+?)\s+FROM/i);
   if (selectMatch && !selectMatch[1].includes('*')) {
@@ -330,21 +364,6 @@ function executeSelect(sql, params, store) {
     });
   }
 
-  // Handle MAX()
-  if (hasMax) {
-    const maxMatch = upper.match(/MAX\((\w+(?:\.\w+)?)\)/);
-    if (maxMatch) {
-      const col = maxMatch[1].split('.').pop().replace(/"/g, '');
-      const aliasMatch = upper.match(/AS\s+(\w+)/i);
-      const alias = aliasMatch ? aliasMatch[1].toLowerCase() : 'max_id';
-      const maxVal = rows.reduce((m, r) => {
-        const v = typeof r[col] === 'string' ? parseInt(r[col].replace(/\D/g, ''), 10) : r[col];
-        return v > m ? v : m;
-      }, 0);
-      return { table, rows: [{ [alias]: maxVal || 0 }] };
-    }
-  }
-
   // Handle LIMIT
   const limit = extractLimit(sql);
   if (limit) {
@@ -364,18 +383,39 @@ function executeInsert(sql, params, store) {
 
   const cols = colMatch[1].split(',').map(c => c.trim().replace(/"/g, ''));
 
-  // Handle INSERT OR IGNORE — skip if row exists
+  const row = {};
+  let paramIdx = 0;
+  const valuesMatch = sql.match(/VALUES\s*\((.+)\)/i);
+  if (valuesMatch) {
+    const valueParts = valuesMatch[1].split(',').map(v => v.trim());
+    cols.forEach((col, i) => {
+      const val = valueParts[i];
+      if (val === '?') {
+        row[col] = params[paramIdx++];
+      } else if (/^'(.*)'$/.test(val)) {
+        row[col] = val.slice(1, -1);
+      } else if (val.toUpperCase() === 'NULL') {
+        row[col] = null;
+      } else if (/^-?\d+(\.\d+)?$/.test(val)) {
+        row[col] = Number(val);
+      } else {
+        row[col] = val;
+      }
+    });
+  } else {
+    cols.forEach((col, i) => { row[col] = params[i]; });
+  }
+
   const isIgnore = sql.toUpperCase().includes('INSERT OR IGNORE');
   if (isIgnore) {
-    // Check if row already exists (match primary key columns)
     const existing = (store[table] || []).find(r => {
-      return cols.every((col, i) => String(r[col]) === String(params[i]));
+      return cols.every((col) => {
+        const val = row[col];
+        return val !== undefined && String(r[col]) === String(val);
+      });
     });
     if (existing) return { success: true, changes: 0 };
   }
-
-  const row = {};
-  cols.forEach((col, i) => { row[col] = params[i]; });
 
   if (!store[table]) store[table] = [];
   store[table].push(row);

@@ -5,13 +5,23 @@ import { basicTables } from '../helpers/fixtures.js';
 import { installCryptoMock } from '../helpers/mock-crypto.js';
 import { handleLinkAccount } from '../../src/handlers/linkAccount.js';
 
+const now = new Date().toISOString();
+
+function linkTables() {
+  const t = basicTables();
+  t.settings = t.settings.map(s =>
+    s.key === 'ACTIVE_SEASON_ID' ? { ...s, value: '6' } : s
+  );
+  return t;
+}
+
 describe('handleLinkAccount', () => {
   let DB;
   let env;
 
   beforeEach(() => {
     installCryptoMock();
-    const tables = basicTables();
+    const tables = linkTables();
     DB = createMockDb(tables);
     env = { DB };
   });
@@ -107,5 +117,56 @@ describe('handleLinkAccount', () => {
     assert.ok(Array.isArray(result.seasons));
     assert.ok(result.seasons.length >= 2);
     assert.equal(typeof result.votingOpen, 'boolean');
+  });
+
+  it('different device creates new session for same player', async () => {
+    const result = await handleLinkAccount(
+      { playerId: 'P001', email: 'alice@test.com', deviceId: 'dev-different' },
+      env
+    );
+    assert.ok(result.token);
+    assert.notEqual(result.token, 'test-token-alice', 'new token for different device');
+  });
+
+  it('relink with different email updates DB', async () => {
+    const result = await handleLinkAccount(
+      { playerId: 'P001', email: 'newemail@test.com', deviceId: 'dev-alice' },
+      env
+    );
+    assert.equal(result.token, 'test-token-alice', 'same token reused');
+    assert.equal(result.linkedPlayer.email, 'newemail@test.com');
+  });
+
+  it('alreadyVoted true when player has votes', async () => {
+    const tables = linkTables();
+    tables.leader_votes = [
+      ...tables.leader_votes,
+      { timestamp: now, season_id: 6, week: 3, player_id: 'P001', leader_id: '2' },
+    ];
+    DB = createMockDb(tables);
+    env = { DB };
+    const result = await handleLinkAccount(
+      { playerId: 'P001', email: 'alice@test.com', deviceId: 'dev-alice' },
+      env
+    );
+    assert.equal(result.alreadyVoted, true, 'P001 voted in week 3 already');
+  });
+
+  it('alreadyVoted false when player has not voted', async () => {
+    const result = await handleLinkAccount(
+      { playerId: 'P004', email: 'diana@test.com', deviceId: 'dev-diana' },
+      env
+    );
+    assert.equal(result.alreadyVoted, false, 'P004 has not voted');
+  });
+
+  it('weeklyParticipation included in response', async () => {
+    const result = await handleLinkAccount(
+      { playerId: 'P001', email: 'alice@test.com', deviceId: 'dev-alice' },
+      env
+    );
+    assert.ok(result.weeklyParticipation);
+    assert.equal(typeof result.weeklyParticipation.voted, 'number');
+    assert.equal(typeof result.weeklyParticipation.total, 'number');
   });
 });
