@@ -26,7 +26,7 @@ cd backend && node --test "test/**/*.test.js"
 cd backend && npx wrangler deploy
 
 # Run both test suites
-node --test "test/*.test.js" && cd backend && node --test "test/**/*.test.js"
+node --test "test/*.test.js"; cd backend; node --test "test/**/*.test.js"
 ```
 
 ## Code Conventions
@@ -80,3 +80,9 @@ Router wraps in `{ success: true, data: result }` or `{ success: false, error: m
 - Don't commit secrets or API keys
 - Don't remove the GAS backup (`backend/Code.gs`) — it's the reference implementation
 - Don't add individual player participation rankings publicly
+
+## Ask Before Acting
+- **Always ask before `git push`** — confirm the user wants to push
+- **Always ask before `wrangler deploy`** — confirm the user wants to deploy to production
+- **Ask about commit strategy** — when unsure if changes should be 1 commit or several, ask
+- **Ask about amending** — when you think an amend might be appropriate, ask first

@@ -1,29 +1,27 @@
 # Security model
 
-The backend runs as `ANYONE_ANONYMOUS` because it is called directly from a static, no-auth
-client (GitHub Pages) via `fetch` to `/exec`. There is no shared secret and no Google sign-in.
-Identity for voting is established by a **per-device session token** minted at link time.
+The backend is a Cloudflare Worker with no shared secret and no Google sign-in. The static
+client (GitHub Pages) calls it directly with `fetch`. Identity for voting is established by a
+**per-device session token** minted at link time.
 
 - **Per-device session tokens** — when a user links on a device, the backend mints a UUID
-  token stored in the `Sessions` sheet (one row per device, many rows per player) and returns
+  token stored in the D1 `sessions` table (one row per device, many rows per player) and returns
   it to the client, which persists it in `localStorage`. Every subsequent request sends the
   token; the backend resolves it to the linked player and lazily deletes stale sessions.
 - **Link is keyed on an email + player name** — the user types an email and picks a player
   from the (public) active roster. The backend enforces ownership: an email cannot be claimed
   by two players, a player cannot be claimed by two emails, and a player re-picking their own
   already-claimed identity on a new device re-links cleanly.
-- **One vote per player per week** — enforced under a script lock
-  (`hasSubmittedThisWeek` + `LockService`), so concurrent requests cannot both pass the check.
-- **Session TTL** — sessions expire after 90 days of inactivity. The `LAST_ACTIVE`
+- **One vote per player per week** — enforced by a `UNIQUE(season_id, week, player_id)`
+  constraint on the `leader_votes` table, so concurrent requests cannot both succeed.
+- **Session TTL** — sessions expire after 90 days of inactivity. The `last_active`
   timestamp is refreshed on each successful vote and link, so active weekly voters
   never expire. An expired session is lazily deleted on next use.
-- **Admin lifecycle** — week advancement (`advanceLeagueWeek`), season start
-  (`startNewSeason`), and player sync (`syncPlayersFromWebsite`) are not exposed via the
-  public API; they run only via time-driven triggers or manual invocation.
-- **Admin unclaim (revocation)** — clearing a `Players` col D email unclaims the player and
-  invalidates their sessions; stale tokens are lazily GC'd on their next request. This is a
-  manual sheet edit (no `onEdit` trigger — a negative decision deliberately kept out to avoid
-  implicit writes to player data on random edits).
+- **Admin lifecycle** — week advancement (`advanceWeek`), and player sync (`syncPlayers`)
+  run as Cloudflare Worker cron triggers (scheduled handlers) or manual invocation via
+  `curl`/`wrangler`. They are not exposed through the public API.
+- **Admin unclaim (revocation)** — clearing a player's email in D1 unclaims the player and
+  invalidates their sessions; stale tokens are lazily GC'd on their next request.
 
 ## Accepted limitation: email is not Google-verified
 
@@ -34,12 +32,11 @@ to league members) and claiming their identity **before** the legitimate owner d
 handed a valid session token. Mitigations already in place:
 
 - Mandatory one-time link step before any vote is accepted.
-- One vote per player per week under a script lock.
+- One vote per player per week under a UNIQUE constraint.
 - Full audit logging on every `getAppData`, `linkAccount`, `submitVote`, and `unlinkAccount`
-  call (View → Executions) so anomalies can be detected and corrected.
+  call (Cloudflare Worker logs) so anomalies can be detected and corrected.
 - Unlink/revoke story: user can unlink a device ("Not you?"); admin can unclaim a player.
 
 **Deferred upgrade:** if competitive integrity or public security review ever matters, replace
 the asserted email with Google-verified identity (e.g. the static client sends an OAuth token and the
-backend resolves it against `https://www.googleapis.com/oauth2/v3/userinfo`). See the local
-`docs/phase2-token-verification.md` note (git-ignored).
+backend resolves it against `https://www.googleapis.com/oauth2/v3/userinfo`).
