@@ -229,18 +229,6 @@ function applyBoot(boot) {
     }
   }
 
-  const spCard = $('vote-season-participation-card');
-  const spText = $('vote-season-participation-text');
-  if (spCard && spText) {
-    const sp = boot.seasonParticipation;
-    if (sp && sp.totalPlayers > 0) {
-      spText.textContent = sp.playersWhoVoted + ' of ' + sp.totalPlayers + ' players have voted this season (' + sp.participationPct + '% participation)';
-      spCard.style.display = 'block';
-    } else {
-      spCard.style.display = 'none';
-    }
-  }
-
   if (boot.status === 'linked') {
     const voteForm = $('vote-form');
     const votedCard = $('already-voted-card');
@@ -540,8 +528,8 @@ function renderLeaderboard(res) {
   const lpText = $('leaderboard-participation-text');
   if (lpCard && lpText) {
     const p = res.participation;
-    if (p && p.totalPlayers > 0) {
-      lpText.textContent = p.playersWhoVoted + ' of ' + p.totalPlayers + ' players participated this season (' + p.participationPct + '%)';
+    if (p && p.totalVotes > 0) {
+      lpText.textContent = p.totalVotes + ' votes cast by ' + p.playersWhoVoted + ' players this season';
       lpCard.style.display = 'block';
     } else {
       lpCard.style.display = 'none';
@@ -615,18 +603,6 @@ function loadMySeasonStats() {
 }
 
 function renderMySeasonStats(res) {
-  const mpCard = $('mystats-participation-card');
-  const mpText = $('mystats-participation-text');
-  if (mpCard && mpText) {
-    const p = res.participation;
-    if (p && p.totalPlayers > 0) {
-      mpText.textContent = p.playersWhoVoted + ' of ' + p.totalPlayers + ' players participated this season (' + p.participationPct + '%)';
-      mpCard.style.display = 'block';
-    } else {
-      mpCard.style.display = 'none';
-    }
-  }
-
   const gamSection = $('myseason-gamification-section');
   const gamContainer = $('myseason-gamification-container');
   const compliance = res.compliance || {};

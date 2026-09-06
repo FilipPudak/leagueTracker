@@ -16,7 +16,7 @@ describe('handleGetMySeasonStats', () => {
     env = { DB };
   });
 
-  it('returns awards won, leaders, compliance, streaks, raffleTickets, participation', async () => {
+  it('returns awards won, leaders, compliance, streaks, raffleTickets', async () => {
     const result = await handleGetMySeasonStats(
       { token: 'test-token-alice', seasonId: 6 },
       env
@@ -26,10 +26,6 @@ describe('handleGetMySeasonStats', () => {
     assert.ok(result.compliance);
     assert.ok(result.streaks);
     assert.equal(typeof result.raffleTickets, 'number');
-    assert.ok(result.participation);
-    assert.equal(typeof result.participation.participationPct, 'number');
-    assert.equal(typeof result.participation.totalPlayers, 'number');
-    assert.equal(typeof result.participation.playersWhoVoted, 'number');
   });
 
   it('missing token → 401', async () => {

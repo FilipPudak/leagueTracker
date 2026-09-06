@@ -111,6 +111,10 @@ export async function getSeasonParticipation(db, seasonId) {
     WHERE a.season_id = ?
   `).bind(seasonId).first();
 
+  const totalRow = await db.prepare(`
+    SELECT COUNT(*) as total_votes FROM leader_votes WHERE season_id = ?
+  `).bind(seasonId).first();
+
   const total = await db.prepare(`
     SELECT COUNT(*) as count FROM players WHERE active = 1
   `).first();
@@ -118,12 +122,11 @@ export async function getSeasonParticipation(db, seasonId) {
   const totalPlayers = total?.count || 0;
   const playersWithAttendance = row?.players_with_attendance || 0;
   const playersWhoVoted = row?.players_who_voted || 0;
+  const totalVotes = totalRow?.total_votes || 0;
 
-  // Participation = % of active players who have attendance data (showed up)
-  // and of those, how many voted at least once
   const participationPct = totalPlayers > 0
     ? Math.round((playersWithAttendance / totalPlayers) * 1000) / 10
     : 0;
 
-  return { participationPct, totalPlayers, playersWhoVoted };
+  return { participationPct, totalPlayers, playersWhoVoted, totalVotes };
 }
