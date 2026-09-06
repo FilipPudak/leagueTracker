@@ -1,6 +1,6 @@
 import { findSessionByToken, touchSessionTimestamp } from '../lib/auth.js';
 import { getSetting, getAwardsForSeason, getMostPlayedLeaders } from '../db/queries.js';
-import { getCompliance, getStreaks, getRaffleTickets } from '../lib/participation.js';
+import { getCompliance, getStreaks, getRaffleTickets, getSeasonParticipation } from '../lib/participation.js';
 import { assignStandardRanks } from '../lib/awards.js';
 
 export async function handleGetMySeasonStats(body, env) {
@@ -63,6 +63,7 @@ export async function handleGetMySeasonStats(body, env) {
   const compliance = await getCompliance(DB, sid, playerId);
   const streaks = await getStreaks(DB, sid, playerId);
   const raffleTickets = await getRaffleTickets(DB, sid, playerId);
+  const participation = await getSeasonParticipation(DB, sid);
 
   return {
     awardsWon,
@@ -70,5 +71,6 @@ export async function handleGetMySeasonStats(body, env) {
     compliance,
     streaks,
     raffleTickets,
+    participation,
   };
 }

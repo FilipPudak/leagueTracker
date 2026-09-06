@@ -1,7 +1,7 @@
 import { getSettings, getPlayerById, getAllActivePlayers, getAllActiveLeaders, getAllSeasons } from '../db/queries.js';
 import { isVotingOpen } from '../db/queries.js';
 import { findSessionByToken, touchSessionTimestamp } from '../lib/auth.js';
-import { getWeeklyParticipation } from '../lib/participation.js';
+import { getWeeklyParticipation, getSeasonParticipation } from '../lib/participation.js';
 
 export async function handleGetAppData(body, env) {
   const { DB } = env;
@@ -51,6 +51,12 @@ export async function handleGetAppData(body, env) {
     weeklyParticipation = await getWeeklyParticipation(DB, activeSeasonId, currentWeek);
   }
 
+  // Season participation aggregate
+  let seasonParticipation = null;
+  if (activeSeasonId) {
+    seasonParticipation = await getSeasonParticipation(DB, activeSeasonId);
+  }
+
   // Unlinked players for the link form picker
   let unlinkedPlayers = [];
   if (status === 'unlinked') {
@@ -77,5 +83,6 @@ export async function handleGetAppData(body, env) {
     alreadySubmitted,
     alreadyVoted: alreadySubmitted,
     weeklyParticipation,
+    seasonParticipation,
   };
 }
