@@ -147,8 +147,6 @@ INSERT OR REPLACE INTO awards (season_id, award_name, player_id, score) VALUES (
 INSERT OR REPLACE INTO awards (season_id, award_name, player_id, score) VALUES (6, 'Galactic Schemer', 'P004', 7);
 INSERT OR REPLACE INTO awards (season_id, award_name, player_id, score) VALUES (6, 'Galactic Schemer', 'P011', 6);
 INSERT OR REPLACE INTO awards (season_id, award_name, player_id, score) VALUES (6, 'Galactic Ruler', 'P001', 67);
-INSERT OR REPLACE INTO awards (season_id, award_name, player_id, score) VALUES (6, 'Galactic Ruler', 'P002', 66);
-INSERT OR REPLACE INTO awards (season_id, award_name, player_id, score) VALUES (6, 'Galactic Ruler', 'P003', 63);
 INSERT OR REPLACE INTO awards (season_id, award_name, player_id, score) VALUES (6, 'A New Hope', 'P008', 6);
 INSERT OR REPLACE INTO awards (season_id, award_name, player_id, score) VALUES (6, 'A New Hope', 'P011', 4);
 INSERT OR REPLACE INTO awards (season_id, award_name, player_id, score) VALUES (6, 'A New Hope', 'P001', 3);
