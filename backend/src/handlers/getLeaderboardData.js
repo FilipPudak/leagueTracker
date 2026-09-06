@@ -68,18 +68,18 @@ export async function handleGetLeaderboardData(body, env) {
     ambassador = assignStandardRanks(ambassador);
   }
 
-  // Galactic Ruler: stored or live from SWU site (single winner — rank 1 only)
+  // Galactic Ruler: stored or live from SWU site (top 3 by rank, no ties)
   let ruler = awardsMap['Galactic Ruler'] || null;
   if ((!ruler || ruler.length === 0) && isActiveSeason) {
     const round = votingOpen ? currentWeek : seasonLength;
     const standings = await fetchSeasonStandings(seasonId, round);
     if (standings) {
-      const rank1 = standings.filter(s => s.rank === 1).slice(0, 1);
-      ruler = rank1.length > 0 ? [{
-        playerId: meleeIdMap.get(rank1[0].username?.toLowerCase()) || null,
-        score: rank1[0].points || 0,
-        name: rank1[0].name,
-      }] : null;
+      const top3 = standings.filter(s => s.rank <= 3).slice(0, 3);
+      ruler = top3.length > 0 ? assignStandardRanks(top3.map(s => ({
+        playerId: meleeIdMap.get(s.username?.toLowerCase()) || null,
+        score: s.points || 0,
+        name: s.name,
+      }))) : null;
     }
   } else if (ruler) {
     ruler = assignStandardRanks(ruler);

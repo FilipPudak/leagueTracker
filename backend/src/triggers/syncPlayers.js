@@ -102,14 +102,14 @@ export async function syncPlayers(env) {
   // Site-based awards (Galactic Ruler, A New Hope)
   const standings = await fetchSeasonStandings(activeSeasonId, currentWeek);
   if (standings) {
-    const rank1 = standings.filter(s => s.rank === 1);
+    const top3 = standings.filter(s => s.rank <= 3).slice(0, 3);
     const rulerEntries = [];
-    for (const s of rank1) {
+    for (const s of top3) {
       const resolvedId = await findPlayerByMelee(DB, s.username);
       if (resolvedId) rulerEntries.push({ playerId: resolvedId, score: s.points, name: s.name });
     }
     if (rulerEntries.length > 0) {
-      await writePodiumBlock(DB, activeSeasonId, 'Galactic Ruler', rulerEntries.slice(0, 1));
+      await writePodiumBlock(DB, activeSeasonId, 'Galactic Ruler', rulerEntries);
     }
 
     const midRound = Math.floor(seasonLength / 2);

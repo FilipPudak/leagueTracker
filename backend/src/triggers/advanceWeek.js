@@ -41,15 +41,15 @@ export async function advanceWeek(env) {
     // Site-based awards (Galactic Ruler, A New Hope)
     const finalStandings = await fetchSeasonStandings(activeSeasonId, seasonLength);
     if (finalStandings) {
-      // Galactic Ruler: rank 1
-      const rank1 = finalStandings.filter(s => s.rank === 1);
+      // Galactic Ruler: top 3 by rank (no ties — ties broken by rank position)
+      const top3 = finalStandings.filter(s => s.rank <= 3).slice(0, 3);
       const rulerEntries = [];
-      for (const s of rank1) {
+      for (const s of top3) {
         const resolvedId = await findPlayerByMelee(DB, s.username);
         if (resolvedId) rulerEntries.push({ playerId: resolvedId, score: s.points, name: s.name });
       }
       if (rulerEntries.length > 0) {
-        await writePodiumBlock(DB, activeSeasonId, 'Galactic Ruler', rulerEntries.slice(0, 1));
+        await writePodiumBlock(DB, activeSeasonId, 'Galactic Ruler', rulerEntries);
       }
 
       // A New Hope: biggest climb from mid-season to final
