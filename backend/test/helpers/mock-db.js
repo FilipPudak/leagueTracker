@@ -1,6 +1,12 @@
 // Pattern-matching D1 mock factory for testing Cloudflare Worker handlers.
 // Maintains in-memory tables and responds to the prepare/bind/all/first/run chain.
 
+// UNIQUE constraints per table: array of column arrays that must be unique
+const UNIQUE_CONSTRAINTS = {
+  sessions: [['player_id', 'device_id']],
+  leader_votes: [['season_id', 'week', 'player_id']],
+};
+
 export function createMockDb(tables = {}) {
   // Deep-clone seed data so tests can't corrupt shared state
   const store = {};
@@ -56,11 +62,19 @@ export function createMockDb(tables = {}) {
     }
   }
 
+  async function batch(statements) {
+    const results = [];
+    for (const stmt of statements) {
+      results.push(await stmt.run());
+    }
+    return results;
+  }
+
   function getStore() { return store; }
   function getCalls() { return calls; }
   function clearCalls() { calls.length = 0; }
 
-  return { prepare, getStore, getCalls, clearCalls };
+  return { prepare, batch, getStore, getCalls, clearCalls };
 }
 
 // --- SQL execution helpers ---
@@ -406,19 +420,33 @@ function executeInsert(sql, params, store) {
     cols.forEach((col, i) => { row[col] = params[i]; });
   }
 
-  const isIgnore = sql.toUpperCase().includes('INSERT OR IGNORE');
-  if (isIgnore) {
-    const existing = (store[table] || []).find(r => {
-      return cols.every((col) => {
-        const val = row[col];
-        return val !== undefined && String(r[col]) === String(val);
-      });
-    });
-    if (existing) return { success: true, changes: 0 };
+  const upper = sql.toUpperCase();
+  const isIgnore = upper.includes('INSERT OR IGNORE');
+  const isReplace = upper.includes('INSERT OR REPLACE');
+
+  // Check UNIQUE constraints
+  const constraints = UNIQUE_CONSTRAINTS[table] || [];
+  let constraintHandled = false;
+  for (const uniqueCols of constraints) {
+    const conflict = (store[table] || []).find(r =>
+      uniqueCols.every(col => String(r[col]) === String(row[col]))
+    );
+    if (conflict) {
+      if (isReplace) {
+        store[table] = store[table].filter(r =>
+          !uniqueCols.every(col => String(r[col]) === String(row[col]))
+        );
+        constraintHandled = true;
+      } else if (isIgnore) {
+        return { success: true, changes: 0 };
+      } else {
+        throw new Error(`UNIQUE constraint failed: ${table}.${uniqueCols.join(',')}`);
+      }
+    }
   }
 
-  const isReplace = sql.toUpperCase().includes('INSERT OR REPLACE');
-  if (isReplace && store[table]) {
+  // Fallback: for INSERT OR REPLACE without explicit constraints, delete by primary key
+  if (isReplace && !constraintHandled && store[table]) {
     const pkCol = cols[0];
     const pkVal = row[pkCol];
     if (pkVal !== undefined) {

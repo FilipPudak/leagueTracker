@@ -1,26 +1,15 @@
-import { findSessionByToken, touchSessionTimestamp } from '../lib/auth.js';
-import { getSetting, getAwardsForSeason, getMostPlayedLeaders } from '../db/queries.js';
+import { getSetting, getAwardsForSeason } from '../db/queries.js';
 import { getCompliance, getStreaks, getRaffleTickets } from '../lib/participation.js';
-import { assignStandardRanks } from '../lib/awards.js';
 
-export async function handleGetMySeasonStats(body, env) {
+export async function handleGetMySeasonStats(body, env, session) {
   const { DB } = env;
-  const { token, seasonId } = body;
+  const { seasonId } = body;
 
-  if (!token) {
-    const err = new Error('Session expired. Please re-link to continue.');
-    err.status = 401;
-    throw err;
-  }
-
-  const session = await findSessionByToken(DB, token);
   if (!session) {
     const err = new Error('Session expired. Please re-link to continue.');
     err.status = 401;
     throw err;
   }
-
-  await touchSessionTimestamp(DB, token);
 
   const playerId = session.player_id;
   let sid = seasonId ? Number(seasonId) : null;

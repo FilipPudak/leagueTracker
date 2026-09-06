@@ -25,6 +25,18 @@ export async function findSessionByToken(db, token) {
     return null;
   }
 
+  // Verify email still belongs to this player (admin may have cleared/changed it)
+  const sessionEmail = (row.email || '').toLowerCase().trim();
+  if (sessionEmail) {
+    const emailOwner = await db.prepare(
+      'SELECT id FROM players WHERE LOWER(email) = LOWER(?)'
+    ).bind(sessionEmail).first();
+    if (!emailOwner || String(emailOwner.id) !== String(row.player_id)) {
+      await db.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
+      return null;
+    }
+  }
+
   return row;
 }
 
@@ -45,17 +57,22 @@ export async function findSessionByPlayerAndDevice(db, playerId, deviceId) {
 }
 
 export async function touchSessionTimestamp(db, token) {
+  if (!token) return;
   await db.prepare(
     "UPDATE sessions SET last_active = datetime('now') WHERE token = ?"
   ).bind(token).run();
 }
 
 export async function createSession(db, playerId, deviceId, email) {
-  // Generate UUID token
+  // Delete any existing session for this (player, device) pair (UNIQUE constraint safety net)
+  await db.prepare(
+    'DELETE FROM sessions WHERE player_id = ? AND device_id = ?'
+  ).bind(playerId, deviceId).run();
+
   const token = crypto.randomUUID();
   const now = new Date().toISOString();
   await db.prepare(
-    'INSERT OR REPLACE INTO sessions (token, player_id, device_id, email, created, last_active) VALUES (?, ?, ?, ?, ?, ?)'
+    'INSERT INTO sessions (token, player_id, device_id, email, created, last_active) VALUES (?, ?, ?, ?, ?, ?)'
   ).bind(token, playerId, deviceId, email || '', now, now).run();
   return token;
 }
@@ -64,4 +81,18 @@ export async function deleteSessionsByPlayerAndDevice(db, playerId, deviceId) {
   await db.prepare(
     'DELETE FROM sessions WHERE player_id = ? AND device_id = ?'
   ).bind(playerId, deviceId).run();
+}
+
+export async function collapseDeviceSessions(db, playerId, deviceId) {
+  const rows = await db.prepare(
+    'SELECT token, last_active FROM sessions WHERE player_id = ? AND device_id = ? ORDER BY last_active DESC'
+  ).bind(playerId, deviceId).all();
+  const sessions = rows.results || [];
+  if (sessions.length <= 1) return;
+
+  // Keep the newest, delete all others
+  const keepToken = sessions[0].token;
+  for (let i = 1; i < sessions.length; i++) {
+    await db.prepare('DELETE FROM sessions WHERE token = ?').bind(sessions[i].token).run();
+  }
 }

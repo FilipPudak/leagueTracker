@@ -6,6 +6,10 @@ import { handleGetLeaderboardData } from './handlers/getLeaderboardData.js';
 import { handleGetMySeasonStats } from './handlers/getMySeasonStats.js';
 import { handleStartNewSeason } from './handlers/startNewSeason.js';
 import { enableFetchCache, disableFetchCache } from './lib/scraping.js';
+import { findSessionByToken, touchSessionTimestamp } from './lib/auth.js';
+
+const TOKEN_REQUIRED = ['submitVote', 'unlinkAccount', 'getMySeasonStats'];
+const TOKEN_OPTIONAL = ['getAppData'];
 
 export default {
   async fetch(request, env) {
@@ -36,7 +40,7 @@ export default {
       });
     }
 
-    const { action, token, deviceId } = body;
+    const { action, token } = body;
 
     const handlers = {
       getAppData: handleGetAppData,
@@ -58,7 +62,24 @@ export default {
 
     try {
       enableFetchCache();
-      const result = await handler(body, env);
+
+      // Centralized session resolution
+      let session = null;
+      if (TOKEN_REQUIRED.includes(action) || TOKEN_OPTIONAL.includes(action)) {
+        if (token) {
+          session = await findSessionByToken(env.DB, token);
+          if (session) {
+            await touchSessionTimestamp(env.DB, token);
+          }
+        }
+        if (TOKEN_REQUIRED.includes(action) && !session) {
+          const err = new Error('Session expired. Please re-link to continue.');
+          err.status = 401;
+          throw err;
+        }
+      }
+
+      const result = await handler(body, env, session);
       disableFetchCache();
       return new Response(JSON.stringify({ success: true, data: result }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

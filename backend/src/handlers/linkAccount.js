@@ -1,5 +1,5 @@
-import { getPlayerById, getPlayerByEmail, getAllActivePlayers, getAllActiveLeaders, getAllSeasons, getSetting, updateSetting, isVotingOpen } from '../db/queries.js';
-import { createSession, findSessionByPlayerAndDevice } from '../lib/auth.js';
+import { getPlayerById, getPlayerByEmail, getAllSeasons, getSetting, isVotingOpen } from '../db/queries.js';
+import { createSession, findSessionByPlayerAndDevice, collapseDeviceSessions } from '../lib/auth.js';
 import { getWeeklyParticipation } from '../lib/participation.js';
 
 export async function handleLinkAccount(body, env) {
@@ -39,6 +39,9 @@ export async function handleLinkAccount(body, env) {
     await DB.prepare('UPDATE players SET email = LOWER(?) WHERE id = ?')
       .bind(email.trim().toLowerCase(), playerId).run();
   }
+
+  // Collapse any duplicate sessions for this (player, device) pair
+  await collapseDeviceSessions(DB, playerId, deviceId);
 
   // Create or reuse session token
   let session = await findSessionByPlayerAndDevice(DB, playerId, deviceId);

@@ -1,20 +1,12 @@
-import { deleteSessionsByPlayerAndDevice, findSessionByToken } from '../lib/auth.js';
+import { deleteSessionsByPlayerAndDevice } from '../lib/auth.js';
 import { getPlayerById } from '../db/queries.js';
 
-export async function handleUnlinkAccount(body, env) {
+export async function handleUnlinkAccount(body, env, session) {
   const { DB } = env;
-  const { token } = body;
 
-  if (!token) {
-    const err = new Error('Token required.');
-    err.status = 400;
-    throw err;
-  }
-
-  const session = await findSessionByToken(DB, token);
   if (!session) {
-    const err = new Error('Session not found.');
-    err.status = 404;
+    const err = new Error('Session expired. Please re-link to continue.');
+    err.status = 401;
     throw err;
   }
 

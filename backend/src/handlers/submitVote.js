@@ -1,25 +1,15 @@
 import { getSetting, isVotingOpen } from '../db/queries.js';
-import { findSessionByToken, touchSessionTimestamp } from '../lib/auth.js';
 import { getRaffleTickets, getWeeklyParticipation } from '../lib/participation.js';
 
-export async function handleSubmitVote(body, env) {
+export async function handleSubmitVote(body, env, session) {
   const { DB } = env;
-  const { token, voteData: rawVoteData, deviceId } = body;
+  const { voteData: rawVoteData } = body;
 
-  if (!token) {
-    const err = new Error('Session expired. Please re-link to continue.');
-    err.status = 401;
-    throw err;
-  }
-
-  const session = await findSessionByToken(DB, token);
   if (!session) {
     const err = new Error('Session expired. Please re-link to continue.');
     err.status = 401;
     throw err;
   }
-
-  await touchSessionTimestamp(DB, token);
 
   const playerId = session.player_id;
   const activeSeasonId = await getSetting(DB, 'ACTIVE_SEASON_ID');
@@ -32,14 +22,14 @@ export async function handleSubmitVote(body, env) {
     throw err;
   }
 
-  if (!activeSeasonId || !currentWeek) {
+  const seasonId = activeSeasonId ? parseInt(String(activeSeasonId).replace(/\D/g, ''), 10) : null;
+  const week = currentWeek ? parseInt(String(currentWeek).replace(/\D/g, ''), 10) : null;
+
+  if (!seasonId || !week) {
     const err = new Error('No active season.');
     err.status = 400;
     throw err;
   }
-
-  const seasonId = Number(activeSeasonId);
-  const week = parseInt(currentWeek.replace(/\D/g, ''), 10);
 
   // Normalize vote data: accept multiple field name variants
   const voteData = rawVoteData || {};
@@ -72,17 +62,23 @@ export async function handleSubmitVote(body, env) {
 
   const now = new Date().toISOString();
 
-  // Insert votes; catch constraint violation for duplicate guard
+  // Insert votes atomically; catch constraint violation for duplicate guard
   try {
-    await DB.prepare(
-      'INSERT INTO leader_votes (timestamp, season_id, week, player_id, leader_id) VALUES (?, ?, ?, ?, ?)'
-    ).bind(now, seasonId, week, playerId, leader1Id).run();
+    const statements = [
+      DB.prepare(
+        'INSERT INTO leader_votes (timestamp, season_id, week, player_id, leader_id) VALUES (?, ?, ?, ?, ?)'
+      ).bind(now, seasonId, week, playerId, leader1Id),
+    ];
 
     if (opponentId) {
-      await DB.prepare(
-        'INSERT INTO opponent_votes (timestamp, season_id, week, opponent_id) VALUES (?, ?, ?, ?)'
-      ).bind(now, seasonId, week, opponentId).run();
+      statements.push(
+        DB.prepare(
+          'INSERT INTO opponent_votes (timestamp, season_id, week, opponent_id) VALUES (?, ?, ?, ?)'
+        ).bind(now, seasonId, week, opponentId)
+      );
     }
+
+    await DB.batch(statements);
   } catch (e) {
     if (e.message && e.message.includes('UNIQUE constraint')) {
       const err = new Error('You have already submitted votes for this week.');

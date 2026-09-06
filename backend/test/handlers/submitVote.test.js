@@ -13,6 +13,8 @@ function submitVoteTables() {
   return t;
 }
 
+const aliceSession = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
+
 describe('handleSubmitVote', () => {
   let DB;
   let env;
@@ -27,43 +29,16 @@ describe('handleSubmitVote', () => {
   it('successful vote returns raffleTickets and weeklyParticipation', async () => {
     const result = await handleSubmitVote(
       {
-        token: 'test-token-alice',
         voteData: { leader1Id: '1', opponentId: 'P002' },
         deviceId: 'dev-alice',
       },
-      env
+      env,
+      aliceSession
     );
     assert.equal(typeof result.raffleTickets, 'number');
     assert.ok(result.weeklyParticipation);
     assert.equal(typeof result.weeklyParticipation.voted, 'number');
     assert.equal(typeof result.weeklyParticipation.total, 'number');
-  });
-
-  it('missing token → 401', async () => {
-    await assert.rejects(
-      () => handleSubmitVote({ voteData: { leader1Id: '1', opponentId: 'P002' } }, env),
-      (err) => {
-        assert.equal(err.status, 401);
-        return true;
-      }
-    );
-  });
-
-  it('invalid session token → 401', async () => {
-    await assert.rejects(
-      () =>
-        handleSubmitVote(
-          {
-            token: 'bogus-token',
-            voteData: { leader1Id: '1', opponentId: 'P002' },
-          },
-          env
-        ),
-      (err) => {
-        assert.equal(err.status, 401);
-        return true;
-      }
-    );
   });
 
   it('voting closed → 403', async () => {
@@ -76,10 +51,10 @@ describe('handleSubmitVote', () => {
       () =>
         handleSubmitVote(
           {
-            token: 'test-token-alice',
             voteData: { leader1Id: '1', opponentId: 'P002' },
           },
-          { DB: db }
+          { DB: db },
+          aliceSession
         ),
       (err) => {
         assert.equal(err.status, 403);
@@ -102,10 +77,10 @@ describe('handleSubmitVote', () => {
       () =>
         handleSubmitVote(
           {
-            token: 'test-token-alice',
             voteData: { leader1Id: '2', opponentId: 'P002' },
           },
-          { DB: db }
+          { DB: db },
+          aliceSession
         ),
       (err) => {
         assert.equal(err.status, 409);
@@ -119,10 +94,10 @@ describe('handleSubmitVote', () => {
       () =>
         handleSubmitVote(
           {
-            token: 'test-token-alice',
             voteData: { leader1Id: '1', opponentId: 'P001' },
           },
-          env
+          env,
+          aliceSession
         ),
       (err) => {
         assert.equal(err.status, 400);
@@ -133,7 +108,7 @@ describe('handleSubmitVote', () => {
 
   it('missing voteData → 400', async () => {
     await assert.rejects(
-      () => handleSubmitVote({ token: 'test-token-alice' }, env),
+      () => handleSubmitVote({ token: 'test-token-alice' }, env, aliceSession),
       (err) => {
         assert.equal(err.status, 400);
         return true;
@@ -146,10 +121,10 @@ describe('handleSubmitVote', () => {
       () =>
         handleSubmitVote(
           {
-            token: 'test-token-alice',
             voteData: { opponentId: 'P002' },
           },
-          env
+          env,
+          aliceSession
         ),
       (err) => {
         assert.equal(err.status, 400);
@@ -161,10 +136,10 @@ describe('handleSubmitVote', () => {
   it('missing opponentId still succeeds with leader only', async () => {
     const result = await handleSubmitVote(
       {
-        token: 'test-token-alice',
         voteData: { leader1Id: '1' },
       },
-      env
+      env,
+      aliceSession
     );
     assert.equal(typeof result.raffleTickets, 'number');
   });
@@ -193,10 +168,10 @@ describe('handleSubmitVote', () => {
       () =>
         handleSubmitVote(
           {
-            token: 'test-token-alice',
             voteData: { leader1Id: '1', opponentId: 'P002' },
           },
-          { DB: db }
+          { DB: db },
+          aliceSession
         ),
       (err) => {
         assert.equal(err.status, 409);
@@ -213,10 +188,10 @@ describe('handleSubmitVote', () => {
       () =>
         handleSubmitVote(
           {
-            token: 'test-token-alice',
             voteData: { leader1Id: '1', opponentId: 'P002' },
           },
-          { DB: db }
+          { DB: db },
+          aliceSession
         ),
       (err) => {
         assert.equal(err.status, 400);
@@ -228,11 +203,11 @@ describe('handleSubmitVote', () => {
   it('both leader_votes and opponent_votes rows inserted', async () => {
     await handleSubmitVote(
       {
-        token: 'test-token-alice',
         voteData: { leader1Id: '1', opponentId: 'P002' },
         deviceId: 'dev-alice',
       },
-      env
+      env,
+      aliceSession
     );
     const store = DB.getStore();
     const lv = store.leader_votes.filter(r => r.player_id === 'P001' && r.season_id === 6 && r.week === 3);
@@ -241,28 +216,13 @@ describe('handleSubmitVote', () => {
     assert.equal(ov.length, 1, 'opponent_votes row inserted');
   });
 
-  it('session timestamp touched on success', async () => {
-    const before = DB.getStore().sessions.find(s => s.token === 'test-token-alice');
-    const beforeActive = before.last_active;
-    await handleSubmitVote(
-      {
-        token: 'test-token-alice',
-        voteData: { leader1Id: '1', opponentId: 'P002' },
-        deviceId: 'dev-alice',
-      },
-      env
-    );
-    const after = DB.getStore().sessions.find(s => s.token === 'test-token-alice');
-    assert.ok(after.last_active >= beforeActive, 'session timestamp updated');
-  });
-
   it('accepts leaderId as field alias', async () => {
     const result = await handleSubmitVote(
       {
-        token: 'test-token-alice',
         voteData: { leaderId: '1', opponentId: 'P002' },
       },
-      env
+      env,
+      aliceSession
     );
     assert.equal(typeof result.raffleTickets, 'number');
   });
@@ -270,10 +230,10 @@ describe('handleSubmitVote', () => {
   it('accepts favoriteOpponentId as field alias', async () => {
     const result = await handleSubmitVote(
       {
-        token: 'test-token-alice',
         voteData: { leader1Id: '1', favoriteOpponentId: 'P002' },
       },
-      env
+      env,
+      aliceSession
     );
     assert.equal(typeof result.raffleTickets, 'number');
   });
@@ -281,11 +241,21 @@ describe('handleSubmitVote', () => {
   it('self-voting check applies only when opponentId provided', async () => {
     const result = await handleSubmitVote(
       {
-        token: 'test-token-alice',
         voteData: { leader1Id: '1' },
       },
-      env
+      env,
+      aliceSession
     );
     assert.ok(result);
+  });
+
+  it('null session (bypassing router) → 401', async () => {
+    await assert.rejects(
+      () => handleSubmitVote({ voteData: { leader1Id: '1' } }, env, null),
+      (err) => {
+        assert.equal(err.status, 401);
+        return true;
+      }
+    );
   });
 });

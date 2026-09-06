@@ -39,7 +39,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   email TEXT,
   created TEXT NOT NULL,
   last_active TEXT NOT NULL,
-  FOREIGN KEY (player_id) REFERENCES players(id)
+  FOREIGN KEY (player_id) REFERENCES players(id),
+  UNIQUE(player_id, device_id)
 );
 
 -- Weekly votes: leader played (replaces LeaderVotes sheet)

@@ -1,9 +1,8 @@
 import { getSettings, getPlayerById, getAllActivePlayers, getAllActiveLeaders, getAllSeasons } from '../db/queries.js';
 import { isVotingOpen } from '../db/queries.js';
-import { findSessionByToken, touchSessionTimestamp } from '../lib/auth.js';
 import { getWeeklyParticipation } from '../lib/participation.js';
 
-export async function handleGetAppData(body, env) {
+export async function handleGetAppData(body, env, session) {
   const { DB } = env;
   const { token } = body;
 
@@ -21,28 +20,24 @@ export async function handleGetAppData(body, env) {
   let linkedPlayer = null;
   let alreadySubmitted = false;
 
-  if (token) {
-    const session = await findSessionByToken(DB, token);
-    if (session) {
-      await touchSessionTimestamp(DB, token);
-      const player = await getPlayerById(DB, session.player_id);
-      if (player) {
-        status = 'linked';
-        linkedPlayer = { id: player.id, name: player.name, email: player.email };
+  if (session) {
+    const player = await getPlayerById(DB, session.player_id);
+    if (player) {
+      status = 'linked';
+      linkedPlayer = { id: player.id, name: player.name, email: player.email };
 
-        // Check if already voted this week
-        if (activeSeasonId && currentWeek) {
-          const row = await DB.prepare(
-            'SELECT 1 FROM leader_votes WHERE season_id = ? AND week = ? AND player_id = ?'
-          ).bind(activeSeasonId, currentWeek, player.id).first();
-          alreadySubmitted = !!row;
-        }
-      } else {
-        status = 'invalid-token';
+      // Check if already voted this week
+      if (activeSeasonId && currentWeek) {
+        const row = await DB.prepare(
+          'SELECT 1 FROM leader_votes WHERE season_id = ? AND week = ? AND player_id = ?'
+        ).bind(activeSeasonId, currentWeek, player.id).first();
+        alreadySubmitted = !!row;
       }
     } else {
       status = 'invalid-token';
     }
+  } else if (token) {
+    status = 'invalid-token';
   }
 
   // Weekly participation count

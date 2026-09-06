@@ -14,28 +14,29 @@ describe('handleGetAppData', () => {
     env = { DB };
   });
 
-  it('returns linked player info when valid token provided', async () => {
-    const result = await handleGetAppData({ token: 'test-token-alice' }, env);
+  it('returns linked player info when session provided', async () => {
+    const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
+    const result = await handleGetAppData({}, env, session);
     assert.equal(result.status, 'linked');
     assert.equal(result.linkedPlayer.id, 'P001');
     assert.equal(result.linkedPlayer.name, 'Alice');
     assert.equal(result.linkedPlayer.email, 'alice@test.com');
   });
 
-  it('returns status unlinked when no token', async () => {
-    const result = await handleGetAppData({}, env);
+  it('returns status unlinked when no session', async () => {
+    const result = await handleGetAppData({}, env, null);
     assert.equal(result.status, 'unlinked');
     assert.equal(result.linkedPlayer, null);
   });
 
-  it('returns status invalid-token for unknown token', async () => {
-    const result = await handleGetAppData({ token: 'unknown-token' }, env);
+  it('returns status invalid-token for null session', async () => {
+    const result = await handleGetAppData({ token: 'unknown-token' }, env, null);
     assert.equal(result.status, 'invalid-token');
     assert.equal(result.linkedPlayer, null);
   });
 
   it('includes seasons, players, leaders', async () => {
-    const result = await handleGetAppData({}, env);
+    const result = await handleGetAppData({}, env, null);
     assert.ok(Array.isArray(result.seasons));
     assert.ok(result.seasons.length >= 2);
     assert.ok(Array.isArray(result.players));
@@ -50,14 +51,14 @@ describe('handleGetAppData', () => {
   });
 
   it('includes weeklyParticipation', async () => {
-    const result = await handleGetAppData({}, env);
+    const result = await handleGetAppData({}, env, null);
     assert.ok(result.weeklyParticipation);
     assert.equal(typeof result.weeklyParticipation.voted, 'number');
     assert.equal(typeof result.weeklyParticipation.total, 'number');
   });
 
   it('returns votingOpen from settings', async () => {
-    const result = await handleGetAppData({}, env);
+    const result = await handleGetAppData({}, env, null);
     assert.equal(result.votingOpen, true);
   });
 
@@ -67,7 +68,7 @@ describe('handleGetAppData', () => {
       s.key === 'VOTING_OPEN' ? { ...s, value: 'FALSE' } : s
     );
     const db = createMockDb(tables);
-    const result = await handleGetAppData({}, { DB: db });
+    const result = await handleGetAppData({}, { DB: db }, null);
     assert.equal(result.votingOpen, false);
   });
 
@@ -81,27 +82,31 @@ describe('handleGetAppData', () => {
       leader_id: '2',
     });
     const db = createMockDb(tables);
-    const result = await handleGetAppData({ token: 'test-token-alice' }, { DB: db });
+    const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
+    const result = await handleGetAppData({}, { DB: db }, session);
     assert.equal(result.alreadySubmitted, true);
   });
 
   it('alreadySubmitted is false when player has not voted', async () => {
-    const result = await handleGetAppData({ token: 'test-token-bob' }, env);
+    const session = { token: 'test-token-bob', player_id: 'P002', device_id: 'dev-bob', email: 'bob@test.com' };
+    const result = await handleGetAppData({}, env, session);
     assert.equal(result.alreadySubmitted, false);
   });
 
   it('returns currentPlayer alias for linkedPlayer', async () => {
-    const result = await handleGetAppData({ token: 'test-token-alice' }, env);
+    const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
+    const result = await handleGetAppData({}, env, session);
     assert.deepEqual(result.currentPlayer, result.linkedPlayer);
   });
 
   it('returns alreadyVoted alias for alreadySubmitted', async () => {
-    const result = await handleGetAppData({ token: 'test-token-alice' }, env);
+    const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
+    const result = await handleGetAppData({}, env, session);
     assert.equal(result.alreadyVoted, result.alreadySubmitted);
   });
 
   it('returns unlinkedPlayers when user is unlinked', async () => {
-    const result = await handleGetAppData({}, env);
+    const result = await handleGetAppData({}, env, null);
     assert.ok(Array.isArray(result.unlinkedPlayers));
     assert.ok(result.unlinkedPlayers.length > 0);
     assert.ok(result.unlinkedPlayers[0].id);
@@ -109,7 +114,8 @@ describe('handleGetAppData', () => {
   });
 
   it('returns empty unlinkedPlayers when user is linked', async () => {
-    const result = await handleGetAppData({ token: 'test-token-alice' }, env);
+    const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
+    const result = await handleGetAppData({}, env, session);
     assert.deepEqual(result.unlinkedPlayers, []);
   });
 });
