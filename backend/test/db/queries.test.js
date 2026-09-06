@@ -16,6 +16,7 @@ import {
   getMostPlayedLeaders,
   getMaxSeasonId,
   isVotingOpen,
+  parseSeasonId,
 } from '../../src/db/queries.js';
 
 describe('db/queries', () => {
@@ -156,5 +157,17 @@ describe('db/queries', () => {
     it('rejects empty string', () => assert.equal(isVotingOpen(''), false));
     it('rejects null', () => assert.equal(isVotingOpen(null), false));
     it('rejects undefined', () => assert.equal(isVotingOpen(undefined), false));
+  });
+
+  describe('parseSeasonId', () => {
+    it('parses numeric string "6"', () => assert.equal(parseSeasonId('6'), 6));
+    it('parses prefixed string "S6"', () => assert.equal(parseSeasonId('S6'), 6));
+    it('parses "Season 12"', () => assert.equal(parseSeasonId('Season 12'), 12));
+    it('parses number 6', () => assert.equal(parseSeasonId(6), 6));
+    it('parses "S100"', () => assert.equal(parseSeasonId('S100'), 100));
+    it('returns null for null', () => assert.equal(parseSeasonId(null), null));
+    it('returns null for undefined', () => assert.equal(parseSeasonId(undefined), null));
+    it('returns null for empty string', () => assert.equal(parseSeasonId(''), null));
+    it('returns null for non-numeric string', () => assert.equal(parseSeasonId('Season Ended'), null));
   });
 });

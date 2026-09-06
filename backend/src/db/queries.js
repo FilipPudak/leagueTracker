@@ -25,6 +25,12 @@ export function isVotingOpen(settingValue) {
   return v === 'TRUE' || v === 'YES' || v === '1';
 }
 
+export function parseSeasonId(value) {
+  if (value == null) return null;
+  const n = parseInt(String(value).replace(/\D/g, ''), 10);
+  return Number.isNaN(n) ? null : n;
+}
+
 // Player helpers
 export async function getPlayerById(db, id) {
   return db.prepare('SELECT * FROM players WHERE id = ?').bind(id).first();

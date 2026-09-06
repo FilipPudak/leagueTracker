@@ -1,4 +1,4 @@
-import { getSettings, getAwardsForSeason, getMostPlayedLeaders } from '../db/queries.js';
+import { getSettings, getAwardsForSeason, getMostPlayedLeaders, parseSeasonId } from '../db/queries.js';
 import { isVotingOpen } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, assignStandardRanks } from '../lib/awards.js';
 import { getSeasonParticipation } from '../lib/participation.js';
@@ -14,7 +14,7 @@ export async function handleGetLeaderboardData(body, env) {
   const { seasonId: requestedSeasonId } = body;
 
   const settings = await getSettings(DB);
-  const activeSeasonId = settings.ACTIVE_SEASON_ID ? Number(settings.ACTIVE_SEASON_ID) : null;
+  const activeSeasonId = parseSeasonId(settings.ACTIVE_SEASON_ID);
   const currentWeek = settings.CURRENT_WEEK ? parseInt(settings.CURRENT_WEEK.replace(/\D/g, ''), 10) : 1;
   const votingOpen = isVotingOpen(settings.VOTING_OPEN);
   const seasonLength = settings.SEASON_LENGTH ? Number(settings.SEASON_LENGTH) : 11;

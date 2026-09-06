@@ -1,5 +1,5 @@
 // Weekly advance: increment week, reopen voting, close season at final week
-import { getSettings, updateSetting, isVotingOpen } from '../db/queries.js';
+import { getSettings, updateSetting, isVotingOpen, parseSeasonId } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, writePodiumBlock, assignStandardRanks } from '../lib/awards.js';
 import { fetchSeasonStandings } from '../lib/scraping.js';
 
@@ -16,7 +16,7 @@ export async function advanceWeek(env) {
 
   const settings = await getSettings(DB);
   const votingOpen = isVotingOpen(settings.VOTING_OPEN);
-  const activeSeasonId = settings.ACTIVE_SEASON_ID ? Number(settings.ACTIVE_SEASON_ID) : null;
+  const activeSeasonId = parseSeasonId(settings.ACTIVE_SEASON_ID);
   const currentWeek = settings.CURRENT_WEEK ? parseInt(settings.CURRENT_WEEK.replace(/\D/g, ''), 10) : 1;
   const seasonLength = settings.SEASON_LENGTH ? Number(settings.SEASON_LENGTH) : 11;
 

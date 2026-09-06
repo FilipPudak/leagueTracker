@@ -1,5 +1,5 @@
 // Weekly sync: scrape SWU site → update players, attendance, awards
-import { getSettings, updateSetting, getAllActivePlayers } from '../db/queries.js';
+import { getSettings, updateSetting, getAllActivePlayers, parseSeasonId } from '../db/queries.js';
 import { isVotingOpen } from '../db/queries.js';
 import { fetchPlayerList, fetchSeasonStandings } from '../lib/scraping.js';
 import { computeSchemer, computeAmbassador, writePodiumBlock, assignStandardRanks } from '../lib/awards.js';
@@ -17,7 +17,7 @@ export async function syncPlayers(env) {
 
   const settings = await getSettings(DB);
   const votingOpen = isVotingOpen(settings.VOTING_OPEN);
-  const activeSeasonId = settings.ACTIVE_SEASON_ID ? Number(settings.ACTIVE_SEASON_ID) : null;
+  const activeSeasonId = parseSeasonId(settings.ACTIVE_SEASON_ID);
   const currentWeek = settings.CURRENT_WEEK ? parseInt(settings.CURRENT_WEEK.replace(/\D/g, ''), 10) : 1;
   const seasonLength = settings.SEASON_LENGTH ? Number(settings.SEASON_LENGTH) : 11;
 
