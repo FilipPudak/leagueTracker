@@ -12,8 +12,34 @@ export async function handleGetAppData(body, env, session) {
   const votingOpen = isVotingOpen(settings.VOTING_OPEN);
 
   const seasons = await getAllSeasons(DB);
-  const players = await getAllActivePlayers(DB);
+  const allActivePlayersResult = await getAllActivePlayers(DB);
+  const allActivePlayers = allActivePlayersResult.results || [];
   const leaders = await getAllActiveLeaders(DB);
+
+  let players = allActivePlayers;
+
+  if (votingOpen && session && activeSeasonId && currentWeek) {
+    const matchRow = await DB.prepare(
+      'SELECT 1 FROM match_results WHERE season_id = ? AND round = ? AND (player1_id = ? OR player2_id = ?) LIMIT 1'
+    ).bind(activeSeasonId, currentWeek, session.player_id, session.player_id).first();
+
+    if (matchRow) {
+      const matches = await DB.prepare(
+        'SELECT player1_id, player2_id FROM match_results WHERE season_id = ? AND round = ? AND (player1_id = ? OR player2_id = ?)'
+      ).bind(activeSeasonId, currentWeek, session.player_id, session.player_id).all();
+
+      const opponentIds = new Set();
+      for (const m of (matches.results || [])) {
+        if (m.player1_id === session.player_id && m.player2_id) opponentIds.add(m.player2_id);
+        if (m.player2_id === session.player_id && m.player1_id) opponentIds.add(m.player1_id);
+      }
+
+      const filtered = allActivePlayers.filter(p => opponentIds.has(p.id));
+      if (filtered.length > 0) {
+        players = filtered;
+      }
+    }
+  }
 
   let status = 'unlinked';
   let linkedPlayer = null;
@@ -64,7 +90,7 @@ export async function handleGetAppData(body, env, session) {
     votingOpen,
     settings: safeSettings,
     seasons: seasons.results || [],
-    players: (players.results || []).map(p => ({ id: p.id, name: p.name })),
+    players: players.map(p => ({ id: p.id, name: p.name })),
     unlinkedPlayers,
     leaders: (leaders.results || []).map(l => ({ id: l.id, name: l.name, set: l.set })),
     activeSeasonId,

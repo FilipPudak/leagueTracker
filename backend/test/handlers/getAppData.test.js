@@ -118,4 +118,63 @@ describe('handleGetAppData', () => {
     const result = await handleGetAppData({}, env, session);
     assert.deepEqual(result.unlinkedPlayers, []);
   });
+
+  describe('opponent filtering', () => {
+    it('returns all active players when no match data exists', async () => {
+      const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
+      const result = await handleGetAppData({}, env, session);
+      assert.ok(result.players.length >= 4, 'All active players returned');
+    });
+
+    it('filters players to opponents faced this week when match data exists', async () => {
+      const tables = basicTables();
+      tables.match_results = [
+        { season_id: 6, round: 3, melee_match_id: 500, player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: '2-1', is_bye: 0 },
+        { season_id: 6, round: 3, melee_match_id: 501, player1_id: 'P001', player2_id: 'P003', winner_id: 'P003', result: '0-2', is_bye: 0 },
+      ];
+      const db = createMockDb(tables);
+      const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
+      const result = await handleGetAppData({}, { DB: db }, session);
+      const playerIds = result.players.map(p => p.id);
+      assert.ok(playerIds.includes('P002'), 'Bob is opponent');
+      assert.ok(playerIds.includes('P003'), 'Charlie is opponent');
+      assert.ok(!playerIds.includes('P004'), 'Diana excluded');
+      assert.ok(!playerIds.includes('P005'), 'Eve excluded (inactive anyway)');
+    });
+
+    it('falls back to all players when match data has no resolved player IDs', async () => {
+      const tables = basicTables();
+      tables.match_results = [
+        { season_id: 6, round: 3, melee_match_id: 500, player1_id: 'UNKNOWN', player2_id: 'P002', winner_id: null, result: null, is_bye: 0 },
+      ];
+      const db = createMockDb(tables);
+      const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
+      const result = await handleGetAppData({}, { DB: db }, session);
+      assert.ok(result.players.length >= 4, 'Falls back to all active players');
+    });
+
+    it('returns all players when voting is closed even with match data', async () => {
+      const tables = basicTables();
+      tables.settings = tables.settings.map(s =>
+        s.key === 'VOTING_OPEN' ? { ...s, value: 'FALSE' } : s
+      );
+      tables.match_results = [
+        { season_id: 6, round: 3, melee_match_id: 500, player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: '2-1', is_bye: 0 },
+      ];
+      const db = createMockDb(tables);
+      const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
+      const result = await handleGetAppData({}, { DB: db }, session);
+      assert.ok(result.players.length >= 4, 'All players returned when voting closed');
+    });
+
+    it('returns all players for unlinked user even with match data', async () => {
+      const tables = basicTables();
+      tables.match_results = [
+        { season_id: 6, round: 3, melee_match_id: 500, player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: '2-1', is_bye: 0 },
+      ];
+      const db = createMockDb(tables);
+      const result = await handleGetAppData({}, { DB: db }, null);
+      assert.ok(result.players.length >= 4, 'All players for unlinked user');
+    });
+  });
 });
