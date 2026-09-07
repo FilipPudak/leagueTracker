@@ -122,23 +122,10 @@ export default {
   async scheduled(event, env) {
     enableFetchCache();
     try {
-      const cron = event.cron;
-
-      if (cron === '30 8 * * 1') {
-        try {
-          const { syncPlayers } = await import('./triggers/syncPlayers.js');
-          await syncPlayers(env);
-        } catch (err) {
-          console.error('[Cron] syncPlayers failed:', err);
-        }
-      } else if (cron === '0 9 * * 1') {
-        try {
-          const { advanceWeek } = await import('./triggers/advanceWeek.js');
-          await advanceWeek(env);
-        } catch (err) {
-          console.error('[Cron] advanceWeek failed:', err);
-        }
-      }
+      const { syncFromMelee } = await import('./triggers/syncFromMelee.js');
+      await syncFromMelee(env);
+    } catch (err) {
+      console.error('[Cron] syncFromMelee failed:', err);
     } finally {
       disableFetchCache();
     }

@@ -9,7 +9,7 @@ SWU League Voting app for a Star Wars Unlimited gaming league in Stockholm.
 ## Architecture
 - **Cloudflare Worker**: `https://league-tracker.filip-pudak.workers.dev`
 - **D1 Database ID**: `ccf38d5e-1639-4eb3-8447-9f3644127e4b`
-- **Schema**: 9 tables (settings, players, leaders, seasons, sessions, leader_votes, opponent_votes, awards, attendance) + 6 indexes
+- **Schema**: 12 tables (settings, players, leaders, seasons, sessions, leader_votes, opponent_votes, awards, attendance, melee_tournaments, season_standings, match_results) + 9 indexes
 - **Season ID format**: "S6" → extracted as integer 6 via `parseInt(str.replace(/\D/g, ''), 10)`
 - **Vote CSVs are empty**: Awards were entered manually. leader_votes and opponent_votes tables will always be empty.
 

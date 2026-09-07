@@ -10,7 +10,7 @@ database_name = "league-tracker"
 database_id = "ccf38d5e-1639-4eb3-8447-9f3644127e4b"
 
 [triggers]
-crons = ["30 8 * * 1", "0 9 * * 1"]
+crons = ["15 22 * * 3"]
 
 [vars]
 ALLOWED_ORIGIN = "https://filip-pudak.github.io"
