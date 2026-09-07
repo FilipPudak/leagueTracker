@@ -22,7 +22,8 @@ export async function handleStartNewSeason(body, env) {
 
   await updateSetting(DB, 'ACTIVE_SEASON_ID', String(nextSeasonId));
   await updateSetting(DB, 'CURRENT_WEEK', 'Week 1');
-  await updateSetting(DB, 'VOTING_OPEN', 'TRUE');
+  await updateSetting(DB, 'VOTING_OPEN', 'FALSE');
+  await updateSetting(DB, 'SEASON_STARTED', 'TRUE');
 
   return { seasonId: nextSeasonId, seasonName: nextSeasonName };
 }

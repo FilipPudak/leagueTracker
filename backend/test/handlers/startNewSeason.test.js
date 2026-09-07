@@ -32,7 +32,10 @@ describe('handleStartNewSeason', () => {
     assert.equal(currentWeek.value, 'Week 1');
 
     const votingOpen = store.settings.find(s => s.key === 'VOTING_OPEN');
-    assert.equal(votingOpen.value, 'TRUE');
+    assert.equal(votingOpen.value, 'FALSE');
+
+    const seasonStarted = store.settings.find(s => s.key === 'SEASON_STARTED');
+    assert.equal(seasonStarted.value, 'TRUE');
   });
 
   it('rejects missing admin token', async () => {
