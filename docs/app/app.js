@@ -87,7 +87,7 @@ async function callApi(action, payload = {}, _attempt = 0) {
   try {
     res = await fetch(API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       redirect: 'follow'
     });
