@@ -3,30 +3,23 @@
 ## Project Overview
 SWU League Voting app for a Star Wars Unlimited gaming league in Stockholm.
 - **Frontend**: Static HTML/JS on GitHub Pages (`docs/app/`)
-- **GAS Backend**: Original Google Apps Script backend (`backend/Code.gs`) — kept as backup
-- **Worker Backend**: Cloudflare Workers + D1 database (`backend/src/`) — primary backend
+- **Worker Backend**: Cloudflare Workers + D1 database (`backend/src/`)
 - **URL**: https://stockholm.sw-unlimited.com/ (league standings site we scrape)
 
 ## Architecture
 - **Cloudflare Worker**: `https://league-tracker.filip-pudak.workers.dev`
 - **D1 Database ID**: `ccf38d5e-1639-4eb3-8447-9f3644127e4b`
 - **Schema**: 9 tables (settings, players, leaders, seasons, sessions, leader_votes, opponent_votes, awards, attendance) + 6 indexes
-- **Season ID format**: "S6" in Sheets → extracted as integer 6 in D1 via `parseInt(str.replace(/\D/g, ''), 10)`
-- **Vote CSVs are empty**: Awards were entered manually in Sheets. leader_votes and opponent_votes tables will always be empty.
+- **Season ID format**: "S6" → extracted as integer 6 via `parseInt(str.replace(/\D/g, ''), 10)`
+- **Vote CSVs are empty**: Awards were entered manually. leader_votes and opponent_votes tables will always be empty.
 
 ## Commands
 ```bash
-# Run GAS tests (from project root)
-node --test "test/*.test.js"
-
 # Run Worker tests (from backend/)
 cd backend && node --test "test/**/*.test.js"
 
 # Deploy Worker
 cd backend && npx wrangler deploy
-
-# Run both test suites
-node --test "test/*.test.js"; cd backend; node --test "test/**/*.test.js"
 ```
 
 ## Code Conventions
@@ -69,9 +62,7 @@ Router wraps in `{ success: true, data: result }` or `{ success: false, error: m
 - **Mock Fetch**: `backend/test/helpers/mock-fetch.js` — URL-to-response mapping
 - **Mock Crypto**: `backend/test/helpers/mock-crypto.js` — sequential UUID stubs
 - **Fixtures**: `backend/test/helpers/fixtures.js` — `basicTables()`, `emptyTables()`, `closedVotingTables()`
-- **218 Worker tests** across: lib, handlers, queries, triggers, router
-- **110 GAS tests** in root `test/` directory
-- **Total: 328 tests, all green**
+- **244 Worker tests** across: lib, handlers, queries, triggers, router
 
 ## Git Conventions
 - Commit messages: `type: description` (e.g. `fix:`, `feat:`, `test:`, `chore:`)
@@ -83,7 +74,6 @@ Router wraps in `{ success: true, data: result }` or `{ success: false, error: m
 - Don't add external test dependencies (mocha, jest, etc.) — use `node:test` only
 - Don't use `&&` in shell commands (PowerShell) — use `;` or separate commands
 - Don't commit secrets or API keys
-- Don't remove the GAS backup (`backend/Code.gs`) — it's the reference implementation
 - Don't add individual player participation rankings publicly
 
 ## Ask Before Acting

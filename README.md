@@ -19,7 +19,6 @@ front end on GitHub Pages backed by a Cloudflare Worker + D1 database backend.
 | Folder | Role |
 |--------|------|
 | `backend/src/` | **Cloudflare Worker** backend. Modular ES modules handling API requests, weekly lifecycle triggers, and SWU site scraping. Data stored in D1. |
-| `backend/Code.gs` | Original **Google Apps Script** backend — kept as backup reference implementation. |
 | `docs/app/` | **Static client** (plain HTML/CSS/JS) served from GitHub Pages. Calls the Worker URL directly with `fetch`. |
 
 The backend is protected by **per-device session tokens** (see `docs/SECURITY.md`).
@@ -41,10 +40,6 @@ The backend is protected by **per-device session tokens** (see `docs/SECURITY.md
 
 ## Tests
 
-The repo has two test suites:
-
-### Worker tests (primary)
-
 The Cloudflare Worker backend has a comprehensive test suite using `node:test` and an
 in-memory D1 mock — zero external dependencies:
 
@@ -63,25 +58,3 @@ cd backend && node --test "test/**/*.test.js"
 
 Test infrastructure: `backend/test/helpers/mock-db.js` (D1 mock), `mock-fetch.js`,
 `mock-crypto.js`, `fixtures.js`, `test-utils.js`.
-
-### GAS tests (backup reference)
-
-The original Google Apps Script backend has tests using an in-memory GAS mock:
-
-```sh
-node --test "test/*.test.js"
-```
-
-| Tier | File | What it covers |
-|------|------|----------------|
-| 1 — Pure logic | `test/tier1.pure.test.js` | Lock-free helpers: `parseWeek`, `isVotingOpen`, `assignStandardRanks`, `userError`. |
-| 2 — Data & handlers | `test/tier2.handlers.test.js` | Sheet-backed readers and the `doPost` request handlers. |
-| 3 — Lifecycle & awards | `test/tier3.lifecycle.test.js` | `advanceLeagueWeek`, `calculateSeasonAwards`, `startNewSeason`, `syncPlayersFromWebsite`. |
-
-Test harness: `test/mockSheets.js` (GAS mocks) and `test/fixtures.js` (fixture dataset).
-
-### Running both suites
-
-```sh
-node --test "test/*.test.js"; cd backend; node --test "test/**/*.test.js"
-```

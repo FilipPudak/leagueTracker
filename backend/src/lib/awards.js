@@ -1,5 +1,3 @@
-// Award computation logic (ported from GAS)
-
 const AWARD_NAMES = [
   'Galactic Ruler',
   'Galactic Schemer',
@@ -25,7 +23,7 @@ export function assignStandardRanks(items) {
 }
 
 // Take top 3 with tie-aware boundary: if 4+ players share the 3rd-place score,
-// keep all tied at that level (up to a reasonable cap). Matches GAS behavior.
+// keep all tied at that level (up to a reasonable cap).
 function tieAwareTop3(items) {
   if (!items || items.length === 0) return [];
   const sorted = [...items].sort((a, b) => (b.score || 0) - (a.score || 0));

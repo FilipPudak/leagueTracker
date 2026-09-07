@@ -134,7 +134,7 @@ export async function handleGetLeaderboardData(body, env) {
     });
   }
 
-  // Format scores to match GAS display
+  // Format scores
   schemer = formatScore(schemer, (e) => `${e.score} Leaders`);
   ambassador = formatScore(ambassador, (e) => `${e.score} Votes`);
   ruler = formatScore(ruler, (e) => `${e.score} Pts`);
