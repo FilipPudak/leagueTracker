@@ -37,6 +37,12 @@ export function parseWeek(value) {
   return Number.isNaN(n) ? null : n;
 }
 
+export function isSeasonStarted(settingValue) {
+  if (settingValue == null) return false;
+  const v = String(settingValue).trim().toUpperCase();
+  return v === 'TRUE' || v === 'YES' || v === '1';
+}
+
 // Player helpers
 export async function getPlayerById(db, id) {
   return db.prepare('SELECT * FROM players WHERE id = ?').bind(id).first();

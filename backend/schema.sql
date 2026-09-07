@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS players (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   melee_name TEXT,
+  melee_guid TEXT,
   email TEXT,
   active INTEGER DEFAULT 1
 );
@@ -97,3 +98,47 @@ CREATE INDEX IF NOT EXISTS idx_sessions_player ON sessions(player_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_device ON sessions(device_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_season ON attendance(season_id, week);
 CREATE INDEX IF NOT EXISTS idx_attendance_season_player ON attendance(season_id, player_id);
+
+-- Melee.gg tournament mapping
+CREATE TABLE IF NOT EXISTS melee_tournaments (
+  melee_id INTEGER PRIMARY KEY,
+  season_id INTEGER NOT NULL,
+  round INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  date TEXT,
+  FOREIGN KEY (season_id) REFERENCES seasons(id)
+);
+
+-- Season standings from Melee.gg
+CREATE TABLE IF NOT EXISTS season_standings (
+  season_id INTEGER NOT NULL,
+  round INTEGER NOT NULL,
+  player_id TEXT NOT NULL,
+  wins INTEGER DEFAULT 0,
+  losses INTEGER DEFAULT 0,
+  draws INTEGER DEFAULT 0,
+  match_points INTEGER DEFAULT 0,
+  rank INTEGER,
+  PRIMARY KEY (season_id, round, player_id),
+  FOREIGN KEY (season_id) REFERENCES seasons(id),
+  FOREIGN KEY (player_id) REFERENCES players(id)
+);
+
+-- Match results from Melee.gg
+CREATE TABLE IF NOT EXISTS match_results (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  season_id INTEGER NOT NULL,
+  round INTEGER NOT NULL,
+  melee_match_id INTEGER,
+  player1_id TEXT NOT NULL,
+  player2_id TEXT NOT NULL,
+  winner_id TEXT,
+  result TEXT,
+  FOREIGN KEY (season_id) REFERENCES seasons(id),
+  FOREIGN KEY (player1_id) REFERENCES players(id),
+  FOREIGN KEY (player2_id) REFERENCES players(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_melee_tournaments_season ON melee_tournaments(season_id);
+CREATE INDEX IF NOT EXISTS idx_season_standings_season ON season_standings(season_id, round);
+CREATE INDEX IF NOT EXISTS idx_match_results_season ON match_results(season_id, round);

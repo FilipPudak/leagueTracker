@@ -76,8 +76,18 @@ Router wraps in `{ success: true, data: result }` or `{ success: false, error: m
 - Don't commit secrets or API keys
 - Don't add individual player participation rankings publicly
 
-## Ask Before Acting
-- **Always ask before `git push`** — confirm the user wants to push
-- **Always ask before `wrangler deploy`** — confirm the user wants to deploy to production
-- **Ask about commit strategy** — when unsure if changes should be 1 commit or several, ask
-- **Ask about amending** — when you think an amend might be appropriate, ask first
+## Ask Before Acting — Hard Rules
+
+NEVER do any of the following without explicit user permission in the same message:
+
+1. **`git commit`** — always ask first, even if all changes are ready
+2. **`git push`** — always ask first, even after a commit
+3. **`wrangler deploy`** — always ask first, even after a push
+4. **Amend a commit** — always ask first
+
+"Go ahead", "please do", or similar applies only to the task being discussed (e.g. writing code, fixing a bug). It does NOT count as permission to commit, push, or deploy unless those actions are explicitly mentioned.
+
+When asking, list what you plan to do so the user can approve or adjust:
+- "Ready to commit — shall I commit these changes?"
+- "Want me to push to origin?"
+- "Should I deploy to production?"

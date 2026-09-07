@@ -70,6 +70,9 @@ export function basicTables() {
       { season_id: 6, week: 2, player_id: 'P002' },
       { season_id: 6, week: 2, player_id: 'P003' },
     ],
+    melee_tournaments: [],
+    season_standings: [],
+    match_results: [],
   };
 }
 
@@ -85,6 +88,9 @@ export function emptyTables() {
     opponent_votes: [],
     awards: [],
     attendance: [],
+    melee_tournaments: [],
+    season_standings: [],
+    match_results: [],
   };
 }
 

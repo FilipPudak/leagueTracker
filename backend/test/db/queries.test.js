@@ -17,6 +17,8 @@ import {
   getMaxSeasonId,
   isVotingOpen,
   parseSeasonId,
+  parseWeek,
+  isSeasonStarted,
 } from '../../src/db/queries.js';
 
 describe('db/queries', () => {
@@ -169,5 +171,28 @@ describe('db/queries', () => {
     it('returns null for undefined', () => assert.equal(parseSeasonId(undefined), null));
     it('returns null for empty string', () => assert.equal(parseSeasonId(''), null));
     it('returns null for non-numeric string', () => assert.equal(parseSeasonId('Season Ended'), null));
+  });
+
+  describe('parseWeek', () => {
+    it('parses numeric string "3"', () => assert.equal(parseWeek('3'), 3));
+    it('parses "Week 5"', () => assert.equal(parseWeek('Week 5'), 5));
+    it('parses number 7', () => assert.equal(parseWeek(7), 7));
+    it('returns null for null', () => assert.equal(parseWeek(null), null));
+    it('returns null for undefined', () => assert.equal(parseWeek(undefined), null));
+    it('returns null for empty string', () => assert.equal(parseWeek(''), null));
+    it('returns null for non-numeric string', () => assert.equal(parseWeek('Season Ended'), null));
+  });
+
+  describe('isSeasonStarted', () => {
+    it('accepts TRUE', () => assert.equal(isSeasonStarted('TRUE'), true));
+    it('accepts YES', () => assert.equal(isSeasonStarted('YES'), true));
+    it('accepts 1', () => assert.equal(isSeasonStarted('1'), true));
+    it('accepts true (boolean)', () => assert.equal(isSeasonStarted(true), true));
+    it('accepts case-insensitive True', () => assert.equal(isSeasonStarted('True'), true));
+    it('rejects FALSE', () => assert.equal(isSeasonStarted('FALSE'), false));
+    it('rejects empty string', () => assert.equal(isSeasonStarted(''), false));
+    it('rejects null', () => assert.equal(isSeasonStarted(null), false));
+    it('rejects undefined', () => assert.equal(isSeasonStarted(undefined), false));
+    it('rejects missing key (undefined from getSetting)', () => assert.equal(isSeasonStarted(undefined), false));
   });
 });
