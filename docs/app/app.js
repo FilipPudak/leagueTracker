@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '3.0.0';
 
 // How long a loaded leaderboard/stats payload stays fresh before a re-entry
 // refetches it. Flicking between tabs is sub-second, so a tiny TTL is enough to
