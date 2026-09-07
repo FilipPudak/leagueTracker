@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables, emptyTables, closedVotingTables } from '../helpers/fixtures.js';
 import { installCryptoMock } from '../helpers/mock-crypto.js';
-import { createFetchMock } from '../helpers/mock-fetch.js';
 import { handleGetLeaderboardData } from '../../src/handlers/getLeaderboardData.js';
 
 function leaderboardTables() {
@@ -20,39 +19,25 @@ function tablesWithoutAwards() {
   return t;
 }
 
-const finalStandingsHtml =
-  'standings:[{playerUsername:alice42,playerName:Alice,rank:1,points:100},{playerUsername:bob55,playerName:Bob,rank:2,points:90},{playerUsername:charlie99,playerName:Charlie,rank:3,points:80}],seasonWinCounts';
-
-const midStandingsHtml =
-  'standings:[{playerUsername:alice42,playerName:Alice,rank:3,points:50},{playerUsername:bob55,playerName:Bob,rank:1,points:70},{playerUsername:charlie99,playerName:Charlie,rank:5,points:30}],seasonWinCounts';
-
-function makeStandingsFetch() {
-  return async function fetch(url) {
-    if (url.includes('/round/3')) {
-      return { ok: true, status: 200, text: async () => finalStandingsHtml };
-    }
-    if (url.includes('/round/5')) {
-      return { ok: true, status: 200, text: async () => midStandingsHtml };
-    }
-    return { ok: false, status: 404, text: async () => 'Not Found' };
-  };
-}
-
-function makeFailingFetch() {
-  return async function fetch() {
-    return { ok: false, status: 500, text: async () => 'Internal Server Error' };
-  };
+function tablesWithStandings() {
+  const t = tablesWithoutAwards();
+  t.season_standings = [
+    { season_id: 6, round: 3, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 100, rank: 1 },
+    { season_id: 6, round: 3, player_id: 'P002', wins: 2, losses: 1, draws: 0, match_points: 90, rank: 2 },
+    { season_id: 6, round: 3, player_id: 'P003', wins: 1, losses: 2, draws: 0, match_points: 80, rank: 3 },
+    { season_id: 6, round: 5, player_id: 'P001', wins: 2, losses: 1, draws: 0, match_points: 50, rank: 3 },
+    { season_id: 6, round: 5, player_id: 'P002', wins: 3, losses: 0, draws: 0, match_points: 70, rank: 1 },
+    { season_id: 6, round: 5, player_id: 'P003', wins: 0, losses: 3, draws: 0, match_points: 30, rank: 5 },
+  ];
+  return t;
 }
 
 describe('handleGetLeaderboardData', () => {
   let DB;
   let env;
-  let fetchMock;
 
   beforeEach(() => {
     installCryptoMock();
-    fetchMock = createFetchMock();
-    globalThis.fetch = fetchMock.handler;
     const tables = leaderboardTables();
     DB = createMockDb(tables);
     env = { DB };
@@ -137,23 +122,21 @@ describe('handleGetLeaderboardData', () => {
     assert.ok(/\d+ Votes/.test(result.ambassador[0].score));
   });
 
-  it('live Ruler from SWU standings when no stored award', async () => {
-    const tables = tablesWithoutAwards();
+  it('live Ruler from season_standings when no stored award', async () => {
+    const tables = tablesWithStandings();
     const db = createMockDb(tables);
-    globalThis.fetch = makeStandingsFetch();
     const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
-    assert.ok(result.ruler, 'ruler present from live scrape');
+    assert.ok(result.ruler, 'ruler present from DB');
     assert.ok(result.ruler.length > 0, 'ruler has entries');
     assert.ok(result.ruler[0].name);
     assert.ok(/\d+ Pts/.test(result.ruler[0].score));
   });
 
   it('live New Hope from mid+final standings when no stored award', async () => {
-    const tables = tablesWithoutAwards();
+    const tables = tablesWithStandings();
     const db = createMockDb(tables);
-    globalThis.fetch = makeStandingsFetch();
     const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
-    assert.ok(result.newHope, 'newHope present from live scrape');
+    assert.ok(result.newHope, 'newHope present from DB');
     assert.ok(result.newHope.length > 0, 'newHope has entries');
     assert.ok(result.newHope[0].name);
     assert.ok(/\+\d+ Climb/.test(result.newHope[0].score));
@@ -199,25 +182,21 @@ describe('handleGetLeaderboardData', () => {
     }
   });
 
-  it('standings scrape failure → ruler and newHope null', async () => {
+  it('no standings in DB → ruler and newHope null', async () => {
     const tables = tablesWithoutAwards();
     const db = createMockDb(tables);
-    globalThis.fetch = makeFailingFetch();
     const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
-    assert.equal(result.ruler, null, 'ruler null when scrape fails');
-    assert.equal(result.newHope, null, 'newHope null when scrape fails');
+    assert.equal(result.ruler, null, 'ruler null when no standings');
+    assert.equal(result.newHope, null, 'newHope null when no standings');
   });
 
-  it('non-active season uses stored awards only, no live scrape', async () => {
+  it('non-active season uses stored awards only, no live query', async () => {
     const tables = tablesWithoutAwards();
     tables.awards = [
       { season_id: 5, award_name: 'Galactic Ruler', player_id: 'P001', score: 55 },
     ];
     const db = createMockDb(tables);
-    let fetchCount = 0;
-    globalThis.fetch = async () => { fetchCount++; return { ok: true, status: 200, text: async () => finalStandingsHtml }; };
     const result = await handleGetLeaderboardData({ seasonId: 5 }, { DB: db });
-    assert.equal(fetchCount, 0, 'no live scrape for non-active season');
     assert.ok(result.ruler, 'ruler from stored award');
     assert.equal(result.ruler.length, 1);
   });

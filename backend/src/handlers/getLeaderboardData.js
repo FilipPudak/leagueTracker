@@ -1,7 +1,6 @@
 import { getSettings, getAwardsForSeason, getMostPlayedLeaders, parseSeasonId, isVotingOpen } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, assignStandardRanks } from '../lib/awards.js';
 import { getSeasonParticipation } from '../lib/participation.js';
-import { fetchSeasonStandings } from '../lib/scraping.js';
 
 const AMBASSADOR_CALLSIGNS = [
   'Gold Leader', 'Green Leader', 'Red Leader',
@@ -29,9 +28,8 @@ export async function handleGetLeaderboardData(body, env) {
   const isActiveSeason = seasonId === activeSeasonId;
   const isLive = votingOpen && isActiveSeason;
 
-  // Batch-resolve player IDs → names and melee names → IDs
+  // Batch-resolve player IDs → names
   const nameMap = await buildPlayerNameMap(DB);
-  const meleeIdMap = await buildMeleeIdMap(DB);
 
   // Get stored awards
   const awards = await getAwardsForSeason(DB, seasonId);
@@ -67,48 +65,54 @@ export async function handleGetLeaderboardData(body, env) {
     ambassador = assignStandardRanks(ambassador);
   }
 
-  // Galactic Ruler: stored or live from SWU site (top 3 by rank, no ties)
+  // Galactic Ruler: stored or live from season_standings
   let ruler = awardsMap['Galactic Ruler'] || null;
   if ((!ruler || ruler.length === 0) && isActiveSeason) {
     const round = votingOpen ? currentWeek : seasonLength;
-    const standings = await fetchSeasonStandings(seasonId, round);
-    if (standings) {
-      const top3 = standings.filter(s => s.rank <= 3).slice(0, 3);
-      ruler = top3.length > 0 ? assignStandardRanks(top3.map(s => ({
-        playerId: meleeIdMap.get(s.username?.toLowerCase()) || null,
-        score: s.points || 0,
-        name: s.name,
-      }))) : null;
-    }
+    const standings = await DB.prepare(
+      'SELECT player_id, rank, match_points FROM season_standings WHERE season_id = ? AND round = ?'
+    ).bind(seasonId, round).all();
+    const rows = (standings.results || []).sort((a, b) => (a.rank || 999) - (b.rank || 999));
+    const top3 = rows.filter(s => s.rank <= 3).slice(0, 3);
+    ruler = top3.length > 0 ? assignStandardRanks(top3.map(s => ({
+      playerId: s.player_id,
+      score: s.match_points || 0,
+      name: '',
+    }))) : null;
   } else if (ruler) {
     ruler = assignStandardRanks(ruler);
   }
 
-  // A New Hope: stored or live from SWU site
+  // A New Hope: stored or live from season_standings
   let newHope = awardsMap['A New Hope'] || null;
   if ((!newHope || newHope.length === 0) && isActiveSeason) {
     const midRound = Math.floor(seasonLength / 2);
     const finalRound = votingOpen ? currentWeek : seasonLength;
-    const midStandings = await fetchSeasonStandings(seasonId, midRound);
-    const finStandings = await fetchSeasonStandings(seasonId, finalRound);
+    const midStandings = await DB.prepare(
+      'SELECT player_id, rank FROM season_standings WHERE season_id = ? AND round = ?'
+    ).bind(seasonId, midRound).all();
+    const finStandings = await DB.prepare(
+      'SELECT player_id, rank FROM season_standings WHERE season_id = ? AND round = ?'
+    ).bind(seasonId, finalRound).all();
 
-    if (midStandings && finStandings) {
-      const midMap = new Map(midStandings.map(s => [s.username, s.rank]));
-      const climbers = finStandings
-        .map(s => ({
-          username: s.username,
-          name: s.name,
-          climb: (midMap.get(s.username) || 0) - s.rank,
-        }))
-        .filter(c => c.climb > 0)
-        .sort((a, b) => b.climb - a.climb)
-        .slice(0, 3);
+    const midRows = midStandings.results || [];
+    const finRows = finStandings.results || [];
+    const midRankMap = new Map(midRows.map(s => [s.player_id, s.rank]));
 
-      newHope = assignStandardRanks(climbers.map(c => ({
-        name: c.name,
-        score: c.climb,
-      })));
-    }
+    const climbers = finRows
+      .map(s => ({
+        playerId: s.player_id,
+        climb: (midRankMap.get(s.player_id) || 0) - s.rank,
+      }))
+      .filter(c => c.climb > 0)
+      .sort((a, b) => b.climb - a.climb)
+      .slice(0, 3);
+
+    newHope = climbers.length > 0 ? assignStandardRanks(climbers.map(c => ({
+      playerId: c.playerId,
+      score: c.climb,
+      name: '',
+    }))) : null;
   } else if (newHope) {
     newHope = assignStandardRanks(newHope);
   }
@@ -163,15 +167,6 @@ async function buildPlayerNameMap(DB) {
   const map = {};
   for (const r of (rows.results || [])) {
     map[r.id] = r.name;
-  }
-  return map;
-}
-
-async function buildMeleeIdMap(DB) {
-  const rows = await DB.prepare('SELECT id, melee_name FROM players WHERE melee_name IS NOT NULL').all();
-  const map = new Map();
-  for (const r of (rows.results || [])) {
-    map.set(r.melee_name.toLowerCase(), r.id);
   }
   return map;
 }

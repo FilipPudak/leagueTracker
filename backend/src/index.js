@@ -5,7 +5,6 @@ import { handleSubmitVote } from './handlers/submitVote.js';
 import { handleGetLeaderboardData } from './handlers/getLeaderboardData.js';
 import { handleGetMySeasonStats } from './handlers/getMySeasonStats.js';
 import { handleStartNewSeason } from './handlers/startNewSeason.js';
-import { enableFetchCache, disableFetchCache } from './lib/scraping.js';
 import { findSessionByToken, touchSessionTimestamp } from './lib/auth.js';
 
 const TOKEN_REQUIRED = ['submitVote', 'unlinkAccount', 'getMySeasonStats'];
@@ -85,8 +84,6 @@ export default {
     }
 
     try {
-      enableFetchCache();
-
       // Centralized session resolution
       let session = null;
       if (TOKEN_REQUIRED.includes(action) || TOKEN_OPTIONAL.includes(action)) {
@@ -104,12 +101,10 @@ export default {
       }
 
       const result = await handler(body, env, session);
-      disableFetchCache();
       return new Response(JSON.stringify({ success: true, data: result }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     } catch (err) {
-      disableFetchCache();
       const status = err.status || 500;
       return new Response(JSON.stringify({ success: false, error: err.message || 'Server error' }), {
         status,
@@ -120,14 +115,11 @@ export default {
 
   // Cron trigger handlers
   async scheduled(event, env) {
-    enableFetchCache();
     try {
       const { syncFromMelee } = await import('./triggers/syncFromMelee.js');
       await syncFromMelee(env);
     } catch (err) {
       console.error('[Cron] syncFromMelee failed:', err);
-    } finally {
-      disableFetchCache();
     }
   },
 };
