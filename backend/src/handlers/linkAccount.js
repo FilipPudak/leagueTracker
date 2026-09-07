@@ -1,5 +1,5 @@
 import { getPlayerById, getPlayerByEmail, getAllSeasons, getSetting, isVotingOpen } from '../db/queries.js';
-import { createSession, findSessionByPlayerAndDevice, collapseDeviceSessions } from '../lib/auth.js';
+import { createSession, findSessionByPlayerAndDevice } from '../lib/auth.js';
 import { getWeeklyParticipation } from '../lib/participation.js';
 
 export async function handleLinkAccount(body, env) {
@@ -34,21 +34,20 @@ export async function handleLinkAccount(body, env) {
     throw err;
   }
 
-  // Update player email (if not already set)
-  if (!player.email || player.email.toLowerCase() !== email.toLowerCase()) {
+  if (player.email && player.email.toLowerCase() !== email.toLowerCase()) {
+    const err = new Error('This account already has an email. Please unlink first or contact an admin.');
+    err.status = 403;
+    throw err;
+  }
+  if (!player.email) {
     await DB.prepare('UPDATE players SET email = LOWER(?) WHERE id = ?')
       .bind(email.trim().toLowerCase(), playerId).run();
   }
 
-  // Collapse any duplicate sessions for this (player, device) pair
-  await collapseDeviceSessions(DB, playerId, deviceId);
-
-  // Create or reuse session token
   let session = await findSessionByPlayerAndDevice(DB, playerId, deviceId);
   let token;
   if (session) {
     token = session.token;
-    // Touch last_active
     await DB.prepare("UPDATE sessions SET last_active = datetime('now'), email = ? WHERE token = ?")
       .bind(email.trim().toLowerCase(), token).run();
   } else {

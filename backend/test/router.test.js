@@ -2,12 +2,13 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMockDb } from './helpers/mock-db.js';
 import { basicTables } from './helpers/fixtures.js';
+import { installCryptoMock } from './helpers/mock-crypto.js';
 
 const mod = await import('../src/index.js');
 const worker = mod.default;
 
-function env(tables) {
-  return { DB: createMockDb(tables || basicTables()) };
+function env(tables, extra = {}) {
+  return { DB: createMockDb(tables || basicTables()), ...extra };
 }
 
 function post(body, opts = {}) {
@@ -25,9 +26,17 @@ describe('router/index.js – fetch handler', () => {
     const resp = await worker.fetch(req, env());
 
     assert.equal(resp.status, 200);
-    assert.equal(resp.headers.get('Access-Control-Allow-Origin'), '*');
+    assert.equal(resp.headers.get('Access-Control-Allow-Origin'), 'https://filip-pudak.github.io');
     assert.equal(resp.headers.get('Access-Control-Allow-Methods'), 'POST, OPTIONS');
     assert.equal(resp.headers.get('Access-Control-Allow-Headers'), 'Content-Type');
+  });
+
+  it('OPTIONS uses ALLOWED_ORIGIN from env', async () => {
+    const req = new Request('https://example.com', { method: 'OPTIONS' });
+    const resp = await worker.fetch(req, env(basicTables(), { ALLOWED_ORIGIN: 'https://custom.origin.com' }));
+
+    assert.equal(resp.status, 200);
+    assert.equal(resp.headers.get('Access-Control-Allow-Origin'), 'https://custom.origin.com');
   });
 
   it('non-POST request returns 405', async () => {
@@ -245,5 +254,121 @@ describe('router/index.js – fetch handler', () => {
     assert.equal(resp.status, 401);
     const json = await resp.json();
     assert.match(json.error, /Session expired/i);
+  });
+
+  it('linkAccount routes to handler and creates session', async () => {
+    installCryptoMock();
+    const resp = await worker.fetch(
+      post({
+        action: 'linkAccount',
+        playerId: 'P002',
+        email: 'bob@test.com',
+        deviceId: 'dev-bob-new',
+      }),
+      env()
+    );
+
+    assert.equal(resp.status, 200);
+    const json = await resp.json();
+    assert.equal(json.success, true);
+    assert.ok(json.data.token);
+    assert.equal(json.data.linkedPlayer.id, 'P002');
+  });
+
+  it('linkAccount missing playerId → 400', async () => {
+    const resp = await worker.fetch(
+      post({ action: 'linkAccount', email: 'test@test.com', deviceId: 'dev' }),
+      env()
+    );
+
+    assert.equal(resp.status, 400);
+    const json = await resp.json();
+    assert.equal(json.success, false);
+  });
+
+  it('getLeaderboardData routes to handler', async () => {
+    const resp = await worker.fetch(
+      post({ action: 'getLeaderboardData', seasonId: 6 }),
+      env()
+    );
+
+    assert.equal(resp.status, 200);
+    const json = await resp.json();
+    assert.equal(json.success, true);
+    assert.ok(json.data);
+  });
+
+  it('getLeaderboardData without seasonId falls back to active season', async () => {
+    const resp = await worker.fetch(
+      post({ action: 'getLeaderboardData' }),
+      env()
+    );
+
+    assert.equal(resp.status, 200);
+    const json = await resp.json();
+    assert.equal(json.success, true);
+    assert.ok(json.data);
+    assert.equal(json.data.seasonId, 6);
+  });
+
+  it('startNewSeason routes to handler with valid admin token', async () => {
+    const resp = await worker.fetch(
+      post({ action: 'startNewSeason', adminToken: 'test-secret-123' }),
+      env(basicTables(), { ADMIN_SECRET: 'test-secret-123' })
+    );
+
+    assert.equal(resp.status, 200);
+    const json = await resp.json();
+    assert.equal(json.success, true);
+    assert.equal(json.data.seasonId, 7);
+  });
+
+  it('startNewSeason missing adminToken → 403', async () => {
+    const resp = await worker.fetch(
+      post({ action: 'startNewSeason' }),
+      env(basicTables(), { ADMIN_SECRET: 'test-secret-123' })
+    );
+
+    assert.equal(resp.status, 403);
+    const json = await resp.json();
+    assert.equal(json.success, false);
+    assert.match(json.error, /Unauthorized/i);
+  });
+
+  it('startNewSeason wrong adminToken → 403', async () => {
+    const resp = await worker.fetch(
+      post({ action: 'startNewSeason', adminToken: 'wrong-token' }),
+      env(basicTables(), { ADMIN_SECRET: 'test-secret-123' })
+    );
+
+    assert.equal(resp.status, 403);
+    const json = await resp.json();
+    assert.equal(json.success, false);
+  });
+
+  it('handler throwing non-Error returns 500 with generic message', async () => {
+    const badHandlers = { badAction: () => { throw 'string error'; } };
+    const origHandlers = worker.fetch;
+
+    const req = new Request('https://example.com', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'nonExistentAction' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const resp = await worker.fetch(req, env());
+    assert.equal(resp.status, 400);
+    const json = await resp.json();
+    assert.equal(json.success, false);
+    assert.ok(json.error);
+  });
+
+  it('rate limit: requests within limit succeed', async () => {
+    const testEnv = env();
+    const resp = await worker.fetch(
+      post({ action: 'getAppData' }),
+      testEnv
+    );
+    assert.equal(resp.status, 200);
   });
 });

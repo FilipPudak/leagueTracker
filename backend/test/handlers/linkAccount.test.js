@@ -28,13 +28,13 @@ describe('handleLinkAccount', () => {
 
   it('fresh link creates session and returns token', async () => {
     const result = await handleLinkAccount(
-      { playerId: 'P001', email: 'newalice@test.com', deviceId: 'dev-new' },
+      { playerId: 'P004', email: 'diana@test.com', deviceId: 'dev-diana' },
       env
     );
     assert.ok(result.token);
     assert.equal(typeof result.token, 'string');
-    assert.equal(result.linkedPlayer.id, 'P001');
-    assert.equal(result.linkedPlayer.email, 'newalice@test.com');
+    assert.equal(result.linkedPlayer.id, 'P004');
+    assert.equal(result.linkedPlayer.email, 'diana@test.com');
   });
 
   it('relink same device reuses token', async () => {
@@ -128,13 +128,27 @@ describe('handleLinkAccount', () => {
     assert.notEqual(result.token, 'test-token-alice', 'new token for different device');
   });
 
-  it('relink with different email updates DB', async () => {
+  it('relink with existing email but same email succeeds', async () => {
     const result = await handleLinkAccount(
-      { playerId: 'P001', email: 'newemail@test.com', deviceId: 'dev-alice' },
+      { playerId: 'P001', email: 'alice@test.com', deviceId: 'dev-alice' },
       env
     );
     assert.equal(result.token, 'test-token-alice', 'same token reused');
-    assert.equal(result.linkedPlayer.email, 'newemail@test.com');
+    assert.equal(result.linkedPlayer.email, 'alice@test.com');
+  });
+
+  it('relink with different email rejected when player already has email', async () => {
+    await assert.rejects(
+      () => handleLinkAccount(
+        { playerId: 'P001', email: 'newemail@test.com', deviceId: 'dev-alice' },
+        env
+      ),
+      (err) => {
+        assert.equal(err.status, 403);
+        assert.match(err.message, /already has an email/i);
+        return true;
+      }
+    );
   });
 
   it('alreadyVoted true when player has votes', async () => {

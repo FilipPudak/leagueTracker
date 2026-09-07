@@ -1,10 +1,11 @@
 import { getMaxSeasonId, updateSetting } from '../db/queries.js';
+import { constantTimeEqual } from '../lib/auth.js';
 
 export async function handleStartNewSeason(body, env) {
   const { DB } = env;
   const { adminToken } = body;
 
-  if (!adminToken || adminToken !== env.ADMIN_SECRET) {
+  if (!adminToken || !constantTimeEqual(adminToken, env.ADMIN_SECRET || '')) {
     const err = new Error('Unauthorized. Invalid admin token.');
     err.status = 403;
     throw err;

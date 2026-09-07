@@ -11,10 +11,26 @@ import { findSessionByToken, touchSessionTimestamp } from './lib/auth.js';
 const TOKEN_REQUIRED = ['submitVote', 'unlinkAccount', 'getMySeasonStats'];
 const TOKEN_OPTIONAL = ['getAppData'];
 
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 30;
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now - entry.start > RATE_LIMIT_WINDOW_MS) {
+    rateLimitMap.set(ip, { start: now, count: 1 });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= RATE_LIMIT_MAX;
+}
+
 export default {
   async fetch(request, env) {
+    const allowedOrigin = env.ALLOWED_ORIGIN || 'https://filip-pudak.github.io';
     const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': allowedOrigin,
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     };
@@ -41,6 +57,14 @@ export default {
     }
 
     const { action, token } = body;
+
+    const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+    if (!checkRateLimit(ip)) {
+      return new Response(JSON.stringify({ success: false, error: 'Rate limit exceeded. Please try again later.' }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const handlers = {
       getAppData: handleGetAppData,
@@ -101,13 +125,19 @@ export default {
       const cron = event.cron;
 
       if (cron === '30 8 * * 1') {
-        // syncPlayers: Monday 08:30
-        const { syncPlayers } = await import('./triggers/syncPlayers.js');
-        await syncPlayers(env);
+        try {
+          const { syncPlayers } = await import('./triggers/syncPlayers.js');
+          await syncPlayers(env);
+        } catch (err) {
+          console.error('[Cron] syncPlayers failed:', err);
+        }
       } else if (cron === '0 9 * * 1') {
-        // advanceWeek: Monday 09:00
-        const { advanceWeek } = await import('./triggers/advanceWeek.js');
-        await advanceWeek(env);
+        try {
+          const { advanceWeek } = await import('./triggers/advanceWeek.js');
+          await advanceWeek(env);
+        } catch (err) {
+          console.error('[Cron] advanceWeek failed:', err);
+        }
       }
     } finally {
       disableFetchCache();

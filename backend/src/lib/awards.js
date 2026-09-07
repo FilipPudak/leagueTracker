@@ -66,27 +66,23 @@ export async function computeAmbassador(db, seasonId) {
   return tieAwareTop3(all);
 }
 
-// Write a podium block (3 rows) for an award
+// Write a podium block for an award (supports tie-aware results > 3 entries)
 export async function writePodiumBlock(db, seasonId, awardName, entries) {
-  // entries is array of { playerId, score } — up to 3
-  const top3 = entries.slice(0, 3);
+  const topN = entries.slice(0, 5);
 
-  // If no entries, check if block already exists — preserve manual data
-  if (top3.length === 0) {
+  if (topN.length === 0) {
     const existing = await db.prepare(
       "SELECT 1 FROM awards WHERE season_id = ? AND award_name = ? AND player_id != ''"
     ).bind(seasonId, awardName).first();
     if (existing) return;
   }
 
-  // Delete existing entries for this award/season (idempotent)
   await db.prepare(
     'DELETE FROM awards WHERE season_id = ? AND award_name = ?'
   ).bind(seasonId, awardName).run();
 
-  // Insert up to 3 rows
-  for (let i = 0; i < 3; i++) {
-    const entry = top3[i];
+  for (let i = 0; i < 5; i++) {
+    const entry = topN[i];
     await db.prepare(
       'INSERT INTO awards (season_id, award_name, player_id, score) VALUES (?, ?, ?, ?)'
     ).bind(

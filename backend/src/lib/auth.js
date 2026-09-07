@@ -1,5 +1,15 @@
 const SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
 
+export function constantTimeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
 export async function findSessionByToken(db, token) {
   if (!token) return null;
   const row = await db.prepare(

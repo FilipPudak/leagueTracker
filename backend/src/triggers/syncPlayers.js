@@ -37,27 +37,24 @@ export async function syncPlayers(env) {
   const existingMap = new Map((existingPlayers.results || []).map(p => [p.melee_name?.toLowerCase(), p]));
   const existingEmailMap = new Map((existingPlayers.results || []).filter(p => p.email).map(p => [p.email.toLowerCase(), p]));
 
+  let nextId = (existingPlayers.results || []).reduce((max, p) => {
+    const num = parseInt(p.id.replace(/\D/g, ''), 10);
+    return isNaN(num) ? max : Math.max(max, num);
+  }, 0) + 1;
+
   let added = 0;
   let updated = 0;
 
   for (const [meleeKey, data] of scrapedPlayers) {
     const existing = existingMap.get(meleeKey);
     if (existing) {
-      // Update name if changed
       if (existing.name !== data.name) {
         await DB.prepare('UPDATE players SET name = ? WHERE id = ?')
           .bind(data.name, existing.id).run();
         updated++;
       }
     } else {
-      // New player — generate ID
-      const maxId = existingPlayers.results
-        ? Math.max(0, ...existingPlayers.results.map(p => {
-            const num = parseInt(p.id.replace(/\D/g, ''), 10);
-            return isNaN(num) ? 0 : num;
-          }))
-        : 0;
-      const newId = 'P' + String(maxId + 1).padStart(3, '0');
+      const newId = 'P' + String(nextId++).padStart(3, '0');
       await DB.prepare(
         'INSERT INTO players (id, name, melee_name, active) VALUES (?, ?, ?, 1)'
       ).bind(newId, data.name, data.meleeName).run();
