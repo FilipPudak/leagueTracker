@@ -1,14 +1,7 @@
 // Weekly advance: increment week, reopen voting, close season at final week
-import { getSettings, updateSetting, isVotingOpen, parseSeasonId } from '../db/queries.js';
+import { getSettings, updateSetting, isVotingOpen, parseSeasonId, parseWeek, findPlayerByMelee } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, writePodiumBlock, assignStandardRanks } from '../lib/awards.js';
 import { fetchSeasonStandings } from '../lib/scraping.js';
-
-async function findPlayerByMelee(DB, meleeName) {
-  const row = await DB.prepare(
-    'SELECT id FROM players WHERE LOWER(melee_name) = LOWER(?)'
-  ).bind(meleeName).first();
-  return row ? row.id : null;
-}
 
 export async function advanceWeek(env) {
   const { DB } = env;
@@ -17,7 +10,7 @@ export async function advanceWeek(env) {
   const settings = await getSettings(DB);
   const votingOpen = isVotingOpen(settings.VOTING_OPEN);
   const activeSeasonId = parseSeasonId(settings.ACTIVE_SEASON_ID);
-  const currentWeek = settings.CURRENT_WEEK ? parseInt(settings.CURRENT_WEEK.replace(/\D/g, ''), 10) : 1;
+  const currentWeek = parseWeek(settings.CURRENT_WEEK);
   const seasonLength = settings.SEASON_LENGTH ? Number(settings.SEASON_LENGTH) : 11;
 
   if (!votingOpen || !activeSeasonId) {

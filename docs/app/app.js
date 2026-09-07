@@ -363,6 +363,8 @@ function cancelUnlink() {
 const TAB_INDEX = { 'vote-view': 0, 'leaderboard-view': 1, 'myseason-view': 2 };
 
 function confirmUnlink() {
+  if (unlinkInFlight) return;
+  unlinkInFlight = true;
   cancelUnlink();
   const lastView = appState.lastView;
   showTabs(false);
@@ -381,11 +383,15 @@ function confirmUnlink() {
     })
     .catch((err) => {
       showSpinner(false);
+      unlinkInFlight = false;
       showStatus(err.userMessage || err.message || 'Failed to unlink.', false);
       if (appState.linkedPlayer) {
         showTabs(true);
         showLinkedPresence(appState.linkedPlayer);
         setActiveView(lastView, TAB_INDEX[lastView] || 0);
+      } else {
+        showTabs(false);
+        setActiveView('link-view', 0);
       }
     });
 }
@@ -440,6 +446,7 @@ function populateVotingDropdowns(leaders, players, currentUserId) {
 }
 
 let voteInFlight = false;
+let unlinkInFlight = false;
 
 function submitVotes() {
   if (!appState.votingOpen) {
@@ -686,13 +693,14 @@ function renderStatsList(containerId, items, config) {
   let html = '<div class="stats-list">';
   shown.forEach((item, i) => {
     const rankNumber = item.displayRank !== undefined ? item.displayRank : (i + 1);
+    const safeRank = Math.floor(Number(rankNumber)) || 0;
     const title = config.getTitle(item, i);
     const subtitle = config.getSubtitle ? config.getSubtitle(item, i) : null;
     const score = config.getScore(item);
     html += `
-      <div class="stats-row rank-${escapeHtml(rankNumber)}">
+      <div class="stats-row rank-${safeRank}">
         <div class="stats-left">
-          <div class="rank-pill">#${escapeHtml(rankNumber)}</div>
+          <div class="rank-pill">#${safeRank}</div>
           <div class="stats-info">
             <span class="stats-title">${escapeHtml(title)}</span>
             ${subtitle ? `<span class="stats-subtitle">${escapeHtml(subtitle)}</span>` : ''}

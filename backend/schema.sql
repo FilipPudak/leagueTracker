@@ -96,3 +96,4 @@ CREATE INDEX IF NOT EXISTS idx_opponent_votes_season_week ON opponent_votes(seas
 CREATE INDEX IF NOT EXISTS idx_sessions_player ON sessions(player_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_device ON sessions(device_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_season ON attendance(season_id, week);
+CREATE INDEX IF NOT EXISTS idx_attendance_season_player ON attendance(season_id, player_id);

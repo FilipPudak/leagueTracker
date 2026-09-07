@@ -1,4 +1,4 @@
-import { getSetting, isVotingOpen } from '../db/queries.js';
+import { getSettings, isVotingOpen, parseWeek, hasPlayerVotedThisWeek } from '../db/queries.js';
 import { getRaffleTickets, getWeeklyParticipation } from '../lib/participation.js';
 
 export async function handleSubmitVote(body, env, session) {
@@ -12,9 +12,8 @@ export async function handleSubmitVote(body, env, session) {
   }
 
   const playerId = session.player_id;
-  const activeSeasonId = await getSetting(DB, 'ACTIVE_SEASON_ID');
-  const currentWeek = await getSetting(DB, 'CURRENT_WEEK');
-  const votingOpenVal = await getSetting(DB, 'VOTING_OPEN');
+  const allSettings = await getSettings(DB);
+  const votingOpenVal = allSettings.VOTING_OPEN;
 
   if (!isVotingOpen(votingOpenVal)) {
     const err = new Error('Voting is currently closed for this week.');
@@ -22,8 +21,8 @@ export async function handleSubmitVote(body, env, session) {
     throw err;
   }
 
-  const seasonId = activeSeasonId ? parseInt(String(activeSeasonId).replace(/\D/g, ''), 10) : null;
-  const week = currentWeek ? parseInt(String(currentWeek).replace(/\D/g, ''), 10) : null;
+  const seasonId = allSettings.ACTIVE_SEASON_ID ? parseWeek(allSettings.ACTIVE_SEASON_ID) : null;
+  const week = parseWeek(allSettings.CURRENT_WEEK);
 
   if (!seasonId || !week) {
     const err = new Error('No active season.');
@@ -50,9 +49,7 @@ export async function handleSubmitVote(body, env, session) {
   }
 
   // Check for duplicate vote
-  const existing = await DB.prepare(
-    'SELECT 1 FROM leader_votes WHERE season_id = ? AND week = ? AND player_id = ?'
-  ).bind(seasonId, week, playerId).first();
+  const existing = await hasPlayerVotedThisWeek(DB, seasonId, week, playerId);
 
   if (existing) {
     const err = new Error('You have already submitted votes for this week.');

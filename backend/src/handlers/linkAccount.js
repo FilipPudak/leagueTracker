@@ -1,4 +1,4 @@
-import { getPlayerById, getPlayerByEmail, getAllSeasons, getSetting, isVotingOpen } from '../db/queries.js';
+import { getPlayerById, getPlayerByEmail, getAllSeasons, getSettings, isVotingOpen, parseWeek } from '../db/queries.js';
 import { createSession, findSessionByPlayerAndDevice } from '../lib/auth.js';
 import { getWeeklyParticipation } from '../lib/participation.js';
 
@@ -12,7 +12,13 @@ export async function handleLinkAccount(body, env) {
     throw err;
   }
 
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!deviceId) {
+    const err = new Error('Missing device ID. Please try again.');
+    err.status = 400;
+    throw err;
+  }
+
+  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     const err = new Error('Please enter a valid email address.');
     err.status = 400;
     throw err;
@@ -55,11 +61,11 @@ export async function handleLinkAccount(body, env) {
   }
 
   // Get current state
-  const settings = await getSetting(DB, 'VOTING_OPEN');
-  const votingOpen = isVotingOpen(settings);
-  const activeSeasonId = await getSetting(DB, 'ACTIVE_SEASON_ID');
-  const currentWeek = await getSetting(DB, 'CURRENT_WEEK');
-  const weekNum = currentWeek ? parseInt(currentWeek.replace(/\D/g, ''), 10) : 1;
+  const allSettings = await getSettings(DB);
+  const votingOpen = isVotingOpen(allSettings.VOTING_OPEN);
+  const activeSeasonId = allSettings.ACTIVE_SEASON_ID;
+  const currentWeek = allSettings.CURRENT_WEEK;
+  const weekNum = parseWeek(currentWeek);
 
   // Check if already voted
   let alreadyVoted = false;
@@ -91,7 +97,7 @@ export async function handleLinkAccount(body, env) {
     seasons: seasons.results || [],
     seasonName: seasons.results?.find(s => s.id === Number(activeSeasonId))?.name,
     week: weekNum,
-    seasonId: Number(activeSeasonId),
+    seasonId: activeSeasonId ? Number(activeSeasonId) : null,
     weeklyParticipation,
   };
 }

@@ -1,5 +1,4 @@
-import { getSettings, getAwardsForSeason, getMostPlayedLeaders, parseSeasonId } from '../db/queries.js';
-import { isVotingOpen } from '../db/queries.js';
+import { getSettings, getAwardsForSeason, getMostPlayedLeaders, parseSeasonId, isVotingOpen } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, assignStandardRanks } from '../lib/awards.js';
 import { getSeasonParticipation } from '../lib/participation.js';
 import { fetchSeasonStandings } from '../lib/scraping.js';

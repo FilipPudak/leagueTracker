@@ -1,15 +1,14 @@
-import { getSettings, getPlayerById, getAllActivePlayers, getAllActiveLeaders, getAllSeasons } from '../db/queries.js';
-import { isVotingOpen } from '../db/queries.js';
+import { getSettings, getPlayerById, getAllActivePlayers, getAllActiveLeaders, getAllSeasons, parseSeasonId, parseWeek, isVotingOpen, hasPlayerVotedThisWeek } from '../db/queries.js';
 import { getWeeklyParticipation } from '../lib/participation.js';
 
 export async function handleGetAppData(body, env, session) {
   const { DB } = env;
-  const { token } = body;
+  const token = body.token;
 
   const settings = await getSettings(DB);
   const rawSeasonId = settings.ACTIVE_SEASON_ID || '';
-  const activeSeasonId = rawSeasonId ? parseInt(String(rawSeasonId).replace(/\D/g, ''), 10) : null;
-  const currentWeek = settings.CURRENT_WEEK ? parseInt(settings.CURRENT_WEEK.replace(/\D/g, ''), 10) : 1;
+  const activeSeasonId = rawSeasonId ? parseSeasonId(rawSeasonId) : null;
+  const currentWeek = parseWeek(settings.CURRENT_WEEK);
   const votingOpen = isVotingOpen(settings.VOTING_OPEN);
 
   const seasons = await getAllSeasons(DB);
@@ -28,10 +27,7 @@ export async function handleGetAppData(body, env, session) {
 
       // Check if already voted this week
       if (activeSeasonId && currentWeek) {
-        const row = await DB.prepare(
-          'SELECT 1 FROM leader_votes WHERE season_id = ? AND week = ? AND player_id = ?'
-        ).bind(activeSeasonId, currentWeek, player.id).first();
-        alreadySubmitted = !!row;
+        alreadySubmitted = await hasPlayerVotedThisWeek(DB, activeSeasonId, currentWeek, player.id);
       }
     } else {
       status = 'invalid-token';
@@ -55,12 +51,18 @@ export async function handleGetAppData(body, env, session) {
     unlinkedPlayers = allPlayers.results || [];
   }
 
+  const safeSettings = {
+    WEEKLY_DEADLINE_DAY: settings.WEEKLY_DEADLINE_DAY,
+    WEEKLY_DEADLINE_TIME: settings.WEEKLY_DEADLINE_TIME,
+    TIMEZONE: settings.TIMEZONE,
+  };
+
   return {
     status,
     linkedPlayer,
     currentPlayer: linkedPlayer,
     votingOpen,
-    settings,
+    settings: safeSettings,
     seasons: seasons.results || [],
     players: (players.results || []).map(p => ({ id: p.id, name: p.name })),
     unlinkedPlayers,

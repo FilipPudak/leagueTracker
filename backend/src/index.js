@@ -93,7 +93,7 @@ export default {
         if (token) {
           session = await findSessionByToken(env.DB, token);
           if (session) {
-            await touchSessionTimestamp(env.DB, token);
+            touchSessionTimestamp(env.DB, token).catch(() => {});
           }
         }
         if (TOKEN_REQUIRED.includes(action) && !session) {

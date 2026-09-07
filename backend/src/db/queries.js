@@ -31,6 +31,12 @@ export function parseSeasonId(value) {
   return Number.isNaN(n) ? null : n;
 }
 
+export function parseWeek(value) {
+  if (value == null) return null;
+  const n = parseInt(String(value).replace(/\D/g, ''), 10);
+  return Number.isNaN(n) ? null : n;
+}
+
 // Player helpers
 export async function getPlayerById(db, id) {
   return db.prepare('SELECT * FROM players WHERE id = ?').bind(id).first();
@@ -77,6 +83,22 @@ export async function getAwardsForSeason(db, seasonId) {
   return db.prepare(
     'SELECT * FROM awards WHERE season_id = ? ORDER BY award_name'
   ).bind(seasonId).all();
+}
+
+// Player lookup by Melee name
+export async function findPlayerByMelee(db, meleeName) {
+  const row = await db.prepare(
+    'SELECT id FROM players WHERE LOWER(melee_name) = LOWER(?)'
+  ).bind(meleeName).first();
+  return row ? row.id : null;
+}
+
+// Duplicate vote check
+export async function hasPlayerVotedThisWeek(db, seasonId, week, playerId) {
+  const row = await db.prepare(
+    'SELECT 1 FROM leader_votes WHERE season_id = ? AND week = ? AND player_id = ?'
+  ).bind(seasonId, week, playerId).first();
+  return !!row;
 }
 
 // Most played leaders

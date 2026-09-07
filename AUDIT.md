@@ -7,68 +7,68 @@
 
 ## Critical (1)
 
-| # | Issue | Location | Source |
-|---|-------|----------|--------|
-| **C1** | **Duplicate player IDs on multi-player sync** — `maxId` recomputed from stale snapshot inside loop; all new players get the same ID, crashing on UNIQUE constraint | `syncPlayers.js:54-60` | Production Readiness |
+| # | Issue | Location | Source | Status |
+|---|-------|----------|--------|--------|
+| **C1** | **Duplicate player IDs on multi-player sync** — `maxId` recomputed from stale snapshot inside loop; all new players get the same ID, crashing on UNIQUE constraint | `syncPlayers.js:54-60` | Production Readiness | DONE |
 
 ## High (8)
 
-| # | Issue | Location | Source |
-|---|-------|----------|--------|
-| **H1** | **Any user can overwrite any player's email** — selecting a name from the dropdown lets you hijack the account | `linkAccount.js:38-41` | Security |
-| **H2** | **No rate limiting on any endpoint** — spam votes, link attempts, enumeration | `index.js` | Security |
-| **H3** | **Admin token uses non-constant-time comparison** — timing side-channel | `startNewSeason.js:7` | Security |
-| **H4** | **CORS allows all origins** — any site can submit authenticated requests | `index.js:17` | Production Readiness |
-| **H5** | **`linkAccount` race condition** — concurrent requests create duplicate sessions | `linkAccount.js:44-55` | Production Readiness |
-| **H6** | **`tieAwareTop3` silently truncated** — 4+ tied players cut to 3, defeating tie logic | `awards.js:27-33,72` | Production Readiness |
-| **H7** | **Cron trigger errors swallowed** — no try/catch, no retry, no concurrency guard | `index.js:98-115` | Production Readiness |
-| **H8** | **Router missing `linkAccount`/`getLeaderboardData`/`startNewSeason` action tests** | `router.test.js` | Test Coverage |
+| # | Issue | Location | Source | Status |
+|---|-------|----------|--------|--------|
+| **H1** | **Any user can overwrite any player's email** — selecting a name from the dropdown lets you hijack the account | `linkAccount.js:38-41` | Security | DONE |
+| **H2** | **No rate limiting on any endpoint** — spam votes, link attempts, enumeration | `index.js` | Security | DONE |
+| **H3** | **Admin token uses non-constant-time comparison** — timing side-channel | `startNewSeason.js:7` | Security | DONE |
+| **H4** | **CORS allows all origins** — any site can submit authenticated requests | `index.js:17` | Production Readiness | DONE |
+| **H5** | **`linkAccount` race condition** — concurrent requests create duplicate sessions | `linkAccount.js:44-55` | Production Readiness | DONE |
+| **H6** | **`tieAwareTop3` silently truncated** — 4+ tied players cut to 3, defeating tie logic | `awards.js:27-33,72` | Production Readiness | DONE |
+| **H7** | **Cron trigger errors swallowed** — no try/catch, no retry, no concurrency guard | `index.js:98-115` | Production Readiness | DONE |
+| **H8** | **Router missing `linkAccount`/`getLeaderboardData`/`startNewSeason` action tests** | `router.test.js` | Test Coverage | DONE |
 
 ## Medium (17)
 
-| # | Issue | Location | Source |
-|---|-------|----------|--------|
-| M1 | No CSP, X-Frame-Options, or security headers | `index.html`, `index.js` | Security |
-| M2 | `getAppData` returns full settings table (info leakage) | `getAppData.js:59-65` | Security |
-| M3 | Session token in `localStorage` (XSS amplification) | `app.js:11,61` | Security |
-| M4 | Missing composite index `attendance(season_id, player_id)` | `schema.sql` | Production Readiness |
-| M5 | `adminToken` in POST body (logged by Workers) | `startNewSeason.js:7` | Production Readiness |
-| M6 | `handleLinkAccount` returns `seasonId: 0` when no active season | `linkAccount.js:95` | Production Readiness |
-| M7 | `collapseDeviceSessions` does N individual deletes | `auth.js:86-97` | Production Readiness |
-| M8 | `getLeaderboardData` makes 20+ sequential DB calls | `getLeaderboardData.js` | Production Readiness |
-| M9 | `confirmUnlink` has no reentrancy guard | `app.js:365-391` | Frontend |
-| M10 | HTML attribute injection via `escapeHtml` in class names | `app.js:693-696` | Frontend |
-| M11 | Broken recovery after unlink + failed refetch | `app.js:375-391` | Frontend |
-| M12 | `mock-db.js` IN clause silently skipped | `mock-db.js:205-206` | Tests |
-| M13 | `cleanupTestEnv` calls nonexistent `uninstallCryptoCounter` | `test-utils.js:31` | Tests |
-| M14 | Mock DB doesn't enforce foreign keys | mock-db.js | Tests |
-| M15 | `mock-db.js` batch() runs sequentially (not transactional) | `mock-db.js:66-71` | Tests |
-| M16 | No test for `scheduled()` cron dispatch | `index.js:98-115` | Tests |
-| M17 | Scraping-dependent awards have no DB fallback | `syncPlayers.js:103`, `advanceWeek.js:42` | Root Cause |
+| # | Issue | Location | Source | Status |
+|---|-------|----------|--------|--------|
+| M1 | No CSP, X-Frame-Options, or security headers | `index.html`, `index.js` | Security | |
+| M2 | `getAppData` returns full settings table (info leakage) | `getAppData.js:59-65` | Security | DONE |
+| M3 | Session token in `localStorage` (XSS amplification) | `app.js:11,61` | Security | SKIP |
+| M4 | Missing composite index `attendance(season_id, player_id)` | `schema.sql` | Production Readiness | DONE |
+| M5 | `adminToken` in POST body (logged by Workers) | `startNewSeason.js:7` | Production Readiness | SKIP |
+| M6 | `handleLinkAccount` returns `seasonId: 0` when no active season | `linkAccount.js:95` | Production Readiness | DONE |
+| M7 | `collapseDeviceSessions` does N individual deletes | `auth.js:86-97` | Production Readiness | SKIP |
+| M8 | `getLeaderboardData` makes 20+ sequential DB calls | `getLeaderboardData.js` | Production Readiness | SKIP |
+| M9 | `confirmUnlink` has no reentrancy guard | `app.js:365-391` | Frontend | DONE |
+| M10 | HTML attribute injection via `escapeHtml` in class names | `app.js:693-696` | Frontend | DONE |
+| M11 | Broken recovery after unlink + failed refetch | `app.js:375-391` | Frontend | DONE |
+| M12 | `mock-db.js` IN clause silently skipped | `mock-db.js:205-206` | Tests | SKIP |
+| M13 | `cleanupTestEnv` calls nonexistent `uninstallCryptoCounter` | `test-utils.js:31` | Tests | SKIP |
+| M14 | Mock DB doesn't enforce foreign keys | mock-db.js | Tests | SKIP |
+| M15 | `mock-db.js` batch() runs sequentially (not transactional) | `mock-db.js:66-71` | Tests | SKIP |
+| M16 | No test for `scheduled()` cron dispatch | `index.js:98-115` | Tests | SKIP |
+| M17 | Scraping-dependent awards have no DB fallback | `syncPlayers.js:103`, `advanceWeek.js:42` | Root Cause | SKIP |
 
 ## Low (19)
 
-| # | Issue | Location |
-|---|-------|----------|
-| L1 | Unused `existingEmailMap` in syncPlayers | `syncPlayers.js:38` |
-| L2 | `findPlayerByMelee` duplicated in 2 files | `advanceWeek.js:6-11`, `syncPlayers.js:7-12` |
-| L3 | Week parsing duplicated across 6+ files | multiple |
-| L4 | "Already voted" check duplicated | `getAppData.js:31-34`, `submitVote.js:53-55` |
-| L5 | Award computation duplicated in both triggers | `advanceWeek.js:34-81`, `syncPlayers.js:92-140` |
-| L6 | Repeated error-throw boilerplate in all handlers | all handlers |
-| L7 | Inconsistent settings access (individual vs bulk) | `linkAccount.js`, `submitVote.js` |
-| L8 | Unused destructured `token` | `getAppData.js:7` |
-| L9 | Missing `deviceId` validation | `linkAccount.js:7` |
-| L10 | No input length validation on email | `linkAccount.js:15` |
-| L11 | 90-day session TTL is long | `auth.js:1` |
-| L12 | No keyboard nav semantics for tabs | `index.html:253-256` |
-| L13 | No `aria-live` region for status messages | `index.html:258` |
-| L14 | Inline onclick handlers throughout | `index.html` |
-| L15 | `APP_VERSION` manually bumped | `app.js:18` |
-| L16 | Scraping regex is fragile | `scraping.js:43` |
-| L17 | `touchSessionTimestamp` failure causes 500 | `auth.js` |
-| L18 | NaN propagation from "Season Ended" CURRENT_WEEK | multiple files |
-| L19 | `formatScore` mutates score type (number to string) | `getLeaderboardData.js:188-194` |
+| # | Issue | Location | Status |
+|---|-------|----------|--------|
+| L1 | Unused `existingEmailMap` in syncPlayers | `syncPlayers.js:38` | DONE |
+| L2 | `findPlayerByMelee` duplicated in 2 files | `advanceWeek.js:6-11`, `syncPlayers.js:7-12` | DONE |
+| L3 | Week parsing duplicated across 6+ files | multiple | DONE |
+| L4 | "Already voted" check duplicated | `getAppData.js:31-34`, `submitVote.js:53-55` | DONE |
+| L5 | Award computation duplicated in both triggers | `advanceWeek.js:34-81`, `syncPlayers.js:92-140` | SKIP |
+| L6 | Repeated error-throw boilerplate in all handlers | all handlers | SKIP |
+| L7 | Inconsistent settings access (individual vs bulk) | `linkAccount.js`, `submitVote.js` | DONE |
+| L8 | Unused destructured `token` | `getAppData.js:7` | DONE |
+| L9 | Missing `deviceId` validation | `linkAccount.js:7` | DONE |
+| L10 | No input length validation on email | `linkAccount.js:15` | DONE |
+| L11 | 90-day session TTL is long | `auth.js:1` | SKIP |
+| L12 | No keyboard nav semantics for tabs | `index.html:253-256` | SKIP |
+| L13 | No `aria-live` region for status messages | `index.html:258` | SKIP |
+| L14 | Inline onclick handlers throughout | `index.html` | SKIP |
+| L15 | `APP_VERSION` manually bumped | `app.js:18` | SKIP |
+| L16 | Scraping regex is fragile | `scraping.js:43` | SKIP |
+| L17 | `touchSessionTimestamp` failure causes 500 | `auth.js` | DONE |
+| L18 | NaN propagation from "Season Ended" CURRENT_WEEK | multiple files | SKIP |
+| L19 | `formatScore` mutates score type (number to string) | `getLeaderboardData.js:188-194` | SKIP |
 
 ---
 
