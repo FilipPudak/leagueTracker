@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS match_results (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   season_id INTEGER NOT NULL,
   round INTEGER NOT NULL,
-  melee_match_id INTEGER,
+  melee_match_id TEXT,
   player1_id TEXT NOT NULL,
   player2_id TEXT NOT NULL,
   winner_id TEXT,

@@ -62,7 +62,7 @@ function buildMockFetch(overrides = {}) {
     if (url.includes('/api/tournament/list')) {
       return { ok: true, status: 200, text: async () => JSON.stringify({ Content: tournaments, TotalCount: tournaments.length }) };
     }
-    if (url.includes('/api/standings')) {
+    if (url.includes('/api/standing/list/current/')) {
       return { ok: true, status: 200, text: async () => JSON.stringify({ Content: standings }) };
     }
     if (url.includes('/api/match/list/')) {
@@ -80,12 +80,12 @@ function makeMockClient(fetchFn) {
       const r = await fetchFn('https://melee.gg/api/tournament/list');
       return JSON.parse(await r.text());
     }
-    async getStandings() {
-      const r = await fetchFn('https://melee.gg/api/standings');
+    async getStandings(id) {
+      const r = await fetchFn(`https://melee.gg/api/standing/list/current/${id}`);
       return JSON.parse(await r.text());
     }
-    async getMatches() {
-      const r = await fetchFn('https://melee.gg/api/match/list/1');
+    async getMatches(id) {
+      const r = await fetchFn(`https://melee.gg/api/match/list/${id}`);
       return JSON.parse(await r.text());
     }
   };
@@ -146,6 +146,7 @@ describe('triggers/syncFromMelee', () => {
       { ID: 100, Name: 'SWU Wednesday league season 6 01/01 (week 1)', StartDate: '2026-01-01T19:00:00' },
       { ID: 200, Name: 'SWU TWI Store Championship', StartDate: '2026-01-02T19:00:00' },
       { ID: 201, Name: 'SWU Wednesday league season 6 TOP 8 08/01', StartDate: '2026-01-08T19:00:00' },
+      { ID: 202, Name: 'SWU Wednesday league season 6 clone 15/01', StartDate: '2026-01-15T19:00:00' },
     ];
     db = createMockDb(withSeasonStarted(makeTables()));
     const { mockFetch } = buildMockFetch({ tournaments: mixed });
@@ -157,7 +158,8 @@ describe('triggers/syncFromMelee', () => {
     const ids = store.melee_tournaments.map(t => t.melee_id);
     assert.ok(ids.includes(100), 'league tournament kept');
     assert.ok(!ids.includes(200), 'store championship excluded');
-    assert.ok(!ids.includes(201), 'TOP 8 excluded');
+    assert.ok(ids.includes(201), 'TOP 8 included');
+    assert.ok(!ids.includes(202), 'clone excluded');
   });
 
   it('stores standings in season_standings', async () => {

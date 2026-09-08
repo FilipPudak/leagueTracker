@@ -2,8 +2,8 @@ import { MeleeClient } from '../lib/melee.js';
 import { getSettings, updateSetting, parseSeasonId, parseWeek, isSeasonStarted, isVotingOpen, findPlayerByMelee, getAllActivePlayers } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, writePodiumBlock } from '../lib/awards.js';
 
-const LEAGUE_REGEX = /^SWU Wednesday league(?: season (\d+))?\s+\d{1,2}\/\d{1,2}/i;
-const EXCLUDED_KEYWORDS = ['top 8', 'top 4', 'best of the rest', 'playoff', 'championship', 'prerelease', 'draft', 'clone', 'budget draft'];
+const LEAGUE_REGEX = /^SWU Wednesday league(?: season (\d+))?(?:\s+\d{1,2}\/\d{1,2}|\s+(?:top [48]|best of the rest|playoff|championship|finale))/i;
+const EXCLUDED_KEYWORDS = ['prerelease', 'draft', 'clone', 'budget draft'];
 
 function isLeagueTournament(name) {
   if (!LEAGUE_REGEX.test(name)) return false;
@@ -80,22 +80,22 @@ export async function syncFromMelee(env, deps = {}) {
       if (!isLeagueTournament(t.Name)) continue;
       const info = extractSeasonAndRound(t.Name);
       if (!info) continue;
-      if (info.seasonNum && info.seasonNum !== activeSeasonId) continue;
+      if (info.seasonNum !== activeSeasonId) continue;
       matchedTournaments.push({ ...t, extractedWeek: info.week });
     }
 
-    const total = response.TotalCount || 0;
+    const total = response.RecordsTotal || response.TotalCount || 0;
     page++;
     hasMore = page * pageSize < total && content.length > 0;
   }
 
-  matchedTournaments.sort((a, b) => new Date(a.StartDate) - new Date(b.StartDate));
+  matchedTournaments.sort((a, b) => new Date(a.StartDate || a.LastPairDateTime) - new Date(b.StartDate || b.LastPairDateTime));
 
   const weekMap = new Map();
   let seq = 1;
   for (const t of matchedTournaments) {
     const round = t.extractedWeek || seq++;
-    weekMap.set(t.ID, { meleeId: t.ID, round, name: t.Name, date: t.StartDate });
+    weekMap.set(t.ID, { meleeId: t.ID, round, name: t.Name, date: t.StartDate || t.LastPairDateTime || null });
   }
 
   const seasonLength = weekMap.size || 11;
@@ -184,28 +184,25 @@ export async function syncFromMelee(env, deps = {}) {
       const p2Id = findPlayerIdByMelee(allPlayers, p2Username);
       if (!p1Id || !p2Id) continue;
 
-      const winnerGuid = m.WinnerId;
+      const p1Wins = comps[0].GameWins || 0;
+      const p2Wins = comps[1].GameWins || 0;
       let winnerId = null;
-      if (winnerGuid) {
-        if (comps[0].Team?.ID === winnerGuid || comps[0].Team?.Players?.[0]?.ID === winnerGuid) {
-          winnerId = p1Id;
-        } else if (comps[1].Team?.ID === winnerGuid || comps[1].Team?.Players?.[0]?.ID === winnerGuid) {
-          winnerId = p2Id;
-        }
-      }
+      if (p1Wins > p2Wins) winnerId = p1Id;
+      else if (p2Wins > p1Wins) winnerId = p2Id;
 
       const isBye = !!m.ByeReason;
 
+      const matchGuid = m.Guid || m.ID;
       try {
         await DB.prepare(
           'DELETE FROM match_results WHERE season_id = ? AND round = ? AND melee_match_id = ?'
-        ).bind(activeSeasonId, info.round, m.ID).run();
+        ).bind(activeSeasonId, info.round, matchGuid).run();
         await DB.prepare(
           'INSERT INTO match_results (season_id, round, melee_match_id, player1_id, player2_id, winner_id, result, is_bye) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         ).bind(
           activeSeasonId,
           info.round,
-          m.ID,
+          matchGuid,
           p1Id,
           p2Id,
           winnerId,

@@ -1,7 +1,7 @@
 # Melee API Integration Plan
 
-**Status:** Draft — ready for implementation
-**Date:** 2026-09-06
+**Status:** Implemented — backfill complete
+**Date:** 2026-09-08
 **Goal:** Replace HTML scraping with Melee.gg API calls, add match history, enable richer features.
 
 ---
@@ -16,8 +16,8 @@ Replace all scraping of `stockholm.sw-unlimited.com` with direct calls to the Me
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Player ID | Keep P001 system, add `melee_guid` | P001 is embedded in 5 FK tables; minimal migration |
-| Player fields | Only add `melee_guid` | Keep minimal, add more later if needed |
+| Player ID | Keep P001 system, no `melee_guid` column | `melee_name` is sufficient for linking; P001 is embedded in FK tables |
+| Player fields | Only `melee_name` (no `melee_guid`) | Keep minimal, add more later if needed |
 | Schema approach | Enhance existing players table | Simpler than junction table |
 | Sync schedule | Wednesday 22:15 (single trigger) | After league night ends at 22:00 |
 | Season gating | `SEASON_STARTED` flag | Gates cron between seasons; `VOTING_OPEN` distinguishes first run from advances |
@@ -26,6 +26,294 @@ Replace all scraping of `stockholm.sw-unlimited.com` with direct calls to the Me
 | Opponent filtering | Show only players faced that week | Requires match data before voting opens |
 | Melee auth | HTTP Basic Auth (base64(clientId:clientSecret)) | No OAuth, no token refresh needed |
 | Secrets storage | `.env` (local) + Cloudflare dashboard (prod) | Not in `wrangler.toml` |
+
+---
+
+## Melee.gg API — Confirmed Facts
+
+### Authentication
+
+- **Type:** HTTP Basic Auth
+- **Header:** `Authorization: Basic base64(CLIENT_ID:CLIENT_SECRET)`
+- **Storage:** `.env` (local dev), Cloudflare dashboard encrypted vars (production)
+- **No token refresh** — each request independently authenticated
+
+### Pagination
+
+**WRONG assumption in original plan:** `Skip` and `Take` query params.
+**CORRECT:** Use `variables.page` (1-based) and `variables.pageSize`.
+
+```
+GET /api/tournament/list?Game=StarWarsUnlimited&variables.page=1&variables.pageSize=50
+```
+
+`Skip`/`Take` are ignored by the API. The response includes `HasMore`, `RecordsTotal`, `Content`.
+
+### Response Format
+
+All response fields use **PascalCase** (`Content`, `ID`, `Username`, `GameWins`, etc.).
+
+### Match Objects — No `ID` Field
+
+**WRONG assumption:** Matches have an `ID` field like tournaments do.
+**CORRECT:** Matches have a `Guid` field (UUID string). No numeric `ID`.
+
+```
+Match.Guid = "06f85bd4-a182-4cb0-9625-b2900124b00c"
+```
+
+The `melee_match_id` column in `match_results` stores this GUID as TEXT.
+
+### Winner Determination
+
+**WRONG assumption:** Match objects have a `WinnerId` field.
+**CORRECT:** No `WinnerId`. Compare `Competitors[i].GameWins` to determine winner.
+
+### Date Field
+
+**WRONG assumption:** Tournament objects have a `StartDate` field.
+**CORRECT:** Use `LastPairDateTime` as fallback. No `StartDate` field exists.
+
+### Standings Endpoint
+
+**CONFIRMED:** `/api/standing/list/current/{tournamentId}`
+
+### Standings Object Fields
+
+```
+Rank, Points, MatchWins, MatchDraws, MatchLosses, MatchCount
+GameWins, GameDraws, GameLosses, GameCount
+OpponentMatchWinPercentage, OpponentGameWinPercentage, TeamGameWinPercentage
+TeamId, TournamentId, PhaseId, RoundNumber
+Team.Players[].Username, Team.Players[].DisplayName, Team.Players[].Name
+```
+
+### Match Object Fields
+
+```
+Competitors[].Team.Players[].Username, .DisplayName, .Name
+Competitors[].GameWins, Competitors[].GameByes
+Guid (not ID), ByeReason, ResultString, RoundNumber
+TournamentId, PhaseId, RoundId
+```
+
+### Tournament Object Fields
+
+```
+ID (numeric), Name, Game, Status, StatusDescription
+LastPairDateTime, Formats[], OrganizationId
+Phases[].Rounds[].ID, .Name, .SortOrder
+```
+
+No `NumberOfRounds` field — derive from `Phases[0].Rounds.length`.
+
+---
+
+## Tournament Name Patterns
+
+### Regular League Weeks (with date)
+
+- **Season 1:** `SWU Wednesday league {DD/MM}` (no season number)
+- **Seasons 2-4:** `SWU Wednesday league season {N} {DD/MM}` (no explicit week)
+- **Seasons 5+:** `SWU Wednesday league season {N} {DD/MM} (week {W})` (explicit week)
+
+### Special Tournaments (no date, but valuable data)
+
+- **Top 8 / Top 4:** Championship bracket — reveals season champion
+- **Playoff (championship):** Same as Top 8, different naming
+- **Best of the Rest:** Non-championship bracket data
+- **Finale:** Non-championship bracket for players who didn't make Top 8
+
+### Excluded Tournaments
+
+- `prerelease`, `draft`, `clone`, `budget draft` — not league data
+- Non-league: `SWU DL TWI`, `SWU TWI`, `SWU CardExpo`, etc. — don't match regex at all
+
+### Regex (Current — Includes Special Tournaments)
+
+```js
+const LEAGUE_REGEX = /^SWU Wednesday league(?: season (\d+))?(?:\s+\d{1,2}\/\d{1,2}|\s+(?:top [48]|best of the rest|playoff|championship|finale))/i;
+const EXCLUDED_KEYWORDS = ['prerelease', 'draft', 'clone', 'budget draft'];
+```
+
+This matches both regular league weeks (date pattern) and special tournaments (keyword pattern).
+
+### Why Top 8/Top 4 Are Included
+
+These reveal who was the **Champion** of each season. Valuable for leaderboard display.
+
+---
+
+## Season 1 — The No-Season-Number Problem
+
+Season 1 tournaments have no `season X` in their names:
+```
+SWU Wednesday league 9/10
+SWU Wednesday league 16/10
+...
+SWU Wednesday league Top 8
+SWU Wednesday league finale (for everyone that didnt make top 8)
+```
+
+`extractSeasonAndRound()` returns `{ seasonNum: null, week: null }` for these.
+
+**Solution:** Null-season tournaments default to season 1:
+```js
+const seasonNum = info.seasonNum || 1;
+if (targetSeasonId && seasonNum !== targetSeasonId) continue;
+```
+
+This correctly:
+- Assigns S1 tournaments to season 1 when `targetSeasonId=1`
+- Blocks S1 tournaments from other seasons when `targetSeasonId=7`
+- Includes S1 tournaments in untargeted backfills (defaults to season 1)
+
+---
+
+## Tournament Counts Per Season (Verified from API)
+
+| Season | Regular Weeks | Special | Total |
+|--------|--------------|---------|-------|
+| 1 | 10 | Top 8, Finale | 12 |
+| 2 | 14 | Best of the Rest, Top 8 | 17 |
+| 3 | 15 | TOP 8, Best of the Rest | 17 |
+| 4 | 15 | TOP 8, Best of the Rest | 17 |
+| 5 | 11 | Playoff (championship) | 12 |
+| 6 | 11 | Best of the Rest, TOP 4 | 13 |
+| 7 | 1 | — | 1 (as of 2026-09-08) |
+
+**Notable exclusions:**
+- `269699 SWU Wednesday league season 2` — no date, no special keyword, 0 standings/matches
+- `392843 SWU Wednesday league season 4 10/12 clone` — excluded by "clone" keyword, 0 data
+- `235731 \tSWU Wednesday league season 2 29/1` — has leading tab (user corrected this)
+
+---
+
+## Schema Changes (Implemented)
+
+### `seasons` table
+
+```sql
+CREATE TABLE IF NOT EXISTS seasons (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  created_date TEXT
+);
+```
+
+### `melee_tournaments` table
+
+```sql
+CREATE TABLE IF NOT EXISTS melee_tournaments (
+  melee_id INTEGER PRIMARY KEY,
+  season_id INTEGER NOT NULL,
+  round INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  date TEXT,
+  FOREIGN KEY (season_id) REFERENCES seasons(id)
+);
+```
+
+### `season_standings` table
+
+```sql
+CREATE TABLE IF NOT EXISTS season_standings (
+  season_id INTEGER NOT NULL,
+  round INTEGER NOT NULL,
+  player_id TEXT NOT NULL,
+  wins INTEGER DEFAULT 0,
+  losses INTEGER DEFAULT 0,
+  draws INTEGER DEFAULT 0,
+  match_points INTEGER DEFAULT 0,
+  rank INTEGER,
+  PRIMARY KEY (season_id, round, player_id),
+  FOREIGN KEY (season_id) REFERENCES seasons(id),
+  FOREIGN KEY (player_id) REFERENCES players(id)
+);
+```
+
+### `match_results` table
+
+```sql
+CREATE TABLE IF NOT EXISTS match_results (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  season_id INTEGER NOT NULL,
+  round INTEGER NOT NULL,
+  melee_match_id TEXT,
+  player1_id TEXT NOT NULL,
+  player2_id TEXT NOT NULL,
+  winner_id TEXT,
+  result TEXT,
+  is_bye INTEGER DEFAULT 0,
+  FOREIGN KEY (season_id) REFERENCES seasons(id),
+  FOREIGN KEY (player1_id) REFERENCES players(id),
+  FOREIGN KEY (player2_id) REFERENCES players(id)
+);
+```
+
+**Note:** `melee_match_id` is TEXT (stores UUID strings from Melee API `Guid` field).
+
+---
+
+## Critical Bugs Found and Fixed
+
+### 1. Match ID was `undefined`
+
+**Bug:** Code used `m.ID` but match objects have no `ID` field — only `Guid`.
+**Fix:** `const matchGuid = m.Guid || m.ID;`
+**Impact:** 0 matches inserted across all backfill runs.
+
+### 2. Foreign Key: No season row
+
+**Bug:** `season_standings` and `match_results` have `FOREIGN KEY (season_id) REFERENCES seasons(id)`, but backfill never created season rows.
+**Fix:** `INSERT OR IGNORE INTO seasons (id, name, created_date)` before inserting data.
+**Impact:** All standings/matches inserts failed with FK constraint.
+
+### 3. Foreign Key: Player not in DB
+
+**Bug:** `findOrCreatePlayer` used `INSERT OR IGNORE` with a generated ID. If a player already existed with the same `melee_name`, the INSERT was silently ignored but the function returned the non-existent generated ID.
+**Fix:** Check `SELECT id FROM players WHERE melee_name = ?` before generating a new ID.
+**Impact:** All standings/matches inserts failed with FK constraint.
+
+### 4. Season assignment leak
+
+**Bug:** `info.seasonNum || targetSeasonId` caused tournaments without a season number (S1) to be assigned to whatever season was being backfilled.
+**Fix:** `info.seasonNum || 1` — null-season always means season 1.
+**Impact:** S1 tournaments appeared in S2-S7 backfills.
+
+### 5. Subrequest limit
+
+**Bug:** Cloudflare Workers has a 50 subrequest limit per invocation. Each tournament requires 2 API calls (standings + matches) + multiple D1 queries.
+**Fix:** `maxTournaments` parameter caps how many tournaments are processed per invocation. Default 15, run with 3-5 for safety.
+**Impact:** Backfill fails with "Too many API requests" without batching.
+
+### 6. Excluded championship tournaments
+
+**Bug:** Original `EXCLUDED_KEYWORDS` included `top 8`, `top 4`, `best of the rest`, `playoff`, `championship`.
+**Fix:** Removed from exclusions, updated regex to match them.
+**Impact:** Championship data (season winners) was being lost.
+
+### 7. SQLite type affinity
+
+**Note:** `melee_match_id` column is INTEGER in schema but stores TEXT (UUID strings). SQLite is flexible with types — this works. No migration needed. D1 does not support `ALTER COLUMN`.
+
+---
+
+## Backfill State (as of 2026-09-08)
+
+| Season | Tournaments | Standings Rounds | Match Rounds |
+|--------|------------|-----------------|--------------|
+| 1 | 12 | 11 | 11 |
+| 2 | 14 | 22* | 22* |
+| 3 | 17 | 17 | 17 |
+| 4 | 17 | 17 | 17 |
+| 5 | 12 | 11 | 11 |
+| 6 | 13 | 10 | 9 |
+| 7 | 1 | 3 | 3 |
+
+*Season 2 has 22 distinct rounds but only 14 tournaments — round numbers are offset from earlier buggy backfill runs. Data is correct, just cosmetic round numbering issue.
+
+**Totals:** 77 players, 86 tournaments, 1252 standings, 1945 matches
 
 ---
 
@@ -51,8 +339,6 @@ Season length varies per season — determined dynamically from the count of wee
 | Wed 22:15 (run 2) | TRUE | TRUE | Week 1 → Week 2 | Advance |
 | Players vote Week 2 | TRUE | TRUE | Week 2 | — |
 | ... | ... | ... | ... | ... |
-| Wed 22:15 (run 11) | TRUE | TRUE | Week 10 → Week 11 | Advance |
-| Players vote Week 11 | TRUE | TRUE | Week 11 | — |
 | Wed 22:15 (run 12) | TRUE → FALSE | TRUE → FALSE | Week 11 → Season Ended | Close, awards, season end |
 
 ### Cron Logic (pseudocode)
@@ -85,273 +371,51 @@ Season length varies per season — determined dynamically from the count of wee
 
 ---
 
-## Melee API Integration
+## Sync Flow (syncFromMelee.js)
 
-### Authentication
-
-- **Type:** HTTP Basic Auth
-- **Header:** `Authorization: Basic base64(CLIENT_ID:CLIENT_SECRET)`
-- **Storage:** `.env` (local dev), Cloudflare dashboard encrypted vars (production)
-- **No token refresh** — each request independently authenticated
-
-### Rate Limiting
-
-- **Conservative rate:** 1 request per second (configurable)
-- **Retry on 429:** Exponential backoff (1s → 2s → 4s → 8s), max 3 retries
-- **Retry on 5xx:** Same backoff for server errors
-- **Respect headers:** If Melee returns `Retry-After` header, honor it
-- **Logging:** Log every 429 hit with URL and retry count
-
-### API Endpoints
-
-| Endpoint | Purpose | Returns |
-|---|---|---|
-| `GET /api/tournament/list` | List tournaments (paginated, date-filtered) | Tournament DTOs |
-| `GET /api/tournament/{id}` | Tournament metadata | Phases, Rounds (derived count) |
-| `GET /api/standing/list/current/{id}` | Current standings | Rank, W/D/L, game stats, OMWP |
-| `GET /api/match/list/{id}` | All matches for tournament | Players, scores, bye/forfeit flags |
-| `GET /api/player/list/{id}` | Tournament participants | Player objects with IDs |
-
-**Note:** All response fields use PascalCase (`Content`, `ID`, `Username`, `GameWins`, etc.).
-
-### API Call Budget
-
-| Call | Count per sync | Notes |
-|---|---|---|
-| `listTournaments()` | 1 | Paginated, might need 2-3 pages |
-| `getStandings(id)` | 12 | One per round |
-| `getMatches(id)` | 12 | One per round |
-| **Total** | ~25 | At 1 req/sec = ~25 seconds |
-
-### Backfill Budget
-
-| Seasons | Rounds | Calls | Time at 1 req/sec |
-|---|---|---|---|
-| Season 6 (current) | 12 | 25 | 25 sec |
-| Seasons 1-5 (backfill) | 5 × 12 | 120 | ~2 min |
-| **Total** | | 145 | ~2.5 min |
-
----
-
-## Database Schema Changes
-
-### Enhanced `players` table
-
-```sql
-ALTER TABLE players ADD COLUMN melee_guid TEXT;
-```
-
-### New `melee_tournaments` table
-
-```sql
-CREATE TABLE IF NOT EXISTS melee_tournaments (
-  melee_id INTEGER PRIMARY KEY,
-  season_id INTEGER NOT NULL,
-  round_number INTEGER NOT NULL,
-  name TEXT,
-  synced_at TEXT,
-  FOREIGN KEY (season_id) REFERENCES seasons(id),
-  UNIQUE(season_id, round_number)
-);
-```
-
-### New `season_standings` table
-
-```sql
-CREATE TABLE IF NOT EXISTS season_standings (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  season_id INTEGER NOT NULL,
-  round_number INTEGER NOT NULL,
-  player_id TEXT,
-  melee_username TEXT,
-  rank INTEGER,
-  points INTEGER,
-  match_wins INTEGER,
-  match_draws INTEGER,
-  match_losses INTEGER,
-  game_wins INTEGER,
-  game_draws INTEGER,
-  game_losses INTEGER,
-  omwp REAL,
-  synced_at TEXT,
-  FOREIGN KEY (season_id) REFERENCES seasons(id),
-  UNIQUE(season_id, round_number, melee_username)
-);
-```
-
-### New `match_results` table
-
-```sql
-CREATE TABLE IF NOT EXISTS match_results (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  season_id INTEGER NOT NULL,
-  round_number INTEGER NOT NULL,
-  melee_tournament_id INTEGER,
-  player1_melee TEXT,
-  player2_melee TEXT,
-  player1_id TEXT,
-  player2_id TEXT,
-  player1_wins INTEGER DEFAULT 0,
-  player2_wins INTEGER DEFAULT 0,
-  draws INTEGER DEFAULT 0,
-  winner_id TEXT,
-  is_bye INTEGER DEFAULT 0,
-  is_forfeit INTEGER DEFAULT 0,
-  draw_type TEXT,
-  synced_at TEXT,
-  FOREIGN KEY (season_id) REFERENCES seasons(id)
-);
-```
-
----
-
-## New Files
-
-### `backend/src/lib/melee.js` — API Client
-
-```js
-// Exported functions:
-listTournaments({ startDateFrom, startDateTo, page, pageSize })
-getStandings(tournamentId)
-getMatches(tournamentId)
-getParticipants(tournamentId)
-getTournament(tournamentId)
-
-// Internal:
-makeRequest(path)  // Basic Auth, rate limit, retry with backoff
-```
-
-### `backend/src/triggers/syncFromMelee.js` — Weekly Sync
-
-**Tournament Naming Patterns (from actual data, 155 SWU tournaments):**
-
-Regular league weeks contain a date (`D/M` or `DD/MM`) in the title:
-- Season 1: `SWU Wednesday league {DD/MM}` (no season number)
-- Seasons 2-4: `SWU Wednesday league season {N} {DD/MM}` (no explicit week)
-- Seasons 5+: `SWU Wednesday league season {N} {DD/MM} (week {W})` (explicit week)
-
-**Excluded tournaments** (contain date but are NOT weekly league rounds):
-- `TOP 8`, `TOP 4`, `Best of the Rest`, `Playoff`, `championship`
-- `Prerelease`, `Draft`, `clone`, `Budget Draft`
-- Non-league: `SWU DL TWI`, `SWU TWI`, `SWU CardExpo`, etc.
-
-**Regex:** `/^SWU Wednesday league(?: season (\d+))?\s+\d{1,2}\/\d{1,2}/i`
-
-This matches all regular weekly league tournaments (with date) across all seasons. Week numbers are derived by sorting matched tournaments by date within each season. Explicit `(week N)` is used when present; otherwise sequential from date order.
-
-Season length varies per season — determined dynamically from the count of matched tournaments.
-
-**Flow:**
 1. Check `SEASON_STARTED` → skip if FALSE
-2. `listTournaments()` with date range for current season
-3. Filter by regex to get season's weekly league tournaments
-4. Store/update `melee_tournaments` mapping
-5. For each tournament in current season:
+2. Fetch all tournaments via `listTournaments()` (paginated)
+3. Filter by regex to get current season's league + special tournaments
+4. Sort by date, assign round numbers (use `(week N)` if present, else sequential)
+5. Store new tournaments in `melee_tournaments`
+6. For each tournament not yet synced:
    - `getStandings(id)` → match `Username` to `players.melee_name` → store in `season_standings`
    - `getMatches(id)` → match `Competitors[].Team.Players[].Username` → store in `match_results`
-6. Record attendance from standings presence
-7. Mark all players inactive, re-activate from standings
-8. Advance week logic (see Season Lifecycle section)
-9. Refresh awards from new data
+7. Record attendance from standings presence
+8. Mark all players inactive, re-activate from standings
+9. Advance week logic (see Season Lifecycle section)
+10. Refresh awards from new data
 
 ---
 
-## Modified Files
+## Backfill Flow (backfillFromMelee.js)
 
-### `backend/schema.sql`
-- Add 3 new tables (melee_tournaments, season_standings, match_results)
-- ALTER players ADD COLUMN melee_guid
+1. Fetch all tournaments via `listTournaments()` (paginated, all pages)
+2. Filter by regex + excluded keywords
+3. Group by season number (null → season 1)
+4. For each season group:
+   - Create season row if missing (`INSERT OR IGNORE INTO seasons`)
+   - Check existing tournaments and synced rounds in DB
+   - Insert new tournament rows
+   - For each non-synced tournament (up to `maxTournaments`):
+     - `getStandings(id)` → create players on-the-fly → store standings
+     - `getMatches(id)` → create players on-the-fly → store matches
+5. Return summary: tournaments, standings, matches counts
 
-### `backend/src/db/queries.js`
-- Add `isSeasonStarted(settingValue)` helper
-
-### `backend/src/db/data.sql`
-- Add `SEASON_STARTED` row to settings
-
-### `backend/src/index.js`
-- Import `syncFromMelee` instead of `syncPlayers` and `advanceWeek`
-- Change cron schedule to `["15 22 * * 3"]`
-- Remove old cron handlers
-
-### `backend/src/handlers/startNewSeason.js`
-- Set `SEASON_STARTED = TRUE` instead of `VOTING_OPEN = TRUE`
-- Set `VOTING_OPEN = FALSE`
-
-### `backend/src/handlers/getAppData.js`
-- Add opponent filtering: when voting is open and match data exists for current round, return only players the voter faced
-- Fall back to all active players if no match data
-
-### `backend/src/handlers/getLeaderboardData.js`
-- Read Ruler/New Hope from `season_standings` table (not scraping)
-- Bounty Hunter: read from `awards` table (computed at season end)
-- No more live scraping fallback
-
-### `backend/wrangler.toml`
-- Change cron: `["15 22 * * 3"]`
-- Remove old crons: `["30 8 * * 1", "0 9 * * 1"]`
-
-### `.env.example`
-- Add Melee API credentials:
-  ```
-  MELEE_CLIENT_ID=
-  MELEE_CLIENT_SECRET=
-  ```
-
----
-
-## Deleted Files
-
-| File | Reason |
-|---|---|
-| `backend/src/lib/scraping.js` | Replaced by `melee.js` |
-| `backend/src/triggers/syncPlayers.js` | Replaced by `syncFromMelee.js` |
-| `backend/src/triggers/advanceWeek.js` | Merged into `syncFromMelee.js` |
-
----
-
-## Audit: `votingOpen` Gates
-
-### Gate A — Switch to `seasonStarted`
-
-| File | Line | Current Check | Change |
-|---|---|---|---|
-| `triggers/advanceWeek.js` | 23 | `if (!votingOpen \|\| !activeSeasonId)` | Switch to `SEASON_STARTED` |
-| `triggers/syncPlayers.js` | 24 | `if (!votingOpen \|\| !activeSeasonId)` | Switch to `SEASON_STARTED` |
-
-### Gate B — Keep `votingOpen`
-
-| File | Line | Current Check | Why Keep |
-|---|---|---|---|
-| `handlers/submitVote.js` | 29-33 | `if (!isVotingOpen(votingOpenVal))` | Core vote-submission gate |
-
-### Gate C — Keep `votingOpen`
-
-| File | Line(s) | What It Gates |
-|---|---|---|
-| `handlers/getAppData.js` | 14, 67 | Pass-through to frontend |
-| `handlers/linkAccount.js` | 56-57, 85 | Pass-through to frontend |
-| `handlers/getLeaderboardData.js` | 31, 74, 92, 118, 131 | Privacy masking, round selection |
-
-### Setters
-
-| File | Line | Change |
-|---|---|---|
-| `handlers/startNewSeason.js` | 24 | Set `SEASON_STARTED=TRUE`, `VOTING_OPEN=FALSE` |
-| `triggers/advanceWeek.js` | 94 | Set `VOTING_OPEN=FALSE` (season end) |
-| `triggers/advanceWeek.js` | 101 | Remove (voting stays open) |
+**Batching:** `maxTournaments` parameter (default 15) caps API calls per invocation due to Cloudflare Workers 50 subrequest limit. Use 3-5 for safe backfill runs.
 
 ---
 
 ## Frontend: Opponent Filtering
 
-When match data exists for the current round, the opponent dropdown should show only players the voter faced that week.
+When match data exists for the current round, the opponent dropdown shows only players the voter faced that week.
 
 **Backend query:**
 ```sql
 SELECT DISTINCT
   CASE WHEN mr.player1_id = ? THEN mr.player2_id ELSE mr.player1_id END as id
 FROM match_results mr
-WHERE mr.season_id = ? AND mr.round_number = ?
+WHERE mr.season_id = ? AND mr.round = ?
   AND (mr.player1_id = ? OR mr.player2_id = ?)
   AND (mr.player1_id IS NOT NULL AND mr.player2_id IS NOT NULL)
 ```
@@ -369,7 +433,7 @@ WHERE mr.season_id = ? AND mr.round_number = ?
 -- Get previous season's top 4
 SELECT player_id FROM season_standings
 WHERE season_id = ?
-AND round_number = (SELECT MAX(round_number) FROM season_standings WHERE season_id = ?)
+AND round = (SELECT MAX(round) FROM season_standings WHERE season_id = ?)
 ORDER BY rank ASC LIMIT 4
 
 -- Count wins against those players this season
@@ -385,109 +449,10 @@ GROUP BY winner_id ORDER BY wins DESC LIMIT 3
 | Test File | Change |
 |---|---|
 | `test/helpers/fixtures.js` | Add `SEASON_STARTED` to `basicTables()` and `closedVotingTables()` |
-| `test/triggers/advanceWeek.test.js` | Update gate checks, add `SEASON_STARTED` |
-| `test/triggers/syncPlayers.test.js` | Update gate checks, add `SEASON_STARTED` |
-| `test/handlers/startNewSeason.test.js` | Expect `SEASON_STARTED=TRUE`, `VOTING_OPEN=FALSE` |
-| `test/handlers/getAppData.test.js` | Add opponent filtering tests |
-| New: `test/lib/melee.test.js` | Melee API client tests |
-| New: `test/triggers/syncFromMelee.test.js` | New trigger tests |
-
----
-
-## Migration Order
-
-1. Add `SEASON_STARTED` to `settings` table (schema + data.sql)
-2. Add `melee_guid` column to `players` table
-3. Create `melee_tournaments`, `season_standings`, `match_results` tables
-4. Add `isSeasonStarted()` to `queries.js`
-5. Deploy `melee.js` (API client)
-6. Deploy `syncFromMelee.js` (new trigger)
-7. Update `startNewSeason.js` (set `SEASON_STARTED`, not `VOTING_OPEN`)
-8. Update `index.js` (new cron, new imports)
-9. Update `wrangler.toml` (new cron schedule)
-10. Update `.env.example` (Melee credentials)
-11. Test with current season (Season 6)
-12. Update `getAppData.js` (opponent filtering)
-13. Update `getLeaderboardData.js` (read from DB)
-14. Update fixtures and tests
-15. Remove `scraping.js`, `syncPlayers.js`, `advanceWeek.js`
-16. Run backfill for historical seasons
-
----
-
-## Edge Cases
-
-| Edge Case | Handling |
-|---|---|
-| First sync after `startNewSeason` | `VOTING_OPEN=FALSE` → opens voting, doesn't advance |
-| Melee API down during sync | Retry with backoff, log error, skip that round |
-| 429 rate limit hit | Exponential backoff (1s→2s→4s→8s), max 3 retries |
-| Player username mismatch | Log unresolved matches, manual fix via admin |
-| No match data for opponent filtering | Fall back to all active players |
-| Season ends, no match data for Bounty Hunter | Insert placeholder (current behavior) |
-| Historical seasons have no Melee data | Backfill with regex matching on tournament names |
-| Tournament name pattern changes | Make regex configurable in settings table |
-
----
-
-## Melee API Data Fields
-
-**All fields use PascalCase.** Confirmed from live API probe.
-
-### Standing Object
-```
-Rank, Points
-MatchWins, MatchDraws, MatchLosses, MatchCount
-GameWins, GameDraws, GameLosses, GameCount
-OpponentMatchWinPercentage, OpponentGameWinPercentage, TeamGameWinPercentage
-RoundNumber, PhaseId, TournamentId
-TeamId
-Team.ID, Team.Players[].ID, Team.Players[].Username, Team.Players[].DisplayName
-```
-
-### Match Object
-```
-Competitors[].Team.ID, Competitors[].Team.Players[].ID, Competitors[].Team.Players[].Username
-Competitors[].GameWins, Competitors[].GameByes
-Competitors[].TeamId, Competitors[].ID
-ByeReason (null = no bye), ByeReasonDescription
-RoundNumber, RoundId, PhaseId, TournamentId
-GameDraws, HasResult, ResultString, Type, TypeDescription
-```
-
-### Tournament Object
-```
-ID, Guid, Name, Game, Status, StatusDescription
-Formats[], OrganizationId, OrganizationName, SearchTags
-CurrentPhaseId, LastPairDateTime
-Phases[].ID, Phases[].Name, Phases[].Rounds[].ID, Phases[].Rounds[].Name, Phases[].Rounds[].SortOrder
-```
-**Note:** No `NumberOfRounds` field — derive from `Phases[0].Rounds.length`.
-
-### Player Object
-```
-ID, Username, DisplayName, FirstName, LastName, PlayerName
-TeamId, TournamentId, Status, StatusDescription
-AsmoConnectId, Email
-```
-
----
-
-## Backfill Strategy
-
-1. Call `listTournaments()` with date ranges for each past season
-2. Match tournaments by regex: `/^SWU Wednesday league(?: season (\d+))?\s+\d{1,2}\/\d{1,2}/i`
-3. For each matched tournament:
-   - Extract season number from group 1 (null = season 1)
-   - Sort tournaments by date within season to determine round order
-   - If `(week (\d+))` present, use that as round number; otherwise use position
-4. Fetch standings and matches for each tournament
-5. Store in new tables
-6. Compute awards retroactively
-
-Season length is dynamic — determined from the count of matched tournaments per season (not assumed 11).
-
-This can be run as a one-time script or triggered manually via admin action.
+| `test/triggers/syncFromMelee.test.js` | Updated: TOP 8 now included (not excluded) |
+| `test/triggers/backfillFromMelee.test.js` | Tests for new `maxTournaments` param, FK fixes, Guid usage |
+| `test/lib/melee.test.js` | Updated for `variables.page` pagination params |
+| `test/router.test.js` | Updated for backfillFromMelee routing |
 
 ---
 
@@ -498,3 +463,6 @@ This can be run as a one-time script or triggered manually via admin action.
 - Players don't report decklists in Melee (leader dropdown stays manual)
 - Bounty Hunter requires previous season's top 4 (won't work for Season 1)
 - No cross-tournament player history endpoint (must aggregate per-tournament)
+- D1 does not support `ALTER COLUMN` — column type changes require table rebuild
+- Cloudflare Workers 50 subrequest limit per invocation — backfill must be batched
+- SQLite stores TEXT in INTEGER columns via type affinity (works but not ideal)

@@ -48,16 +48,14 @@ export class MeleeClient {
     throw new Error(`Melee API request failed after ${MAX_RETRIES} retries: ${lastError?.message}`);
   }
 
-  async listTournaments(orgId, skip, take) {
-    const params = { Game: 'StarWarsUnlimited', Skip: skip, Take: take };
+  async listTournaments(orgId, page, take) {
+    const params = { Game: 'StarWarsUnlimited', 'variables.page': page + 1, 'variables.pageSize': take };
     if (orgId != null) params.OrganizationId = orgId;
     return this._fetch('/api/tournament/list', params);
   }
 
   async getStandings(tournamentId) {
-    return this._fetch('/api/standings', {
-      tournamentId,
-    });
+    return this._fetch(`/api/standing/list/current/${tournamentId}`);
   }
 
   async getMatches(tournamentId) {

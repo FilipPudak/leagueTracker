@@ -10,6 +10,6 @@ export async function handleBackfillFromMelee(body, env) {
     throw err;
   }
 
-  const result = await backfillFromMelee(env, { seasonId: seasonId || null });
+  const result = await backfillFromMelee(env, { seasonId: seasonId || null, maxTournaments: body.maxTournaments || undefined });
   return result;
 }

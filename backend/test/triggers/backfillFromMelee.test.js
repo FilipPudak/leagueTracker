@@ -39,7 +39,7 @@ function buildMockFetch(overrides = {}) {
     if (url.includes('/api/tournament/list')) {
       return { ok: true, status: 200, text: async () => JSON.stringify({ Content: tournaments, TotalCount: tournaments.length }) };
     }
-    if (url.includes('/api/standings')) {
+    if (url.includes('/api/standing/list/current/')) {
       return { ok: true, status: 200, text: async () => JSON.stringify({ Content: standings }) };
     }
     if (url.includes('/api/match/list/')) {
@@ -55,12 +55,12 @@ function makeMockClient(fetchFn) {
       const r = await fetchFn('https://melee.gg/api/tournament/list');
       return JSON.parse(await r.text());
     }
-    async getStandings() {
-      const r = await fetchFn('https://melee.gg/api/standings');
+    async getStandings(id) {
+      const r = await fetchFn(`https://melee.gg/api/standing/list/current/${id}`);
       return JSON.parse(await r.text());
     }
-    async getMatches() {
-      const r = await fetchFn('https://melee.gg/api/match/list/1');
+    async getMatches(id) {
+      const r = await fetchFn(`https://melee.gg/api/match/list/${id}`);
       return JSON.parse(await r.text());
     }
   };
@@ -138,7 +138,7 @@ describe('triggers/backfillFromMelee', () => {
     assert.ok(typeof result.matches === 'number');
   });
 
-  it('skips already-synced tournaments', async () => {
+  it('skips tournament INSERT but still re-syncs standings/matches for existing tournaments', async () => {
     const tables = makeTables();
     tables.melee_tournaments = [
       { melee_id: 100, season_id: 5, round: 1, name: 'SWU Wednesday league season 5 01/01 (week 1)', date: '2025-01-01T19:00:00' },
@@ -151,9 +151,10 @@ describe('triggers/backfillFromMelee', () => {
       return buildMockFetch()(url);
     };
 
-    await backfillFromMelee({ DB: db }, { MeleeClient: makeMockClient(globalThis.fetch), seasonId: 5 });
+    const result = await backfillFromMelee({ DB: db }, { MeleeClient: makeMockClient(globalThis.fetch), seasonId: 5 });
 
-    assert.equal(fetchCount, 0, 'No API calls for already-synced tournaments');
+    assert.ok(fetchCount > 0, 'Standings/matches are re-fetched for existing tournaments');
+    assert.equal(result.tournaments, 0, 'No new tournaments inserted');
   });
 
   it('listTournaments failure → loop breaks, returns zeros', async () => {

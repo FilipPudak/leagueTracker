@@ -23,7 +23,7 @@ describe('MeleeClient', () => {
           text: async () => JSON.stringify({ Content: [{ ID: 100, Name: 'Test Tournament', StartDate: '2026-01-01' }], TotalCount: 1 }),
         };
       }
-      if (url.includes('/api/standings')) {
+      if (url.includes('/api/standing/list/current/')) {
         return {
           ok: true, status: 200,
           text: async () => JSON.stringify({ Content: [{ Username: 'alice42', GameWins: 3, GameLosses: 1, MatchPoints: 9 }] }),
@@ -70,8 +70,8 @@ describe('MeleeClient', () => {
     await client.listTournaments(1, 0, 50);
     const url = fetchCalls[0].url;
     assert.ok(url.includes('OrganizationId=1'));
-    assert.ok(url.includes('Skip=0'));
-    assert.ok(url.includes('Take=50'));
+    assert.ok(url.includes('variables.page=1'));
+    assert.ok(url.includes('variables.pageSize=50'));
     assert.ok(url.includes('Game=StarWarsUnlimited'));
   });
 
@@ -87,7 +87,7 @@ describe('MeleeClient', () => {
     const client = new MeleeClient('id', 'secret');
     await client.getStandings(100);
     const url = fetchCalls[0].url;
-    assert.ok(url.includes('tournamentId=100'));
+    assert.ok(url.includes('/api/standing/list/current/100'));
   });
 
   it('getStandings returns Content array', async () => {
