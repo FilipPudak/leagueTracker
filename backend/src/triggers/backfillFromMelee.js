@@ -41,14 +41,14 @@ export async function backfillFromMelee(env, deps = {}) {
     }
 
     const existingTournaments = await DB.prepare(
-      'SELECT melee_id FROM melee_tournaments WHERE season_id = ?'
+      'SELECT melee_id, round FROM melee_tournaments WHERE season_id = ?'
     ).bind(seasonNum).all();
-    const existingIds = new Set((existingTournaments.results || []).map(t => t.melee_id));
+    const existingRoundMap = new Map((existingTournaments.results || []).map(t => [t.melee_id, t.round]));
 
-    const weekMap = buildWeekMap(tournaments);
+    const weekMap = buildWeekMap(tournaments, existingRoundMap);
 
     for (const [, info] of weekMap) {
-      if (!existingIds.has(info.meleeId)) {
+      if (!existingRoundMap.has(info.meleeId)) {
         try {
           await DB.prepare(
             'INSERT OR IGNORE INTO melee_tournaments (melee_id, season_id, round, name, date, phase) VALUES (?, ?, ?, ?, ?, ?)'

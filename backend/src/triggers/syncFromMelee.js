@@ -52,9 +52,9 @@ export async function syncFromMelee(env, deps = {}) {
   const allPlayers = allPlayersResult.results || [];
 
   const storedTournaments = await DB.prepare(
-    'SELECT melee_id FROM melee_tournaments WHERE season_id = ?'
+    'SELECT melee_id, round FROM melee_tournaments WHERE season_id = ?'
   ).bind(activeSeasonId).all();
-  const existingIds = new Set((storedTournaments.results || []).map(t => t.melee_id));
+  const existingRoundMap = new Map((storedTournaments.results || []).map(t => [t.melee_id, t.round]));
 
   const matchedTournaments = await fetchLeagueTournaments(client, { targetSeason: activeSeasonId });
 
@@ -62,10 +62,10 @@ export async function syncFromMelee(env, deps = {}) {
   const seasonLength = season?.length || 11;
   const topResults = season?.top_results || 7;
 
-  const weekMap = buildWeekMap(matchedTournaments);
+  const weekMap = buildWeekMap(matchedTournaments, existingRoundMap);
 
   for (const [meleeId, info] of weekMap) {
-    if (existingIds.has(meleeId)) continue;
+    if (existingRoundMap.has(meleeId)) continue;
     try {
       await DB.prepare(
         'INSERT OR IGNORE INTO melee_tournaments (melee_id, season_id, round, name, date, phase) VALUES (?, ?, ?, ?, ?, ?)'

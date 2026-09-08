@@ -75,11 +75,12 @@ export async function fetchLeagueTournaments(client, { targetSeason } = {}) {
   return sortRoundsDeterministic(all);
 }
 
-export function buildWeekMap(tournaments) {
+export function buildWeekMap(tournaments, existingRoundMap = new Map()) {
   const weekMap = new Map();
   let seq = 1;
   for (const t of tournaments) {
-    const round = resolveRound(t.Name, t.extractedWeek, seq++);
+    const existingRound = existingRoundMap.get(t.ID);
+    const round = existingRound != null ? existingRound : resolveRound(t.Name, t.extractedWeek, seq++);
     weekMap.set(t.ID, {
       meleeId: t.ID,
       round,
