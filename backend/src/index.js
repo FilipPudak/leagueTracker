@@ -7,6 +7,10 @@ import { handleGetMySeasonStats } from './handlers/getMySeasonStats.js';
 import { handleGetStandingsData } from './handlers/getStandingsData.js';
 import { handleStartNewSeason } from './handlers/startNewSeason.js';
 import { handleBackfillFromMelee } from './handlers/handleBackfillFromMelee.js';
+import { handleSyncNow } from './handlers/syncNow.js';
+import { handlePauseSeason, handleResumeSeason } from './handlers/pauseSeason.js';
+import { handleAddLeaders, handleSetLeadersActive, handleRemoveLeaders } from './handlers/leaderManagement.js';
+import { handleMaterializePastAwards } from './handlers/materializePastAwards.js';
 import { findSessionByToken, touchSessionTimestamp } from './lib/auth.js';
 
 const TOKEN_REQUIRED = ['submitVote', 'unlinkAccount', 'getMySeasonStats'];
@@ -77,6 +81,13 @@ export default {
       getStandingsData: handleGetStandingsData,
       startNewSeason: handleStartNewSeason,
       backfillFromMelee: handleBackfillFromMelee,
+      syncNow: handleSyncNow,
+      pauseCurrentSeason: handlePauseSeason,
+      resumeCurrentSeason: handleResumeSeason,
+      addLeaders: handleAddLeaders,
+      setLeadersActive: handleSetLeadersActive,
+      removeLeaders: handleRemoveLeaders,
+      materializePastAwards: handleMaterializePastAwards,
     };
 
     const handler = handlers[action];

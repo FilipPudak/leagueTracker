@@ -62,7 +62,7 @@ Router wraps in `{ success: true, data: result }` or `{ success: false, error: m
 - **Mock Fetch**: `backend/test/helpers/mock-fetch.js` — URL-to-response mapping
 - **Mock Crypto**: `backend/test/helpers/mock-crypto.js` — sequential UUID stubs
 - **Fixtures**: `backend/test/helpers/fixtures.js` — `basicTables()`, `emptyTables()`, `closedVotingTables()`
-- **367 Worker tests** across: lib, handlers, queries, triggers, router
+- **387 Worker tests** across: lib, handlers, queries, triggers, router
 
 ## Git Conventions
 - Commit messages: `type: description` (e.g. `fix:`, `feat:`, `test:`, `chore:`)
