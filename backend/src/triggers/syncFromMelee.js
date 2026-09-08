@@ -4,7 +4,7 @@ import { computeSchemer, computeAmbassador, computeChampion, computeBountyHunter
 import { fetchLeagueTournaments, buildWeekMap } from '../lib/meleeLeague.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';
 
-export function shouldAdvance(isoNow, marker, weekKey) {
+export function shouldAdvance(isoNow, marker) {
   const date = new Date(isoNow);
   const stockholmTime = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/Stockholm',
@@ -14,7 +14,8 @@ export function shouldAdvance(isoNow, marker, weekKey) {
   }).format(date);
   const [hours, minutes] = stockholmTime.split(':').map(Number);
   const isLateEnough = hours > 22 || (hours === 22 && minutes >= 10);
-  const notYetAdvanced = marker !== weekKey;
+  const today = isoNow.split('T')[0];
+  const notYetAdvanced = marker !== today;
   return isLateEnough && notYetAdvanced;
 }
 
@@ -301,12 +302,12 @@ export async function syncFromMelee(env, deps = {}) {
     })));
   }
 
-  const weekKey = `S${activeSeasonId}-W${currentWeek}`;
-  const canAdvance = shouldAdvance(now, lastAdvanced, weekKey);
+  const today = now.split('T')[0];
+  const canAdvance = shouldAdvance(now, lastAdvanced);
 
   if (!votingOpen && canAdvance) {
     await updateSetting(DB, 'VOTING_OPEN', 'TRUE');
-    await updateSetting(DB, 'LAST_ADVANCED', weekKey);
+    await updateSetting(DB, 'LAST_ADVANCED', today);
     console.log('[SyncFromMelee] First run — voting opened.');
   } else if (canAdvance) {
     const nextWeek = (currentWeek || 0) + 1;
@@ -321,7 +322,7 @@ export async function syncFromMelee(env, deps = {}) {
       console.log('[SyncFromMelee] Season ended.');
     } else {
       await updateSetting(DB, 'CURRENT_WEEK', `Week ${nextWeek}`);
-      await updateSetting(DB, 'LAST_ADVANCED', weekKey);
+      await updateSetting(DB, 'LAST_ADVANCED', today);
       console.log(`[SyncFromMelee] Advanced to Week ${nextWeek}.`);
     }
   } else {

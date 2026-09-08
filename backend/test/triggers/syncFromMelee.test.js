@@ -391,12 +391,12 @@ describe('triggers/syncFromMelee', () => {
     assert.equal(settings.CURRENT_WEEK, 'Week 2', 'Week not advanced before 22:10 Stockholm');
   });
 
-  it('does not advance when LAST_ADVANCED matches current weekKey', async () => {
+  it('does not advance when LAST_ADVANCED matches today', async () => {
     const tables = withSeasonStarted(makeTables());
     tables.settings = tables.settings.map(s =>
       s.key === 'CURRENT_WEEK' ? { ...s, value: 'Week 2' } : s
     );
-    tables.settings.push({ key: 'LAST_ADVANCED', value: 'S6-W2' });
+    tables.settings.push({ key: 'LAST_ADVANCED', value: '2026-07-01' });
     db = createMockDb(tables);
     const { mockFetch } = buildMockFetch({ tournaments: TOURNAMENTS.slice(0, 1) });
     globalThis.fetch = mockFetch;
@@ -405,6 +405,6 @@ describe('triggers/syncFromMelee', () => {
     await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch), now: lateTime });
 
     const settings = await getSettings(db);
-    assert.equal(settings.CURRENT_WEEK, 'Week 2', 'Week not advanced when LAST_ADVANCED matches');
+    assert.equal(settings.CURRENT_WEEK, 'Week 2', 'Week not advanced when LAST_ADVANCED matches today');
   });
 });
