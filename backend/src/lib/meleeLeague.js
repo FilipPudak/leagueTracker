@@ -44,7 +44,7 @@ export function sortRoundsDeterministic(tournaments) {
 
 export async function fetchLeagueTournaments(client, { targetSeason } = {}) {
   let page = 0;
-  const pageSize = 50;
+  const pageSize = 250;
   let hasMore = true;
   const all = [];
 

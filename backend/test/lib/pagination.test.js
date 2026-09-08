@@ -78,8 +78,8 @@ describe('MeleeClient pagination', () => {
       const client = new MeleeClient('id', 'secret');
       client.listTournaments = async (org, p) => {
         page = p;
-        if (p === 0) return { Content: [{ ID: 1, Name: 'SWU Wednesday league season 6 15/7 (week 1)', StartDate: '2026-06-15' }], RecordsTotal: 60 };
-        return { Content: [{ ID: 2, Name: 'SWU Wednesday league season 6 22/7 (week 2)', StartDate: '2026-06-22' }], RecordsTotal: 60 };
+        if (p === 0) return { Content: [{ ID: 1, Name: 'SWU Wednesday league season 6 15/7 (week 1)', StartDate: '2026-06-15' }], RecordsTotal: 300 };
+        return { Content: [{ ID: 2, Name: 'SWU Wednesday league season 6 22/7 (week 2)', StartDate: '2026-06-22' }], RecordsTotal: 300 };
       };
 
       const result = await fetchLeagueTournaments(client, { targetSeason: 6 });
