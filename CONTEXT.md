@@ -45,7 +45,7 @@ username that is literally a GUID (P022 "Sigge Maslov").
 | **Vote referent** | A vote for week N is about **night N as it just finished**. |
 | **Voting window** | Opens at night N's sync; closes when night N+1's sync advances the week. The stored weekly deadline (Wed 17:45) is **displayed only** — a courtesy reminder before games start — and never enforced. |
 | **Cron** | Fires **twice per Wednesday: 20:15 and 21:15 UTC**. Exactly one of those is 22:15 Stockholm in either DST state (summer UTC+2 / winter UTC+1). |
-| **Advance gate** | Week-advance and voting-open happen only when computed Stockholm local time ≥ 22:10 **and** the `LAST_ADVANCED` marker (e.g. `S7-W3`) proves this week hasn't advanced yet. Data sync itself runs idempotently on *every* fire: late-published Melee results are picked up automatically. |
+| **Advance gate** | Week-advance and voting-open happen only when computed Stockholm local time ≥ 22:10 **and** the `LAST_ADVANCED` marker (YYYY-MM-DD) is not today's date. Data sync itself runs idempotently on *every* fire: late-published Melee results are picked up automatically. |
 | **Paused** | `SEASON_PAUSED=TRUE`: sync continues, but no advance, no voting open/close. Toggled by `pauseCurrentSeason` / `resumeCurrentSeason`. |
 
 **Rationale:** Cloudflare crons are UTC-only. Double-fire + deterministic local-time gate yields
@@ -195,7 +195,7 @@ never per-player rankings.
 | `VOTING_OPEN` | weekly run (first + close) | gate for submit/update vote; drives Ambassador/BH reveal |
 | `SEASON_STARTED` | startNewSeason, close | gates the weekly run entirely |
 | `SEASON_PAUSED` | pause/resume actions | sync yes, move no |
-| `LAST_ADVANCED` | weekly run | exactly-once advance marker per week |
+| `LAST_ADVANCED` | weekly run | date-based marker (YYYY-MM-DD) — prevents double-advance on dual-cron Wednesdays |
 | `TIMEZONE` | manual | display only (Europe/Stockholm) |
 | `WEEKLY_DEADLINE_DAY` / `_TIME` | manual | **displayed only** ("closes Wed 17:45"), never enforced |
 | ~~`SEASON_LENGTH`~~ | — | **retired** → `seasons.length` |
