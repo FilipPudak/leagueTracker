@@ -69,7 +69,7 @@ export async function fetchLeagueTournaments(client, { targetSeason } = {}) {
 
     const total = response.RecordsTotal || response.TotalCount || 0;
     page++;
-    hasMore = page * pageSize < total && content.length > 0;
+    hasMore = page * pageSize < total;
   }
 
   return sortRoundsDeterministic(all);
