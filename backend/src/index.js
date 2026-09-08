@@ -2,6 +2,7 @@ import { handleGetAppData } from './handlers/getAppData.js';
 import { handleLinkAccount } from './handlers/linkAccount.js';
 import { handleUnlinkAccount } from './handlers/unlinkAccount.js';
 import { handleSubmitVote } from './handlers/submitVote.js';
+import { handleUpdateVote } from './handlers/updateVote.js';
 import { handleGetLeaderboardData } from './handlers/getLeaderboardData.js';
 import { handleGetMySeasonStats } from './handlers/getMySeasonStats.js';
 import { handleGetStandingsData } from './handlers/getStandingsData.js';
@@ -13,7 +14,7 @@ import { handleAddLeaders, handleSetLeadersActive, handleRemoveLeaders } from '.
 import { handleMaterializePastAwards } from './handlers/materializePastAwards.js';
 import { findSessionByToken, touchSessionTimestamp } from './lib/auth.js';
 
-const TOKEN_REQUIRED = ['submitVote', 'unlinkAccount', 'getMySeasonStats'];
+const TOKEN_REQUIRED = ['submitVote', 'updateVote', 'unlinkAccount', 'getMySeasonStats'];
 const TOKEN_OPTIONAL = ['getAppData'];
 
 const rateLimitMap = new Map();
@@ -76,6 +77,7 @@ export default {
       linkAccount: handleLinkAccount,
       unlinkAccount: handleUnlinkAccount,
       submitVote: handleSubmitVote,
+      updateVote: handleUpdateVote,
       getLeaderboardData: handleGetLeaderboardData,
       getMySeasonStats: handleGetMySeasonStats,
       getStandingsData: handleGetStandingsData,
