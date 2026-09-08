@@ -34,10 +34,11 @@ export async function backfillFromMelee(env, deps = {}) {
       .bind(seasonNum, `Season ${seasonNum}`, null).run();
 
     if (resync && targetSeasonId === seasonNum) {
+      await DB.prepare('DELETE FROM melee_tournaments WHERE season_id = ?').bind(seasonNum).run();
       await DB.prepare('DELETE FROM season_standings WHERE season_id = ?').bind(seasonNum).run();
       await DB.prepare('DELETE FROM match_results WHERE season_id = ?').bind(seasonNum).run();
       await DB.prepare('DELETE FROM attendance WHERE season_id = ?').bind(seasonNum).run();
-      console.log(`[Backfill] Resync: wiped standings/matches/attendance for season ${seasonNum}`);
+      console.log(`[Backfill] Resync: wiped tournaments/standings/matches/attendance for season ${seasonNum}`);
     }
 
     const existingTournaments = await DB.prepare(

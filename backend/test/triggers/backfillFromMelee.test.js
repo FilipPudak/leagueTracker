@@ -18,6 +18,22 @@ const ALL_TOURNAMENTS = [
   { ID: 200, Name: 'SWU TWI Store Championship', StartDate: '2025-02-01T19:00:00' },
 ];
 
+const SEASON_6_TOURNAMENTS = [
+  { ID: 601, Name: 'SWU Wednesday league season 6 27/5 (week 1)', StartDate: '2026-05-27T18:00:00' },
+  { ID: 602, Name: 'SWU Wednesday league season 6 3/6 (week 2)', StartDate: '2026-06-03T18:00:00' },
+  { ID: 603, Name: 'SWU Wednesday league season 6 10/6 (week 3)', StartDate: '2026-06-10T18:00:00' },
+  { ID: 604, Name: 'SWU Wednesday league season 6 17/6 (week 4)', StartDate: '2026-06-17T18:00:00' },
+  { ID: 605, Name: 'SWU Wednesday league season 6 24/6 (week 5)', StartDate: '2026-06-24T18:00:00' },
+  { ID: 606, Name: 'SWU Wednesday league season 6 1/7 (week 6)', StartDate: '2026-07-01T18:00:00' },
+  { ID: 607, Name: 'SWU Wednesday league season 6 8/7 (week 7)', StartDate: '2026-07-08T18:00:00' },
+  { ID: 608, Name: 'SWU Wednesday league season 6 15/7 (week 8)', StartDate: '2026-07-15T18:00:00' },
+  { ID: 609, Name: 'SWU Wednesday league season 6 22/7 (week 9)', StartDate: '2026-07-22T18:00:00' },
+  { ID: 610, Name: 'SWU Wednesday league season 6 5/8', StartDate: '2026-08-05T18:00:00' },
+  { ID: 611, Name: 'SWU Wednesday league season 6 12/8 (week 11)', StartDate: '2026-08-12T18:00:00' },
+  { ID: 612, Name: 'SWU Wednesday league season 6 TOP 4', StartDate: '2026-08-19T17:00:00' },
+  { ID: 613, Name: 'SWU Wednesday league season 6 Best of the Rest', StartDate: '2026-08-19T18:00:00' },
+];
+
 const STANDINGS = [
   { Rank: 1, Points: 9, MatchWins: 3, MatchDraws: 0, MatchLosses: 0, GameWins: 6, GameLosses: 1, Team: { Players: [{ Username: 'alice42', ID: 'g1' }] } },
   { Rank: 2, Points: 6, MatchWins: 2, MatchDraws: 0, MatchLosses: 1, GameWins: 4, GameLosses: 3, Team: { Players: [{ Username: 'bob55', ID: 'g2' }] } },
@@ -310,5 +326,97 @@ describe('triggers/backfillFromMelee', () => {
     const store = db.getStore();
     const tournaments = store.melee_tournaments.filter(t => t.season_id === 5);
     assert.ok(tournaments.every(t => t.phase), 'All tournaments have phase');
+  });
+
+  it('includes cut and side events with correct phases', async () => {
+    const tables = makeTables();
+    db = createMockDb(tables);
+    const fetchFn = async (url) => {
+      if (url.includes('/api/tournament/list')) {
+        return { ok: true, status: 200, text: async () => JSON.stringify({ Content: SEASON_6_TOURNAMENTS, TotalCount: SEASON_6_TOURNAMENTS.length }) };
+      }
+      return buildMockFetch()(url);
+    };
+    globalThis.fetch = fetchFn;
+
+    await backfillFromMelee({ DB: db }, { MeleeClient: makeMockClient(fetchFn), seasonId: 6, maxTournaments: 15 });
+
+    const store = db.getStore();
+    const tournaments = store.melee_tournaments.filter(t => t.season_id === 6);
+    assert.equal(tournaments.length, 13, 'All 13 tournaments stored (11 regular + 1 cut + 1 side)');
+
+    const top4 = tournaments.find(t => t.name.includes('TOP 4'));
+    assert.ok(top4, 'TOP 4 tournament stored');
+    assert.equal(top4.phase, 'cut', 'TOP 4 has cut phase');
+
+    const bestOfRest = tournaments.find(t => t.name.includes('Best of the Rest'));
+    assert.ok(bestOfRest, 'Best of the Rest tournament stored');
+    assert.equal(bestOfRest.phase, 'side', 'Best of the Rest has side phase');
+  });
+
+  it('assigns regular rounds 1-N and cut/side after', async () => {
+    const tables = makeTables();
+    db = createMockDb(tables);
+    const fetchFn = async (url) => {
+      if (url.includes('/api/tournament/list')) {
+        return { ok: true, status: 200, text: async () => JSON.stringify({ Content: SEASON_6_TOURNAMENTS, TotalCount: SEASON_6_TOURNAMENTS.length }) };
+      }
+      return buildMockFetch()(url);
+    };
+    globalThis.fetch = fetchFn;
+
+    await backfillFromMelee({ DB: db }, { MeleeClient: makeMockClient(fetchFn), seasonId: 6, maxTournaments: 15 });
+
+    const store = db.getStore();
+    const tournaments = store.melee_tournaments.filter(t => t.season_id === 6);
+    const regulars = tournaments.filter(t => t.phase === 'regular');
+    const specials = tournaments.filter(t => t.phase !== 'regular');
+
+    const regularRounds = regulars.map(t => t.round).sort((a, b) => a - b);
+    assert.deepEqual(regularRounds, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 'Regulars get rounds 1-11');
+
+    const maxRegularRound = Math.max(...regularRounds);
+    for (const s of specials) {
+      assert.ok(s.round > maxRegularRound, `${s.name} round ${s.round} is after regulars (>${maxRegularRound})`);
+    }
+  });
+
+  it('resync:true wipes melee_tournaments for target season', async () => {
+    const tables = makeTables();
+    tables.melee_tournaments = [
+      { melee_id: 999, season_id: 5, round: 1, name: 'Old tournament', date: '2025-01-01', phase: 'regular' },
+      { melee_id: 998, season_id: 5, round: 2, name: 'Old tournament 2', date: '2025-01-08', phase: 'regular' },
+    ];
+    db = createMockDb(tables);
+    globalThis.fetch = buildMockFetch();
+
+    await backfillFromMelee({ DB: db }, { MeleeClient: makeMockClient(globalThis.fetch), seasonId: 5, resync: true });
+
+    const store = db.getStore();
+    const oldTournaments = store.melee_tournaments.filter(t => t.melee_id === 999 || t.melee_id === 998);
+    assert.equal(oldTournaments.length, 0, 'Old tournaments wiped on resync');
+
+    const newTournaments = store.melee_tournaments.filter(t => t.season_id === 5);
+    assert.ok(newTournaments.length > 0, 'New tournaments inserted after wipe');
+  });
+
+  it('no round collisions with mixed explicit and unlabeled tournaments', async () => {
+    const tables = makeTables();
+    db = createMockDb(tables);
+    const fetchFn = async (url) => {
+      if (url.includes('/api/tournament/list')) {
+        return { ok: true, status: 200, text: async () => JSON.stringify({ Content: SEASON_6_TOURNAMENTS, TotalCount: SEASON_6_TOURNAMENTS.length }) };
+      }
+      return buildMockFetch()(url);
+    };
+    globalThis.fetch = fetchFn;
+
+    await backfillFromMelee({ DB: db }, { MeleeClient: makeMockClient(fetchFn), seasonId: 6, maxTournaments: 15 });
+
+    const store = db.getStore();
+    const tournaments = store.melee_tournaments.filter(t => t.season_id === 6);
+    const rounds = tournaments.map(t => t.round);
+    const uniqueRounds = new Set(rounds);
+    assert.equal(rounds.length, uniqueRounds.size, 'No duplicate round numbers');
   });
 });

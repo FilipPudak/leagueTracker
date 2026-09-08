@@ -321,35 +321,74 @@ describe('computeChampion', () => {
 });
 
 describe('computeBountyHunter', () => {
-  it('returns non-bye wins vs previous season top-4', async () => {
+  it('returns non-bye regular-season wins vs previous season top-4 from derived table', async () => {
     const tables = basicTables();
     tables.seasons = [
-      { id: 5, name: 'Season 5', created_date: '2026-01-15', length: 11, top_results: 7 },
-      { id: 6, name: 'Season 6', created_date: '2026-06-03', length: 11, top_results: 7 },
+      { id: 5, name: 'Season 5', created_date: '2026-01-15', length: 3, top_results: 2 },
+      { id: 6, name: 'Season 6', created_date: '2026-06-03', length: 3, top_results: 2 },
     ];
     tables.melee_tournaments = [
-      { melee_id: 100, season_id: 5, round: 11, name: 'SWU Wednesday league season 5 15/11 (week 11)', date: '2026-03-15', phase: 'regular' },
+      { melee_id: 501, season_id: 5, round: 1, name: 'S5 week 1', date: '2026-01-01', phase: 'regular' },
+      { melee_id: 502, season_id: 5, round: 2, name: 'S5 week 2', date: '2026-01-08', phase: 'regular' },
+      { melee_id: 503, season_id: 5, round: 3, name: 'S5 week 3', date: '2026-01-15', phase: 'regular' },
+      { melee_id: 601, season_id: 6, round: 1, name: 'S6 week 1', date: '2026-06-01', phase: 'regular' },
+      { melee_id: 602, season_id: 6, round: 2, name: 'S6 TOP 4', date: '2026-06-08', phase: 'cut' },
     ];
     tables.season_standings = [
-      { season_id: 5, round: 11, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
-      { season_id: 5, round: 11, player_id: 'P002', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 2 },
-      { season_id: 5, round: 11, player_id: 'P003', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 3 },
-      { season_id: 5, round: 11, player_id: 'P004', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 4 },
-      { season_id: 5, round: 11, player_id: 'P005', wins: 2, losses: 1, draws: 0, match_points: 6, rank: 5 },
+      { season_id: 5, round: 1, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+      { season_id: 5, round: 1, player_id: 'P002', wins: 2, losses: 1, draws: 0, match_points: 6, rank: 2 },
+      { season_id: 5, round: 1, player_id: 'P003', wins: 2, losses: 1, draws: 0, match_points: 6, rank: 3 },
+      { season_id: 5, round: 1, player_id: 'P004', wins: 1, losses: 2, draws: 0, match_points: 3, rank: 4 },
+      { season_id: 5, round: 1, player_id: 'P005', wins: 0, losses: 3, draws: 0, match_points: 0, rank: 5 },
+      { season_id: 5, round: 2, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+      { season_id: 5, round: 2, player_id: 'P002', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 2 },
+      { season_id: 5, round: 2, player_id: 'P003', wins: 2, losses: 1, draws: 0, match_points: 6, rank: 3 },
+      { season_id: 5, round: 2, player_id: 'P004', wins: 1, losses: 2, draws: 0, match_points: 3, rank: 4 },
+      { season_id: 5, round: 2, player_id: 'P005', wins: 0, losses: 3, draws: 0, match_points: 0, rank: 5 },
+      { season_id: 5, round: 3, player_id: 'P001', wins: 2, losses: 1, draws: 0, match_points: 6, rank: 2 },
+      { season_id: 5, round: 3, player_id: 'P002', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+      { season_id: 5, round: 3, player_id: 'P003', wins: 2, losses: 1, draws: 0, match_points: 6, rank: 3 },
+      { season_id: 5, round: 3, player_id: 'P004', wins: 1, losses: 2, draws: 0, match_points: 3, rank: 4 },
+      { season_id: 5, round: 3, player_id: 'P005', wins: 0, losses: 3, draws: 0, match_points: 0, rank: 5 },
     ];
     tables.match_results = [
-      { id: 1, season_id: 6, round: 1, melee_match_id: 'm1', player1_id: 'P001', player2_id: 'P005', winner_id: 'P001', result: '2-0', is_bye: 0 },
-      { id: 2, season_id: 6, round: 1, melee_match_id: 'm2', player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: '2-1', is_bye: 0 },
-      { id: 3, season_id: 6, round: 1, melee_match_id: 'm3', player1_id: 'P001', player2_id: 'P003', winner_id: 'P001', result: '2-0', is_bye: 0 },
-      { id: 4, season_id: 6, round: 1, melee_match_id: 'm4', player1_id: 'P001', player2_id: 'P004', winner_id: 'P001', result: '2-0', is_bye: 0 },
-      { id: 5, season_id: 6, round: 1, melee_match_id: 'm5', player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: '2-0', is_bye: 1 },
+      { id: 1, season_id: 6, round: 1, melee_match_id: 'm1', player1_id: 'P005', player2_id: 'P001', winner_id: 'P005', result: '2-0', is_bye: 0 },
+      { id: 2, season_id: 6, round: 1, melee_match_id: 'm2', player1_id: 'P005', player2_id: 'P002', winner_id: 'P005', result: '2-0', is_bye: 0 },
+      { id: 3, season_id: 6, round: 1, melee_match_id: 'm3', player1_id: 'P005', player2_id: 'P003', winner_id: 'P005', result: '2-0', is_bye: 0 },
+      { id: 4, season_id: 6, round: 2, melee_match_id: 'm4', player1_id: 'P005', player2_id: 'P001', winner_id: 'P005', result: '2-0', is_bye: 0 },
     ];
     const db = createMockDb(tables);
 
     const result = await computeBountyHunter(db, 6);
     assert.equal(result.length, 1);
-    assert.equal(result[0].playerId, 'P001');
-    assert.equal(result[0].score, 4);
+    assert.equal(result[0].playerId, 'P005');
+    assert.equal(result[0].score, 3);
+  });
+
+  it('excludes cut/side matches from count', async () => {
+    const tables = basicTables();
+    tables.seasons = [
+      { id: 5, name: 'Season 5', created_date: '2026-01-15', length: 1, top_results: 1 },
+      { id: 6, name: 'Season 6', created_date: '2026-06-03', length: 1, top_results: 1 },
+    ];
+    tables.melee_tournaments = [
+      { melee_id: 501, season_id: 5, round: 1, name: 'S5 week 1', date: '2026-01-01', phase: 'regular' },
+      { melee_id: 601, season_id: 6, round: 1, name: 'S6 week 1', date: '2026-06-01', phase: 'regular' },
+      { melee_id: 602, season_id: 6, round: 2, name: 'S6 TOP 4', date: '2026-06-08', phase: 'cut' },
+    ];
+    tables.season_standings = [
+      { season_id: 5, round: 1, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+    ];
+    tables.match_results = [
+      { id: 1, season_id: 6, round: 1, melee_match_id: 'm1', player1_id: 'P002', player2_id: 'P001', winner_id: 'P002', result: '2-0', is_bye: 0 },
+      { id: 2, season_id: 6, round: 2, melee_match_id: 'm2', player1_id: 'P002', player2_id: 'P001', winner_id: 'P002', result: '2-0', is_bye: 0 },
+    ];
+    const db = createMockDb(tables);
+
+    const result = await computeBountyHunter(db, 6);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].playerId, 'P002');
+    assert.equal(result[0].score, 1);
   });
 
   it('returns empty array for S1 (no previous season)', async () => {
@@ -366,11 +405,15 @@ describe('computeBountyHunter', () => {
   it('excludes bye wins from count', async () => {
     const tables = basicTables();
     tables.seasons = [
-      { id: 5, name: 'Season 5', created_date: '2026-01-15', length: 11, top_results: 7 },
-      { id: 6, name: 'Season 6', created_date: '2026-06-03', length: 11, top_results: 7 },
+      { id: 5, name: 'Season 5', created_date: '2026-01-15', length: 1, top_results: 1 },
+      { id: 6, name: 'Season 6', created_date: '2026-06-03', length: 1, top_results: 1 },
+    ];
+    tables.melee_tournaments = [
+      { melee_id: 501, season_id: 5, round: 1, name: 'S5 week 1', date: '2026-01-01', phase: 'regular' },
+      { melee_id: 601, season_id: 6, round: 1, name: 'S6 week 1', date: '2026-06-01', phase: 'regular' },
     ];
     tables.season_standings = [
-      { season_id: 5, round: 11, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+      { season_id: 5, round: 1, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
     ];
     tables.match_results = [
       { id: 1, season_id: 6, round: 1, melee_match_id: 'm1', player1_id: 'P002', player2_id: 'P001', winner_id: 'P002', result: '2-0', is_bye: 1 },

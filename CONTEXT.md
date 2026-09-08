@@ -99,9 +99,10 @@ A league-season's Melee tournaments are classified by `phase`:
 
 - Excluded entirely: `prerelease`, `draft`, `clone`, `budget draft`, non-league names.
 - Season 1 events carry no "season N" in their name → they belong to **season 1** by definition.
-- **Round assignment:** regular rounds follow the explicit `(week N)` label when present;
-  otherwise date order (labels trusted; mismatch = warning). Same-day ordering: cut before side,
-  then melee_id — deterministic.
+- **Round assignment:** date order only — explicit `(week N)` labels are not trusted for round
+  numbers (organizer typos, missing labels, and label/date mismatches are common). Regular events
+  get sequential rounds 1, 2, 3… by date; cut/side events get rounds after all regulars. Same-day
+  ordering: cut before side, then melee_id — deterministic.
 - Championship events occupy rounds *after* the last regular week; every consumer of
   "final standings" must filter `phase='regular'`.
 
@@ -145,7 +146,7 @@ own row; a podium may exceed three entries (tie-aware); standard competition ran
 | **Galactic Schemer** | Most distinct leaders played (from votes) | share podium |
 | **Galactic Ambassador** | Most favorite-opponent votes received | share podium |
 | **A New Hope** | Biggest rank climb from accumulated standings at end-of-round ⌊length/2⌋ to derived season table at final regular round; must appear in **both** snapshots. Mid-season snapshot uses raw accumulated points (not best-X). | ties share the victory |
-| **Bounty Hunter** | Regular-season non-bye match wins against players who placed top-4 in the **previous** season's final regular season table | share podium; **none in S1** (no prior season) |
+| **Bounty Hunter** | Regular-season non-bye match wins against players who placed top-4 in the **previous** season's **derived season table** (best-X nights, not raw per-round standings). Only matches from regular-phase tournaments count (cut/side excluded). Top-4 is determined by standard competition ranking on the derived table. | share podium; **none in S1** (no prior season) |
 
 **Reveal gating (display rules):** Ambassador names are **callsigns** while voting is live
 ("Gold Leader", …); Bounty Hunter is hidden while voting is live; both resolve at close.

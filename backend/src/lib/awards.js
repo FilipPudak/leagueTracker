@@ -1,3 +1,5 @@
+import { computeSeasonTable } from './seasonTable.js';
+
 const AWARD_NAMES = [
   'Galactic Ruler',
   'Galactic Schemer',
@@ -119,6 +121,9 @@ export async function computeBountyHunter(db, seasonId) {
 
   if (!prevSeasonId) return [];
 
+  const season = await db.prepare('SELECT top_results FROM seasons WHERE id = ?').bind(prevSeasonId).first();
+  const topResults = season?.top_results || 7;
+
   const regularRounds = await db.prepare(
     'SELECT DISTINCT round FROM melee_tournaments WHERE season_id = ? AND phase = ?'
   ).bind(prevSeasonId, 'regular').all();
@@ -127,32 +132,61 @@ export async function computeBountyHunter(db, seasonId) {
   if (regularRoundSet.size === 0) return [];
 
   const allStandings = await db.prepare(
-    'SELECT round, player_id, rank FROM season_standings WHERE season_id = ?'
+    'SELECT round, player_id, wins, losses, draws, rank FROM season_standings WHERE season_id = ?'
   ).bind(prevSeasonId).all();
 
-  const regularStandings = (allStandings.results || []).filter(s => regularRoundSet.has(s.round));
-  const maxRound = Math.max(...regularStandings.map(s => s.round), 0);
+  const nights = (allStandings.results || [])
+    .filter(s => regularRoundSet.has(s.round))
+    .map(s => ({
+      playerId: s.player_id,
+      round: s.round,
+      wins: s.wins || 0,
+      draws: s.draws || 0,
+      losses: s.losses || 0,
+      rank: s.rank,
+    }));
 
-  if (!maxRound) return [];
+  const seasonTable = computeSeasonTable(nights, topResults);
+  const top4Ids = seasonTable.filter(r => r.rank <= 4).map(r => r.playerId);
 
-  const prevStandings = await db.prepare(
-    'SELECT player_id FROM season_standings WHERE season_id = ? AND round = ? AND rank <= 4'
-  ).bind(prevSeasonId, maxRound).all();
-
-  const top4Ids = (prevStandings.results || []).map(s => s.player_id);
   if (top4Ids.length === 0) return [];
 
+  const regularTournaments = await db.prepare(
+    'SELECT melee_id FROM melee_tournaments WHERE season_id = ? AND phase = ?'
+  ).bind(seasonId, 'regular').all();
+  const regularIds = new Set((regularTournaments.results || []).map(t => t.melee_id));
+
   const allMatches = await db.prepare(
-    'SELECT player1_id, player2_id, winner_id, is_bye FROM match_results WHERE season_id = ?'
+    'SELECT melee_match_id, player1_id, player2_id, winner_id, is_bye FROM match_results WHERE season_id = ?'
   ).bind(seasonId).all();
+
+  const tournamentMatches = await db.prepare(
+    'SELECT melee_match_id, season_id, round FROM match_results WHERE season_id = ?'
+  ).bind(seasonId).all();
+
+  const matchToTournament = new Map();
+  for (const m of (tournamentMatches.results || [])) {
+    matchToTournament.set(m.melee_match_id, m.round);
+  }
+
+  const tournamentRoundToPhase = new Map();
+  const tournaments = await db.prepare(
+    'SELECT melee_id, round, phase FROM melee_tournaments WHERE season_id = ?'
+  ).bind(seasonId).all();
+  for (const t of (tournaments.results || [])) {
+    tournamentRoundToPhase.set(t.round, t.phase);
+  }
 
   const wins = new Map();
   for (const m of (allMatches.results || [])) {
     if (m.is_bye || !m.winner_id) continue;
-    if (m.winner_id === m.player1_id && top4Ids.includes(m.player1_id)) {
+    const round = matchToTournament.get(m.melee_match_id);
+    const phase = tournamentRoundToPhase.get(round);
+    if (phase !== 'regular') continue;
+    if (m.winner_id === m.player1_id && top4Ids.includes(m.player2_id)) {
       wins.set(m.player1_id, (wins.get(m.player1_id) || 0) + 1);
     }
-    if (m.winner_id === m.player2_id && top4Ids.includes(m.player2_id)) {
+    if (m.winner_id === m.player2_id && top4Ids.includes(m.player1_id)) {
       wins.set(m.player2_id, (wins.get(m.player2_id) || 0) + 1);
     }
   }

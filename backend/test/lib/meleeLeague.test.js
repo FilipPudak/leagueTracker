@@ -1,6 +1,6 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyPhase, isLeagueTournament, extractSeasonAndRound, resolveRound, sortRoundsDeterministic, buildWeekMap, createPlayerFinder } from '../../src/lib/meleeLeague.js';
+import { classifyPhase, isLeagueTournament, extractSeasonAndRound, sortRoundsDeterministic, buildWeekMap, createPlayerFinder } from '../../src/lib/meleeLeague.js';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables } from '../helpers/fixtures.js';
 
@@ -82,16 +82,6 @@ describe('meleeLeague', () => {
     });
   });
 
-  describe('resolveRound', () => {
-    it('uses explicit week when provided', () => {
-      assert.equal(resolveRound('name', 5, 10), 5);
-    });
-
-    it('falls back to positional seq', () => {
-      assert.equal(resolveRound('SWU Wednesday league no week label', null, 3), 3);
-    });
-  });
-
   describe('sortRoundsDeterministic', () => {
     it('sorts by date first', () => {
       const tournaments = [
@@ -125,30 +115,43 @@ describe('meleeLeague', () => {
   });
 
   describe('buildWeekMap', () => {
-    it('builds map with explicit weeks', () => {
+    it('assigns sequential rounds by date order', () => {
       const tournaments = [
-        { ID: 100, Name: 'SWU Wednesday league season 6 15/7 (week 3)', extractedWeek: 3, phase: 'regular' },
-        { ID: 101, Name: 'SWU Wednesday league season 6 22/7 (week 4)', extractedWeek: 4, phase: 'regular' },
+        { ID: 100, Name: 'SWU Wednesday league season 6 15/7', StartDate: '2026-07-15', phase: 'regular' },
+        { ID: 101, Name: 'SWU Wednesday league season 6 22/7', StartDate: '2026-07-22', phase: 'regular' },
       ];
       const weekMap = buildWeekMap(tournaments);
       assert.equal(weekMap.size, 2);
-      assert.equal(weekMap.get(100).round, 3);
-      assert.equal(weekMap.get(101).round, 4);
-    });
-
-    it('assigns sequential rounds when no explicit week', () => {
-      const tournaments = [
-        { ID: 100, Name: 'SWU Wednesday league season 6 15/7', extractedWeek: null, phase: 'regular' },
-        { ID: 101, Name: 'SWU Wednesday league season 6 22/7', extractedWeek: null, phase: 'regular' },
-      ];
-      const weekMap = buildWeekMap(tournaments);
       assert.equal(weekMap.get(100).round, 1);
       assert.equal(weekMap.get(101).round, 2);
     });
 
+    it('assigns cut/side events after regulars', () => {
+      const tournaments = [
+        { ID: 100, Name: 'SWU Wednesday league season 6 15/7', StartDate: '2026-07-15', phase: 'regular' },
+        { ID: 101, Name: 'SWU Wednesday league season 6 TOP 8', StartDate: '2026-07-22', phase: 'cut' },
+        { ID: 102, Name: 'SWU Wednesday league season 6 Best of the Rest', StartDate: '2026-07-22', phase: 'side' },
+      ];
+      const weekMap = buildWeekMap(tournaments);
+      assert.equal(weekMap.get(100).round, 1);
+      assert.equal(weekMap.get(101).round, 2);
+      assert.equal(weekMap.get(102).round, 3);
+    });
+
+    it('preserves existing round numbers from existingRoundMap', () => {
+      const tournaments = [
+        { ID: 100, Name: 'SWU Wednesday league season 6 15/7', StartDate: '2026-07-15', phase: 'regular' },
+        { ID: 101, Name: 'SWU Wednesday league season 6 22/7', StartDate: '2026-07-22', phase: 'regular' },
+      ];
+      const existingRoundMap = new Map([[100, 5]]);
+      const weekMap = buildWeekMap(tournaments, existingRoundMap);
+      assert.equal(weekMap.get(100).round, 5);
+      assert.equal(weekMap.get(101).round, 1);
+    });
+
     it('includes phase in map entries', () => {
       const tournaments = [
-        { ID: 100, Name: 'SWU Wednesday league season 6 TOP 8', extractedWeek: null, phase: 'cut' },
+        { ID: 100, Name: 'SWU Wednesday league season 6 TOP 8', phase: 'cut' },
       ];
       const weekMap = buildWeekMap(tournaments);
       assert.equal(weekMap.get(100).phase, 'cut');

@@ -5,8 +5,8 @@ const PHASE_ORDER = { cut: 0, regular: 1, side: 2 };
 
 export function classifyPhase(name) {
   const lower = name.toLowerCase();
-  if (/top [48]|playoff|championship/i.test(lower)) return 'cut';
   if (/best of the rest|finale/i.test(lower)) return 'side';
+  if (/top [48]|playoff|championship/i.test(lower)) return 'cut';
   return 'regular';
 }
 
@@ -22,12 +22,6 @@ export function extractSeasonAndRound(name) {
   const weekMatch = name.match(/\(week (\d+)\)/i);
   const week = weekMatch ? parseInt(weekMatch[1], 10) : null;
   return { seasonNum: match[1] ? parseInt(match[1], 10) : null, week };
-}
-
-export function resolveRound(name, explicitWeek, seq) {
-  if (explicitWeek != null) return explicitWeek;
-  console.warn(`[meleeLeague] No explicit week label in "${name}"; using positional round ${seq}`);
-  return seq;
 }
 
 export function sortRoundsDeterministic(tournaments) {
@@ -64,7 +58,7 @@ export async function fetchLeagueTournaments(client, { targetSeason } = {}) {
       if (!info) continue;
       const seasonNum = info.seasonNum || 1;
       if (targetSeason != null && seasonNum !== targetSeason) continue;
-      all.push({ ...t, extractedWeek: info.week, seasonNum, phase: classifyPhase(t.Name) });
+      all.push({ ...t, seasonNum, phase: classifyPhase(t.Name) });
     }
 
     const total = response.RecordsTotal || response.TotalCount || 0;
@@ -77,18 +71,42 @@ export async function fetchLeagueTournaments(client, { targetSeason } = {}) {
 
 export function buildWeekMap(tournaments, existingRoundMap = new Map()) {
   const weekMap = new Map();
-  let seq = 1;
+
+  const regulars = [];
+  const specials = [];
   for (const t of tournaments) {
+    const phase = t.phase || classifyPhase(t.Name);
+    if (phase === 'regular') regulars.push(t);
+    else specials.push(t);
+  }
+
+  let seq = 1;
+  for (const t of regulars) {
     const existingRound = existingRoundMap.get(t.ID);
-    const round = existingRound != null ? existingRound : resolveRound(t.Name, t.extractedWeek, seq++);
+    const round = existingRound != null ? existingRound : seq++;
     weekMap.set(t.ID, {
       meleeId: t.ID,
       round,
       name: t.Name,
       date: t.StartDate || t.LastPairDateTime || null,
-      phase: t.phase || 'regular',
+      phase: 'regular',
     });
   }
+
+  let specialSeq = seq;
+  for (const t of specials) {
+    const existingRound = existingRoundMap.get(t.ID);
+    const round = existingRound != null ? existingRound : specialSeq++;
+    const phase = t.phase || classifyPhase(t.Name);
+    weekMap.set(t.ID, {
+      meleeId: t.ID,
+      round,
+      name: t.Name,
+      date: t.StartDate || t.LastPairDateTime || null,
+      phase,
+    });
+  }
+
   return weekMap;
 }
 
