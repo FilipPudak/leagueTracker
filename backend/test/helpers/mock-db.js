@@ -349,7 +349,8 @@ function executeSelect(sql, params, store) {
   // Handle SELECT specific columns vs SELECT *
   const selectMatch = sql.match(/SELECT\s+(.+?)\s+FROM/i);
   if (selectMatch && !selectMatch[1].includes('*')) {
-    const cols = selectMatch[1].split(',').map(c => {
+    const isDistinct = /DISTINCT/i.test(selectMatch[1]);
+    const cols = selectMatch[1].replace(/DISTINCT/i, '').split(',').map(c => {
       const parts = c.trim().split(/\s+AS\s+/i);
       return { name: parts[0].trim().split('.').pop().replace(/"/g, ''), alias: parts[1]?.trim().toLowerCase() };
     });
@@ -360,6 +361,15 @@ function executeSelect(sql, params, store) {
       }
       return out;
     });
+    if (isDistinct) {
+      const seen = new Set();
+      rows = rows.filter(r => {
+        const key = JSON.stringify(r);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
   }
 
   // Handle ORDER BY

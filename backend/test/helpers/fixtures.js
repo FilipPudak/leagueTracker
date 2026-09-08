@@ -8,7 +8,7 @@ const expiredActive = new Date(Date.now() - 1000 * 60 * 60 * 24 * 100).toISOStri
 export function basicTables() {
   return {
     settings: [
-      { key: 'ACTIVE_SEASON_ID', value: 'S6' },
+      { key: 'ACTIVE_SEASON_ID', value: '6' },
       { key: 'CURRENT_WEEK', value: 'Week 3' },
       { key: 'VOTING_OPEN', value: 'TRUE' },
       { key: 'SEASON_LENGTH', value: '11' },

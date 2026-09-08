@@ -196,6 +196,9 @@ describe('handleMaterializePastAwards', () => {
       { id: 5, name: 'Season 5', created_date: '2026-01-15', length: 11, top_results: 7 },
       { id: 6, name: 'Season 6', created_date: '2026-06-03', length: 11, top_results: 7 },
     ];
+    tables.melee_tournaments = [
+      { melee_id: 100, season_id: 5, round: 1, name: 'SWU Wednesday league season 5 01/01 (week 1)', date: '2026-01-01', phase: 'regular' },
+    ];
     tables.season_standings = [
       { season_id: 5, round: 1, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
       { season_id: 5, round: 1, player_id: 'P002', wins: 2, losses: 1, draws: 0, match_points: 6, rank: 2 },

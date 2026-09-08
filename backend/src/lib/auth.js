@@ -68,9 +68,10 @@ export async function findSessionByPlayerAndDevice(db, playerId, deviceId) {
 
 export async function touchSessionTimestamp(db, token) {
   if (!token) return;
+  const now = new Date().toISOString();
   await db.prepare(
-    "UPDATE sessions SET last_active = datetime('now') WHERE token = ?"
-  ).bind(token).run();
+    'UPDATE sessions SET last_active = ? WHERE token = ?'
+  ).bind(now, token).run();
 }
 
 export async function createSession(db, playerId, deviceId, email) {

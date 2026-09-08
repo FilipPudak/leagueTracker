@@ -20,6 +20,11 @@ export async function handleMaterializePastAwards(body, env) {
 
   const podiums = {};
 
+  const regularRounds = await DB.prepare(
+    'SELECT DISTINCT round FROM melee_tournaments WHERE season_id = ? AND phase = ?'
+  ).bind(seasonId, 'regular').all();
+  const regularRoundSet = new Set((regularRounds.results || []).map(r => r.round));
+
   const allStandings = await DB.prepare(
     'SELECT round, player_id, wins, losses, draws, match_points, rank FROM season_standings WHERE season_id = ?'
   ).bind(seasonId).all();
@@ -27,14 +32,16 @@ export async function handleMaterializePastAwards(body, env) {
   const season = await DB.prepare('SELECT length, top_results FROM seasons WHERE id = ?').bind(seasonId).first();
   const topResults = season?.top_results || 7;
 
-  const nights = (allStandings.results || []).map(s => ({
-    playerId: s.player_id,
-    round: s.round,
-    wins: s.wins || 0,
-    draws: s.draws || 0,
-    losses: s.losses || 0,
-    rank: s.rank,
-  }));
+  const nights = (allStandings.results || [])
+    .filter(s => regularRoundSet.has(s.round))
+    .map(s => ({
+      playerId: s.player_id,
+      round: s.round,
+      wins: s.wins || 0,
+      draws: s.draws || 0,
+      losses: s.losses || 0,
+      rank: s.rank,
+    }));
 
   const seasonTable = computeSeasonTable(nights, topResults);
 

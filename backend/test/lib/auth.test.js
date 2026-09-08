@@ -102,7 +102,9 @@ describe('touchSessionTimestamp', () => {
     const calls = db.getCalls();
     const updateCall = calls.find(c => c.sql.toUpperCase().includes('UPDATE') && c.sql.includes('sessions'));
     assert.ok(updateCall);
-    assert.deepEqual(updateCall.params, ['test-token-alice']);
+    assert.equal(updateCall.params[1], 'test-token-alice');
+    assert.ok(updateCall.params[0].includes('T'), 'timestamp is ISO-8601');
+    assert.ok(updateCall.params[0].includes('Z'), 'timestamp has Z suffix');
   });
 
   it('does not throw for non-existent token', async () => {

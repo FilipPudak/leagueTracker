@@ -16,7 +16,7 @@ export async function handleGetLeaderboardData(body, env) {
   const currentWeek = parseWeek(settings.CURRENT_WEEK);
   const votingOpen = isVotingOpen(settings.VOTING_OPEN);
 
-  const seasonId = requestedSeasonId ? Number(requestedSeasonId) : activeSeasonId;
+  const seasonId = requestedSeasonId ? parseSeasonId(requestedSeasonId) : activeSeasonId;
 
   if (!seasonId) {
     const err = new Error('No season specified.');
@@ -68,8 +68,8 @@ export async function handleGetLeaderboardData(body, env) {
   let ruler = awardsMap['Galactic Ruler'] || null;
   if ((!ruler || ruler.length === 0) && isActiveSeason) {
     const lengthRow = await DB.prepare(
-      'SELECT COUNT(*) as count FROM melee_tournaments WHERE season_id = ?'
-    ).bind(seasonId).first();
+      'SELECT COUNT(*) as count FROM melee_tournaments WHERE season_id = ? AND phase = ?'
+    ).bind(seasonId, 'regular').first();
     const seasonLength = lengthRow?.count || 11;
     const round = votingOpen && currentWeek ? currentWeek : seasonLength;
     const standings = await DB.prepare(
@@ -90,8 +90,8 @@ export async function handleGetLeaderboardData(body, env) {
   let newHope = awardsMap['A New Hope'] || null;
   if ((!newHope || newHope.length === 0) && isActiveSeason) {
     const lengthRow = await DB.prepare(
-      'SELECT COUNT(*) as count FROM melee_tournaments WHERE season_id = ?'
-    ).bind(seasonId).first();
+      'SELECT COUNT(*) as count FROM melee_tournaments WHERE season_id = ? AND phase = ?'
+    ).bind(seasonId, 'regular').first();
     const seasonLength = lengthRow?.count || 11;
     const midRound = Math.floor(seasonLength / 2);
     const finalRound = votingOpen && currentWeek ? currentWeek : seasonLength;

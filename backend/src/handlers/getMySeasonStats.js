@@ -1,4 +1,4 @@
-import { getSetting, getAwardsForSeason } from '../db/queries.js';
+import { getSetting, getAwardsForSeason, parseSeasonId } from '../db/queries.js';
 import { getCompliance, getStreaks, getRaffleTickets } from '../lib/participation.js';
 
 export async function handleGetMySeasonStats(body, env, session) {
@@ -12,11 +12,11 @@ export async function handleGetMySeasonStats(body, env, session) {
   }
 
   const playerId = session.player_id;
-  let sid = seasonId ? Number(seasonId) : null;
+  let sid = seasonId ? parseSeasonId(seasonId) : null;
 
   if (!sid) {
     const activeSeasonId = await getSetting(DB, 'ACTIVE_SEASON_ID');
-    sid = activeSeasonId ? parseInt(String(activeSeasonId).replace(/\D/g, ''), 10) : null;
+    sid = parseSeasonId(activeSeasonId);
   }
 
   if (!sid) {

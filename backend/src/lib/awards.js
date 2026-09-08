@@ -119,15 +119,25 @@ export async function computeBountyHunter(db, seasonId) {
 
   if (!prevSeasonId) return [];
 
-  const maxRound = await db.prepare(
-    'SELECT MAX(round) as max_round FROM season_standings WHERE season_id = ?'
-  ).bind(prevSeasonId).first();
+  const regularRounds = await db.prepare(
+    'SELECT DISTINCT round FROM melee_tournaments WHERE season_id = ? AND phase = ?'
+  ).bind(prevSeasonId, 'regular').all();
+  const regularRoundSet = new Set((regularRounds.results || []).map(r => r.round));
 
-  if (!maxRound?.max_round) return [];
+  if (regularRoundSet.size === 0) return [];
+
+  const allStandings = await db.prepare(
+    'SELECT round, player_id, rank FROM season_standings WHERE season_id = ?'
+  ).bind(prevSeasonId).all();
+
+  const regularStandings = (allStandings.results || []).filter(s => regularRoundSet.has(s.round));
+  const maxRound = Math.max(...regularStandings.map(s => s.round), 0);
+
+  if (!maxRound) return [];
 
   const prevStandings = await db.prepare(
     'SELECT player_id FROM season_standings WHERE season_id = ? AND round = ? AND rank <= 4'
-  ).bind(prevSeasonId, maxRound.max_round).all();
+  ).bind(prevSeasonId, maxRound).all();
 
   const top4Ids = (prevStandings.results || []).map(s => s.player_id);
   if (top4Ids.length === 0) return [];

@@ -1,4 +1,4 @@
-import { getPlayerById, getPlayerByEmail, getAllSeasons, getSettings, isVotingOpen, parseWeek } from '../db/queries.js';
+import { getPlayerById, getPlayerByEmail, getAllSeasons, getSettings, isVotingOpen, parseWeek, parseSeasonId } from '../db/queries.js';
 import { createSession, findSessionByPlayerAndDevice } from '../lib/auth.js';
 import { getWeeklyParticipation } from '../lib/participation.js';
 
@@ -52,10 +52,11 @@ export async function handleLinkAccount(body, env) {
 
   let session = await findSessionByPlayerAndDevice(DB, playerId, deviceId);
   let token;
+  const now = new Date().toISOString();
   if (session) {
     token = session.token;
-    await DB.prepare("UPDATE sessions SET last_active = datetime('now'), email = ? WHERE token = ?")
-      .bind(email.trim().toLowerCase(), token).run();
+    await DB.prepare('UPDATE sessions SET last_active = ?, email = ? WHERE token = ?')
+      .bind(now, email.trim().toLowerCase(), token).run();
   } else {
     token = await createSession(DB, playerId, deviceId, email);
   }
@@ -63,7 +64,7 @@ export async function handleLinkAccount(body, env) {
   // Get current state
   const allSettings = await getSettings(DB);
   const votingOpen = isVotingOpen(allSettings.VOTING_OPEN);
-  const activeSeasonId = allSettings.ACTIVE_SEASON_ID;
+  const activeSeasonId = parseSeasonId(allSettings.ACTIVE_SEASON_ID);
   const currentWeek = allSettings.CURRENT_WEEK;
   const weekNum = parseWeek(currentWeek);
 
@@ -72,7 +73,7 @@ export async function handleLinkAccount(body, env) {
   if (activeSeasonId && weekNum) {
     const row = await DB.prepare(
       'SELECT 1 FROM votes WHERE season_id = ? AND week = ? AND player_id = ?'
-    ).bind(Number(activeSeasonId), weekNum, playerId).first();
+    ).bind(activeSeasonId, weekNum, playerId).first();
     alreadyVoted = !!row;
   }
 
@@ -84,7 +85,7 @@ export async function handleLinkAccount(body, env) {
   // Weekly participation
   let weeklyParticipation = null;
   if (activeSeasonId && weekNum) {
-    weeklyParticipation = await getWeeklyParticipation(DB, Number(activeSeasonId), weekNum);
+    weeklyParticipation = await getWeeklyParticipation(DB, activeSeasonId, weekNum);
   }
 
   return {
@@ -95,9 +96,9 @@ export async function handleLinkAccount(body, env) {
     leaders: (leaders.results || []).map(l => ({ id: l.id, name: l.name, set: l.set })),
     players: (players.results || []).map(p => ({ id: p.id, name: p.name })),
     seasons: seasons.results || [],
-    seasonName: seasons.results?.find(s => s.id === Number(activeSeasonId))?.name,
+    seasonName: seasons.results?.find(s => s.id === activeSeasonId)?.name,
     week: weekNum,
-    seasonId: activeSeasonId ? Number(activeSeasonId) : null,
+    seasonId: activeSeasonId,
     weeklyParticipation,
   };
 }

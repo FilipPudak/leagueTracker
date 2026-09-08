@@ -89,44 +89,38 @@ export async function getWeeklyParticipation(db, seasonId, week) {
     WHERE season_id = ? AND week = ?
   `).bind(seasonId, week).first();
 
-  const total = await db.prepare(`
-    SELECT COUNT(*) as count FROM players WHERE active = 1
-  `).first();
+  const attendance = await db.prepare(`
+    SELECT DISTINCT player_id FROM attendance
+    WHERE season_id = ? AND week = ?
+  `).bind(seasonId, week).all();
 
   return {
     voted: voted?.count || 0,
-    total: total?.count || 0,
+    total: (attendance.results || []).length,
   };
 }
 
 // Get season participation aggregate (leaderboard)
 export async function getSeasonParticipation(db, seasonId) {
-  const row = await db.prepare(`
-    SELECT
-      COUNT(DISTINCT a.player_id) as players_with_attendance,
-      COUNT(DISTINCT v.player_id) as players_who_voted
-    FROM attendance a
-    LEFT JOIN votes v
-      ON a.season_id = v.season_id AND a.player_id = v.player_id
-    WHERE a.season_id = ?
-  `).bind(seasonId).first();
+  const attendanceRows = await db.prepare(`
+    SELECT DISTINCT player_id FROM attendance WHERE season_id = ?
+  `).bind(seasonId).all();
+
+  const votedRows = await db.prepare(`
+    SELECT DISTINCT player_id FROM votes WHERE season_id = ?
+  `).bind(seasonId).all();
 
   const totalRow = await db.prepare(`
     SELECT COUNT(*) as total_votes FROM votes WHERE season_id = ?
   `).bind(seasonId).first();
 
-  const total = await db.prepare(`
-    SELECT COUNT(*) as count FROM players WHERE active = 1
-  `).first();
-
-  const totalPlayers = total?.count || 0;
-  const playersWithAttendance = row?.players_with_attendance || 0;
-  const playersWhoVoted = row?.players_who_voted || 0;
+  const playersWithAttendance = (attendanceRows.results || []).length;
+  const playersWhoVoted = (votedRows.results || []).length;
   const totalVotes = totalRow?.total_votes || 0;
 
-  const participationPct = totalPlayers > 0
-    ? Math.round((playersWithAttendance / totalPlayers) * 1000) / 10
+  const participationPct = playersWithAttendance > 0
+    ? Math.round((playersWhoVoted / playersWithAttendance) * 1000) / 10
     : 0;
 
-  return { participationPct, totalPlayers, playersWhoVoted, totalVotes };
+  return { participationPct, totalPlayers: playersWithAttendance, playersWhoVoted, totalVotes };
 }

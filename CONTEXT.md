@@ -121,7 +121,8 @@ ignored).
 ## 8. Voting
 
 - One **vote** per player per week, in a single merged table (voter column exists; see
-  anonymity). Both fields are **mandatory**: leader played + favorite opponent.
+  anonymity). Both fields are **mandatory**: leader played + favorite opponent. Server-side
+  validation rejects missing opponent with 400.
 - **Editable until close:** `updateVote` replaces both choices, only while `VOTING_OPEN` and only
   for `CURRENT_WEEK`. Re-checks: self-vote prohibited, vote count re-validated.
 - **Anonymity of the favorite-opponent choice is a display and query invariant, not a physical
@@ -201,14 +202,16 @@ never per-player rankings.
 ## 13. Invariants & Known Landmines
 
 1. Round ≡ week ≡ voting window — guarded by `UNIQUE(season_id, round)`.
-2. Every `MAX(round)` / "final standings" query filters `phase='regular'`.
+2. Every `MAX(round)` / "final standings" query filters `phase='regular'` — enforced via
+   separate query for regular rounds from `melee_tournaments`, then filter standings in JS.
 3. A night is "fully synced" only when **both** its standings and its match rows exist; an empty
    tournament (created but unplayed/unpublished) may be re-fetched.
 4. Sync and backfill share one player-lookup/creation path; unknown Melee names are
    auto-created (both paths, identically).
 5. Session timestamps are ISO-8601 UTC with `Z` everywhere (SQL `datetime('now')` and
    date-only strings are legacy formats to be normalized).
-6. Season IDs parse via digit-extraction (`'S6'`→6); no raw `Number()` on season strings.
+6. Season IDs are stored as numeric (`6` not `S6`). `parseSeasonId()` handles both formats
+   for backward compatibility; no raw `Number()` on season strings.
 7. Melee standings/match endpoints return max 25 rows/page — all reads paginate until
    `HasMore=false`.
 8. Match rows have **no numeric ID** — the UUID `Guid` is the stable key (stored in

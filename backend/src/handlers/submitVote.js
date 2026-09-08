@@ -1,4 +1,4 @@
-import { getSettings, isVotingOpen, parseWeek, hasPlayerVotedThisWeek } from '../db/queries.js';
+import { getSettings, isVotingOpen, parseSeasonId, parseWeek, hasPlayerVotedThisWeek } from '../db/queries.js';
 import { getRaffleTickets, getWeeklyParticipation } from '../lib/participation.js';
 
 export async function handleSubmitVote(body, env, session) {
@@ -21,7 +21,7 @@ export async function handleSubmitVote(body, env, session) {
     throw err;
   }
 
-  const seasonId = allSettings.ACTIVE_SEASON_ID ? parseWeek(allSettings.ACTIVE_SEASON_ID) : null;
+  const seasonId = parseSeasonId(allSettings.ACTIVE_SEASON_ID);
   const week = parseWeek(allSettings.CURRENT_WEEK);
 
   if (!seasonId || !week) {
@@ -41,8 +41,14 @@ export async function handleSubmitVote(body, env, session) {
     throw err;
   }
 
-  // Prevent self-voting (only if opponent is provided)
-  if (opponentId && String(opponentId) === String(playerId)) {
+  if (!opponentId) {
+    const err = new Error('Please select your favorite opponent.');
+    err.status = 400;
+    throw err;
+  }
+
+  // Prevent self-voting
+  if (String(opponentId) === String(playerId)) {
     const err = new Error("You can't select yourself as your favorite opponent.");
     err.status = 400;
     throw err;

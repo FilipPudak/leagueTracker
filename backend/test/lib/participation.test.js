@@ -177,17 +177,17 @@ describe('getWeeklyParticipation', () => {
     assert.equal(typeof result.total, 'number');
   });
 
-  it('returns correct total from active players', async () => {
+  it('returns correct total from attendance for week', async () => {
     const db = createMockDb(makeStreakTables());
     const result = await getWeeklyParticipation(db, 7, 1);
-    assert.equal(result.total, 5);
+    assert.equal(result.total, 3);
   });
 
-  it('returns 0 voted for week with no votes', async () => {
+  it('returns 0 voted and 0 total for week with no attendance', async () => {
     const db = createMockDb(makeStreakTables());
     const result = await getWeeklyParticipation(db, 7, 99);
     assert.equal(result.voted, 0);
-    assert.equal(result.total, 5);
+    assert.equal(result.total, 0);
   });
 
   it('returns 0s with empty tables', async () => {
@@ -219,10 +219,10 @@ describe('getSeasonParticipation', () => {
     assert.equal(typeof result.totalVotes, 'number');
   });
 
-  it('returns correct totalPlayers from active players', async () => {
+  it('returns correct totalPlayers from players with attendance', async () => {
     const db = createMockDb(makeStreakTables());
     const result = await getSeasonParticipation(db, 7);
-    assert.equal(result.totalPlayers, 5);
+    assert.equal(result.totalPlayers, 3);
   });
 
   it('returns correct totalVotes count', async () => {

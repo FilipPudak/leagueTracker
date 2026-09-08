@@ -32,7 +32,7 @@ describe('db/queries', () => {
 
   it('getSettings returns key-value object from settings table', async () => {
     const settings = await getSettings(db);
-    assert.equal(settings.ACTIVE_SEASON_ID, 'S6');
+    assert.equal(settings.ACTIVE_SEASON_ID, '6');
     assert.equal(settings.CURRENT_WEEK, 'Week 3');
     assert.equal(settings.VOTING_OPEN, 'TRUE');
     assert.equal(settings.SEASON_LENGTH, '11');

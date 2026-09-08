@@ -136,15 +136,21 @@ describe('handleSubmitVote', () => {
     );
   });
 
-  it('missing opponentId still succeeds with leader only', async () => {
-    const result = await handleSubmitVote(
-      {
-        voteData: { leader1Id: '1' },
-      },
-      env,
-      aliceSession
+  it('missing opponentId → 400', async () => {
+    await assert.rejects(
+      () =>
+        handleSubmitVote(
+          {
+            voteData: { leader1Id: '1' },
+          },
+          env,
+          aliceSession
+        ),
+      (err) => {
+        assert.equal(err.status, 400);
+        return true;
+      }
     );
-    assert.equal(typeof result.raffleTickets, 'number');
   });
 
   it('UNIQUE constraint violation caught → 409', async () => {
@@ -241,15 +247,21 @@ describe('handleSubmitVote', () => {
     assert.equal(typeof result.raffleTickets, 'number');
   });
 
-  it('self-voting check applies only when opponentId provided', async () => {
-    const result = await handleSubmitVote(
-      {
-        voteData: { leader1Id: '1' },
-      },
-      env,
-      aliceSession
+  it('self-voting check rejects when opponent is self', async () => {
+    await assert.rejects(
+      () =>
+        handleSubmitVote(
+          {
+            voteData: { leader1Id: '1', opponentId: 'P001' },
+          },
+          env,
+          aliceSession
+        ),
+      (err) => {
+        assert.equal(err.status, 400);
+        return true;
+      }
     );
-    assert.ok(result);
   });
 
   it('null session (bypassing router) → 401', async () => {
