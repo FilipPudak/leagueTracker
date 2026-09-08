@@ -56,6 +56,7 @@ export async function fetchLeagueTournaments(client, { targetSeason } = {}) {
       if (!isLeagueTournament(t.Name)) continue;
       const info = extractSeasonAndRound(t.Name);
       if (!info) continue;
+      if (!t.StartDate && !t.LastPairDateTime) continue;
       const seasonNum = info.seasonNum || 1;
       if (targetSeason != null && seasonNum !== targetSeason) continue;
       all.push({ ...t, seasonNum, phase: classifyPhase(t.Name) });

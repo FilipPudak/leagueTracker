@@ -79,7 +79,7 @@ Per-season values live on the `seasons` row (`length`, `top_results`), set at `s
 
 | Season | Length (regular nights) | Top results | Source |
 |---|---|---|---|
-| S1 | 10 | 7 *(assumption — validate against the offline fixture at materialization)* | inferred |
+| S1 | 9 | 7 *(assumption — validate against the offline fixture at materialization)* | inferred |
 | S2 | 15 | 10 | organizer's rule |
 | S3 | 15 | 10 | organizer's rule |
 | S4 | 15 | 10 | organizer's rule |
