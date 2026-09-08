@@ -1,5 +1,5 @@
 import { getSettings, getAwardsForSeason, getMostPlayedLeaders, parseSeasonId, parseWeek, isVotingOpen } from '../db/queries.js';
-import { computeSchemer, computeAmbassador, assignStandardRanks } from '../lib/awards.js';
+import { computeSchemer, computeAmbassador, computeChampion, assignStandardRanks } from '../lib/awards.js';
 import { getSeasonParticipation } from '../lib/participation.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';
 
@@ -156,6 +156,15 @@ export async function handleGetLeaderboardData(body, env) {
   // Bounty Hunter: stored only, hidden while voting is live
   const bountyHunter = isLive ? null : (awardsMap['Bounty Hunter'] || null);
 
+  // Galactic Champion: stored or live from cut tournament
+  let champion = awardsMap['Galactic Champion'] || null;
+  if ((!champion || champion.length === 0) && isActiveSeason) {
+    const live = await computeChampion(DB, seasonId);
+    champion = live.length > 0 ? assignStandardRanks(live) : null;
+  } else if (champion) {
+    champion = assignStandardRanks(champion);
+  }
+
   // Season participation aggregate
   const participation = await getSeasonParticipation(DB, seasonId);
 
@@ -163,6 +172,7 @@ export async function handleGetLeaderboardData(body, env) {
   schemer = resolveNames(schemer, nameMap);
   ambassador = resolveNames(ambassador, nameMap);
   ruler = resolveNames(ruler, nameMap);
+  champion = resolveNames(champion, nameMap);
   newHope = resolveNames(newHope, nameMap);
   const bountyHunterNamed = resolveNames(bountyHunter, nameMap);
 
@@ -177,6 +187,7 @@ export async function handleGetLeaderboardData(body, env) {
   schemer = formatScore(schemer, (e) => `${e.score} Leaders`);
   ambassador = formatScore(ambassador, (e) => `${e.score} Votes`);
   ruler = formatScore(ruler, (e) => `${e.score} Pts`);
+  champion = formatScore(champion, (e) => e.score ? `🏆` : null);
   newHope = formatScore(newHope, (e) => `+${e.score} Climb`);
   const bountyHunterFormatted = formatScore(bountyHunterNamed, (e) => e.score ? `${e.score} 💀` : null);
 
@@ -192,6 +203,7 @@ export async function handleGetLeaderboardData(body, env) {
     schemer,
     ambassador,
     ruler,
+    champion,
     newHope,
     bountyHunter: bountyHunterFormatted,
     participation,

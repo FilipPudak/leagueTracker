@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '3.0.0';
+const APP_VERSION = '4.0.0';
 
 // How long a loaded leaderboard/stats payload stays fresh before a re-entry
 // refetches it. Flicking between tabs is sub-second, so a tiny TTL is enough to
@@ -31,12 +31,16 @@ let appState = {
   seasons: [],
   leaderboardCache: {},
   mystatsCache: {},
+  standingsCache: {},
   leaderboardToken: 0,
   mystatsToken: 0,
+  standingsToken: 0,
   leaderboardInFlight: false,
   leaderboardInFlightSeason: null,
   mystatsInFlight: false,
   mystatsInFlightSeason: null,
+  standingsInFlight: false,
+  standingsInFlightSeason: null,
   lastView: 'vote-view'
 };
 
@@ -185,13 +189,17 @@ function applyBoot(boot) {
   appState.linkedPlayer = boot.currentPlayer || boot.linkedPlayer || null;
   appState.votingOpen = Boolean(boot.votingOpen);
   appState.seasons = boot.seasons || [];
+  appState.players = boot.players || [];
   appState.seasonName = boot.seasonName;
   appState.week = boot.week;
   appState.seasonId = boot.seasonId;
 
   const seasonName = boot.seasonName || ('Season ' + (appState.settings.activeSeasonId || ''));
   const subtitleEl = $('app-subtitle');
-  if (subtitleEl) subtitleEl.textContent = seasonName + ' • Week ' + (boot.week || 1);
+  if (subtitleEl) {
+    const week = boot.week || 1;
+    subtitleEl.textContent = seasonName + (week === 'Season Ended' ? ' — Season Ended' : ' • Week ' + week);
+  }
 
   const badge = $('voting-badge');
   if (badge) {
@@ -205,7 +213,7 @@ function applyBoot(boot) {
     }
   }
 
-  ['season-filter', 'myseason-season-filter'].forEach((id) => {
+  ['season-filter', 'myseason-season-filter', 'standings-season-filter'].forEach((id) => {
     const sel = $(id);
     if (!sel) return;
     sel.innerHTML = '';
@@ -229,6 +237,19 @@ function applyBoot(boot) {
     }
   }
 
+  const deadlineCard = $('deadline-copy');
+  const deadlineText = $('deadline-text');
+  if (deadlineCard && deadlineText) {
+    const day = appState.settings.weeklyDeadlineDay;
+    const time = appState.settings.weeklyDeadlineTime;
+    if (day && time) {
+      deadlineText.textContent = 'Voting closes ' + day + ' ' + time + ' before games';
+      deadlineCard.style.display = appState.votingOpen ? 'block' : 'none';
+    } else {
+      deadlineCard.style.display = 'none';
+    }
+  }
+
   if (boot.status === 'linked') {
     const voteForm = $('vote-form');
     const votedCard = $('already-voted-card');
@@ -242,6 +263,8 @@ function applyBoot(boot) {
     if (boot.alreadySubmitted || boot.alreadyVoted) {
       if (voteForm) voteForm.style.display = 'none';
       if (votedCard) votedCard.style.display = 'block';
+      const changeBtn = $('btn-change-vote');
+      if (changeBtn) changeBtn.style.display = appState.votingOpen ? 'inline-block' : 'none';
       clearStatus();
     } else if (!appState.votingOpen) {
       if (voteForm) voteForm.style.display = 'none';
@@ -283,12 +306,28 @@ function populateLinkPicker(players) {
   if (!select) return;
   select.innerHTML = '<option value="">-- Choose Your Name --</option>';
   (players || []).forEach((p) => {
-    select.appendChild(new Option(p.name, p.id));
+    const opt = new Option(p.name, p.id);
+    opt.dataset.name = (p.name || '').toLowerCase();
+    select.appendChild(opt);
   });
   const prefill = readPrefill();
   if (prefill.playerId) select.value = prefill.playerId;
   const emailEl = $('link-email');
   if (prefill.email && emailEl) emailEl.value = prefill.email;
+}
+
+function filterLinkPicker() {
+  const searchEl = $('link-player-search');
+  const select = $('link-player-select');
+  if (!searchEl || !select) return;
+  const query = searchEl.value.toLowerCase().trim();
+  const options = select.options;
+  for (let i = 0; i < options.length; i++) {
+    const opt = options[i];
+    if (!opt.value) { opt.style.display = ''; continue; }
+    const name = opt.dataset.name || opt.textContent.toLowerCase();
+    opt.style.display = name.includes(query) ? '' : 'none';
+  }
 }
 
 /* ---------------------------------------------------------------- intents -- */
@@ -360,7 +399,7 @@ function cancelUnlink() {
   if (overlay) overlay.style.display = 'none';
 }
 
-const TAB_INDEX = { 'vote-view': 0, 'leaderboard-view': 1, 'myseason-view': 2 };
+const TAB_INDEX = { 'vote-view': 0, 'standings-view': 1, 'leaderboard-view': 2, 'myseason-view': 3 };
 
 function confirmUnlink() {
   if (unlinkInFlight) return;
@@ -412,21 +451,27 @@ function switchTab(tabId) {
       const linkView = $('link-view');
       if (linkView) linkView.classList.add('active');
     }
+  } else if (tabId === 'standings-view') {
+    clearStatus();
+    showSpinner(false);
+    setActiveView('standings-view', 1);
+    appState.lastView = 'standings-view';
+    loadStandingsData();
   } else if (tabId === 'leaderboard-view') {
     clearStatus();
     showSpinner(false);
-    setActiveView('leaderboard-view', 1);
+    setActiveView('leaderboard-view', 2);
     appState.lastView = 'leaderboard-view';
     loadLeaderboardData();
   } else if (tabId === 'myseason-view') {
     if (appState.linkedPlayer) {
       clearStatus();
       showSpinner(false);
-      setActiveView('myseason-view', 2);
+      setActiveView('myseason-view', 3);
       appState.lastView = 'myseason-view';
       loadMySeasonStats();
     } else {
-      setActiveView('link-view', 2);
+      setActiveView('link-view', 3);
     }
   }
 }
@@ -443,6 +488,14 @@ function populateVotingDropdowns(leaders, players, currentUserId) {
   (players || []).forEach((p) => {
     if (String(p.id) !== String(currentUserId)) opp.appendChild(new Option(p.name, p.id));
   });
+}
+
+function changeVote() {
+  const voteForm = $('vote-form');
+  const votedCard = $('already-voted-card');
+  if (voteForm) voteForm.style.display = '';
+  if (votedCard) votedCard.style.display = 'none';
+  clearStatus();
 }
 
 let voteInFlight = false;
@@ -490,6 +543,138 @@ function submitVotes() {
         showStatus(msg || 'Vote submission failed.', false);
       }
     });
+}
+
+/* ----------------------------------------------------------- standings --- */
+
+function loadStandingsData() {
+  const sel = $('standings-season-filter');
+  const roundSel = $('standings-round-filter');
+  const selectedSeasonId = sel ? sel.value : '';
+  const asOfRound = roundSel ? roundSel.value : '';
+
+  if (isFreshCache(appState.standingsCache, selectedSeasonId + '-' + asOfRound)) {
+    renderStandings(appState.standingsCache[selectedSeasonId + '-' + asOfRound].data);
+    return;
+  }
+
+  if (appState.standingsInFlight && appState.standingsInFlightSeason === selectedSeasonId) {
+    showSpinner(true, 'standings');
+    return;
+  }
+
+  const token = ++appState.standingsToken;
+  appState.standingsInFlight = true;
+  appState.standingsInFlightSeason = selectedSeasonId;
+  showSpinner(true, 'standings');
+
+  const payload = { seasonId: selectedSeasonId };
+  if (asOfRound) payload.asOfRound = parseInt(asOfRound, 10);
+
+  callApi('getStandingsData', payload)
+    .then((res) => {
+      if (token !== appState.standingsToken) return;
+      appState.standingsInFlight = false;
+      appState.standingsInFlightSeason = null;
+      showSpinner(false, 'standings');
+      appState.standingsCache[selectedSeasonId + '-' + asOfRound] = { data: res, ts: Date.now() };
+      renderStandings(res);
+    })
+    .catch((err) => {
+      if (token !== appState.standingsToken) return;
+      appState.standingsInFlight = false;
+      appState.standingsInFlightSeason = null;
+      showSpinner(false, 'standings');
+      showStatus(err.userMessage || err.message || 'Failed to load standings.', false);
+    });
+}
+
+function renderStandings(res) {
+  updateRoundFilter(res.rounds, res.asOfRound);
+  renderStandingsTable(res.table);
+  renderRoundResults(res.rounds);
+  const content = $('standings-content');
+  if (content) content.style.display = 'block';
+}
+
+function updateRoundFilter(rounds, asOfRound) {
+  const sel = $('standings-round-filter');
+  if (!sel) return;
+  const currentValue = sel.value;
+  sel.innerHTML = '<option value="">Latest Regular</option>';
+  const regularRounds = rounds.filter(r => r.phase === 'regular');
+  regularRounds.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r.round;
+    opt.textContent = 'After Round ' + r.round;
+    if (String(r.round) === String(asOfRound)) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function renderStandingsTable(table) {
+  const tbody = $('standings-table-body');
+  if (!tbody) return;
+  if (!table || table.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#94a3b8; padding:16px;">No standings data.</td></tr>';
+    return;
+  }
+  const players = appState.players || [];
+  const nameMap = {};
+  players.forEach(p => { nameMap[p.id] = p.name; });
+
+  tbody.innerHTML = table.map(row => {
+    const rankClass = row.rank <= 3 ? ' rank-' + row.rank : '';
+    const playerName = nameMap[row.playerId] || row.playerId;
+    return `<tr class="standings-row${rankClass}">
+      <td style="font-weight:700;">${escapeHtml(row.rank)}</td>
+      <td style="font-weight:600;">${escapeHtml(playerName)}</td>
+      <td style="text-align:center;">${escapeHtml(row.played)}</td>
+      <td style="text-align:center;">${escapeHtml(row.won)}</td>
+      <td style="text-align:center;">${escapeHtml(row.drawn)}</td>
+      <td style="text-align:center;">${escapeHtml(row.lost)}</td>
+      <td style="text-align:center; font-weight:700; color:#38bdf8;">${escapeHtml(row.points)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderRoundResults(rounds) {
+  const container = $('round-results-container');
+  if (!container) return;
+  if (!rounds || rounds.length === 0) {
+    container.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:12px;">No round data.</div>';
+    return;
+  }
+
+  const players = appState.players || [];
+  const nameMap = {};
+  players.forEach(p => { nameMap[p.id] = p.name; });
+
+  container.innerHTML = rounds.map(round => {
+    const phaseClass = 'round-phase-' + round.phase;
+    const phaseLabel = round.phase === 'cut' ? 'Championship Cut' : (round.phase === 'side' ? 'Side Event' : 'Regular');
+    const playerRows = (round.players || [])
+      .sort((a, b) => (a.rank || 999) - (b.rank || 999))
+      .map(p => {
+        const playerName = nameMap[p.playerId] || p.playerId;
+        return `<div class="stats-row" style="padding:6px 10px;">
+          <div class="stats-left">
+            <div class="rank-pill" style="width:24px; height:24px; font-size:0.65rem;">#${escapeHtml(p.rank || '-')}</div>
+            <span class="stats-title" style="font-size:0.85rem;">${escapeHtml(playerName)}</span>
+          </div>
+          <span class="stats-score" style="font-size:0.8rem;">${escapeHtml(p.points)} pts</span>
+        </div>`;
+      })
+      .join('');
+
+    return `<div class="round-card">
+      <div class="round-header" onclick="this.nextElementSibling.classList.toggle('open')">
+        <span class="round-title">Round ${escapeHtml(round.round)}${round.name ? ' — ' + escapeHtml(round.name) : ''}</span>
+        <span class="round-phase ${phaseClass}">${escapeHtml(phaseLabel)}</span>
+      </div>
+      <div class="round-body">${playerRows || '<div style="color:#94a3b8; padding:8px 0;">No standings recorded.</div>'}</div>
+    </div>`;
+  }).join('');
 }
 
 /* ----------------------------------------------------------- leaderboard --- */
@@ -551,6 +736,7 @@ function renderLeaderboard(res) {
   renderLeaderboardSection('schemer-section', 'schemer-container', res, 'schemer');
   renderLeaderboardSection('ambassador-section', 'ambassador-container', res, 'ambassador');
   renderLeaderboardSection('ruler-section', 'ruler-container', res, 'ruler');
+  renderLeaderboardSection('champion-section', 'champion-container', res, 'champion');
   renderLeaderboardSection('new-hope-section', 'new-hope-container', res, 'newHope');
   renderLeaderboardSection('bounty-hunter-section', 'bounty-hunter-container', res, 'bountyHunter');
   const content = $('leaderboard-content');
@@ -615,6 +801,21 @@ function renderMySeasonStats(res) {
   const compliance = res.compliance || {};
   const streaks = res.streaks || {};
   const raffle = res.raffleTickets || 0;
+  const milestone = res.milestone || {};
+
+  const milestoneContainer = $('myseason-milestone-container');
+  const milestoneBar = $('milestone-bar');
+  const milestoneText = $('milestone-text');
+  if (milestoneContainer && milestoneBar && milestoneText) {
+    if (milestone.votes !== undefined && milestone.target) {
+      const pct = Math.min(100, Math.round((milestone.votes / milestone.target) * 100));
+      milestoneBar.style.width = pct + '%';
+      milestoneText.textContent = milestone.votes + ' of ' + milestone.target + ' votes' + (milestone.complete ? ' — Prize earned!' : '');
+      milestoneContainer.style.display = 'block';
+    } else {
+      milestoneContainer.style.display = 'none';
+    }
+  }
 
   if (gamSection && gamContainer) {
     if (compliance.weeksAttended > 0 || raffle > 0) {

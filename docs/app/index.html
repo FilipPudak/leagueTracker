@@ -215,6 +215,24 @@
       font-size: 0.75rem; color: #475569; border-top: 1px solid rgba(71, 85, 105, 0.25);
       font-family: monospace;
     }
+
+    .standings-row { transition: background 0.15s ease; }
+    .standings-row:hover { background: rgba(56, 189, 248, 0.05); }
+    .standings-row td { padding: 8px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+    .standings-row.rank-1 td:first-child { color: #facc15; font-weight: 900; }
+    .standings-row.rank-2 td:first-child { color: #e2e8f0; font-weight: 900; }
+    .standings-row.rank-3 td:first-child { color: #f59e0b; font-weight: 900; }
+
+    .round-card { background: #090d16; border: 1px solid rgba(56, 189, 248, 0.15); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+    .round-header { padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .round-header:hover { background: rgba(56, 189, 248, 0.05); }
+    .round-title { font-weight: 700; font-size: 0.9rem; color: #f8fafc; }
+    .round-phase { font-family: 'Orbitron', sans-serif; font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 3px; letter-spacing: 0.5px; }
+    .round-phase-regular { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
+    .round-phase-cut { background: rgba(250, 204, 21, 0.15); color: #facc15; }
+    .round-phase-side { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
+    .round-body { padding: 0 14px 12px; display: none; }
+    .round-body.open { display: block; }
     .footer-version { opacity: 0.8; }
     .footer-discord {
       display: inline-flex; align-items: center; gap: 6px;
@@ -251,7 +269,8 @@
 
     <div class="nav-tabs" style="display:none;">
       <button type="button" class="tab-btn active" onclick="switchTab('vote-view')">Vote</button>
-      <button type="button" class="tab-btn" onclick="switchTab('leaderboard-view')">Leaderboard</button>
+      <button type="button" class="tab-btn" onclick="switchTab('standings-view')">Standings</button>
+      <button type="button" class="tab-btn" onclick="switchTab('leaderboard-view')">Awards</button>
       <button type="button" class="tab-btn" onclick="switchTab('myseason-view')">My Stats</button>
     </div>
 
@@ -273,13 +292,17 @@
       </div>
       <div class="form-group">
         <label for="link-player-select">Select Your Name</label>
-        <select id="link-player-select"><option value="">-- Choose Your Name --</option></select>
+        <input type="text" id="link-player-search" class="text-input" placeholder="Type to search..." oninput="filterLinkPicker()" autocomplete="off" />
+        <select id="link-player-select" size="6" style="margin-top: 8px;"><option value="">-- Choose Your Name --</option></select>
       </div>
       <button type="button" class="btn-submit" onclick="submitAccountLink()">Link Account</button>
     </div>
 
     <!-- VOTE PANEL -->
     <div id="vote-view" class="view-panel">
+      <div id="deadline-copy" class="card" style="display: none; margin-bottom: 12px; padding: 10px 14px; font-size: 0.85rem; color: #94a3b8;">
+        <span id="deadline-text"></span>
+      </div>
       <form id="vote-form" onsubmit="event.preventDefault(); submitVotes();">
         <div class="form-group">
           <label for="leader-1">Leader Played</label>
@@ -294,11 +317,53 @@
 
       <div id="already-voted-card" class="card" style="display: none;">
         <h3 style="margin-top:0; font-family:'Orbitron', sans-serif;">Votes Received!</h3>
-        <p style="font-size: 0.9rem; color: #a7f3d0; margin-bottom:0;">Your votes for this week are logged. Check back next week!</p>
+        <p style="font-size: 0.9rem; color: #a7f3d0; margin-bottom:12px;">Your votes for this week are logged. Check back next week!</p>
+        <button type="button" id="btn-change-vote" class="btn-ghost" onclick="changeVote()" style="display:none;">Change Vote</button>
       </div>
 
       <div id="weekly-participation-card" class="card" style="display: none; margin-top: 12px; padding: 10px 14px; font-size: 0.85rem; color: #94a3b8;">
         <span id="weekly-participation-text"></span>
+      </div>
+    </div>
+
+    <!-- STANDINGS PANEL -->
+    <div id="standings-view" class="view-panel">
+      <div class="form-group">
+        <label for="standings-season-filter">Select Season</label>
+        <select id="standings-season-filter" onchange="loadStandingsData()"></select>
+      </div>
+      <div class="form-group">
+        <label for="standings-round-filter">As of Round</label>
+        <select id="standings-round-filter" onchange="loadStandingsData()">
+          <option value="">Latest Regular</option>
+        </select>
+      </div>
+
+      <div id="standings-content" style="display: none;">
+        <div id="standings-table-section">
+          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Season Table</h3>
+          <div style="overflow-x: auto;">
+            <table id="standings-table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+              <thead>
+                <tr style="border-bottom: 1px solid rgba(56, 189, 248, 0.3);">
+                  <th style="text-align: left; padding: 8px 6px; color: #38bdf8; font-family: 'Orbitron', sans-serif; font-size: 0.7rem;">#</th>
+                  <th style="text-align: left; padding: 8px 6px; color: #38bdf8; font-family: 'Orbitron', sans-serif; font-size: 0.7rem;">Player</th>
+                  <th style="text-align: center; padding: 8px 4px; color: #38bdf8; font-family: 'Orbitron', sans-serif; font-size: 0.7rem;">P</th>
+                  <th style="text-align: center; padding: 8px 4px; color: #38bdf8; font-family: 'Orbitron', sans-serif; font-size: 0.7rem;">W</th>
+                  <th style="text-align: center; padding: 8px 4px; color: #38bdf8; font-family: 'Orbitron', sans-serif; font-size: 0.7rem;">D</th>
+                  <th style="text-align: center; padding: 8px 4px; color: #38bdf8; font-family: 'Orbitron', sans-serif; font-size: 0.7rem;">L</th>
+                  <th style="text-align: center; padding: 8px 4px; color: #38bdf8; font-family: 'Orbitron', sans-serif; font-size: 0.7rem;">Pts</th>
+                </tr>
+              </thead>
+              <tbody id="standings-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="round-results-section" style="margin-top: 24px;">
+          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Round Results</h3>
+          <div id="round-results-container"></div>
+        </div>
       </div>
     </div>
 
@@ -319,6 +384,16 @@
           <div id="most-played-container"></div>
         </div>
 
+        <div id="ruler-section" style="margin-top: 20px;">
+          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Ruler</h3>
+          <div id="ruler-container"></div>
+        </div>
+
+        <div id="champion-section" style="margin-top: 20px;">
+          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Champion</h3>
+          <div id="champion-container"></div>
+        </div>
+
         <div id="schemer-section" style="margin-top: 20px;">
           <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Schemer</h3>
           <div id="schemer-container"></div>
@@ -327,11 +402,6 @@
         <div id="ambassador-section" style="margin-top: 20px;">
           <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Ambassador</h3>
           <div id="ambassador-container"></div>
-        </div>
-
-        <div id="ruler-section" style="margin-top: 20px;">
-          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Ruler</h3>
-          <div id="ruler-container"></div>
         </div>
 
         <div id="new-hope-section" style="margin-top: 20px;">
@@ -356,6 +426,13 @@
       <div id="myseason-content" style="display: none;">
         <div id="myseason-gamification-section" style="margin-top: 0; display: none;">
           <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Voting Stats</h3>
+          <div id="myseason-milestone-container" class="card" style="padding: 12px; margin-bottom: 8px; display: none;">
+            <div style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 8px;">Voting Milestone</div>
+            <div style="background: #1e293b; border-radius: 4px; height: 8px; overflow: hidden;">
+              <div id="milestone-bar" style="background: #38bdf8; height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+            </div>
+            <div id="milestone-text" style="font-size: 0.8rem; color: #94a3b8; margin-top: 6px;"></div>
+          </div>
           <div id="myseason-gamification-container" class="card" style="padding: 12px; line-height: 1.7;"></div>
         </div>
 
