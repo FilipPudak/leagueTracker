@@ -22,12 +22,23 @@ function tablesWithoutAwards() {
 function tablesWithStandings() {
   const t = tablesWithoutAwards();
   t.season_standings = [
-    { season_id: 6, round: 3, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 100, rank: 1 },
-    { season_id: 6, round: 3, player_id: 'P002', wins: 2, losses: 1, draws: 0, match_points: 90, rank: 2 },
-    { season_id: 6, round: 3, player_id: 'P003', wins: 1, losses: 2, draws: 0, match_points: 80, rank: 3 },
-    { season_id: 6, round: 5, player_id: 'P001', wins: 2, losses: 1, draws: 0, match_points: 50, rank: 3 },
-    { season_id: 6, round: 5, player_id: 'P002', wins: 3, losses: 0, draws: 0, match_points: 70, rank: 1 },
-    { season_id: 6, round: 5, player_id: 'P003', wins: 0, losses: 3, draws: 0, match_points: 30, rank: 5 },
+    // Round 3 (early season)
+    { season_id: 6, round: 3, player_id: 'P001', wins: 1, losses: 2, draws: 0, match_points: 30, rank: 5 },
+    { season_id: 6, round: 3, player_id: 'P002', wins: 3, losses: 0, draws: 0, match_points: 90, rank: 1 },
+    { season_id: 6, round: 3, player_id: 'P003', wins: 2, losses: 1, draws: 0, match_points: 60, rank: 3 },
+    // Round 5 (mid-season)
+    { season_id: 6, round: 5, player_id: 'P001', wins: 1, losses: 2, draws: 0, match_points: 30, rank: 5 },
+    { season_id: 6, round: 5, player_id: 'P002', wins: 3, losses: 0, draws: 0, match_points: 90, rank: 1 },
+    { season_id: 6, round: 5, player_id: 'P003', wins: 2, losses: 1, draws: 0, match_points: 60, rank: 3 },
+    // Round 11 (final regular)
+    { season_id: 6, round: 11, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 90, rank: 1 },
+    { season_id: 6, round: 11, player_id: 'P002', wins: 2, losses: 1, draws: 0, match_points: 60, rank: 2 },
+    { season_id: 6, round: 11, player_id: 'P003', wins: 1, losses: 2, draws: 0, match_points: 30, rank: 3 },
+  ];
+  t.melee_tournaments = [
+    { melee_id: 100, season_id: 6, round: 3, name: 'SWU Wednesday league season 6 10/6 (week 3)', date: '2026-06-10', phase: 'regular' },
+    { melee_id: 101, season_id: 6, round: 5, name: 'SWU Wednesday league season 6 24/6 (week 5)', date: '2026-06-24', phase: 'regular' },
+    { melee_id: 102, season_id: 6, round: 11, name: 'SWU Wednesday league season 6 26/8 (week 11)', date: '2026-08-26', phase: 'regular' },
   ];
   return t;
 }
@@ -134,6 +145,11 @@ describe('handleGetLeaderboardData', () => {
 
   it('live New Hope from mid+final standings when no stored award', async () => {
     const tables = tablesWithStandings();
+    tables.settings = tables.settings.map(s =>
+      s.key === 'VOTING_OPEN' ? { ...s, value: 'FALSE' } : s
+    ).map(s =>
+      s.key === 'CURRENT_WEEK' ? { ...s, value: 'Season Ended' } : s
+    );
     const db = createMockDb(tables);
     const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
     assert.ok(result.newHope, 'newHope present from DB');

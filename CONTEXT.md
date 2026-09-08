@@ -114,6 +114,7 @@ ignored).
 | Term | Definition |
 |---|---|
 | **Night result** | A player's final standing in one regular tournament: match W/D/L (a "match" = one BO3 set), night points = 3W + D, rank. **A bye counts as a win** — this is how the league's official regular standings treat byes. |
+| **Scoring** | Win = 3 points, Draw = 1 point, Loss = 0 points. Night points = 3W + D. |
 | **Season table** | Derived, not stored: for each player, the **sum of their best `top_results` night results** (by night points; a tie at the boundary keeps the earlier night), then Played/Won/Drawn/Lost totals, Points = 3W + D. Ranks: points desc → undefeated-nights count → sum of night ranks (lower better) → **shared rank** if still tied. |
 | **Match result** | One BO3 set between two players: winner = higher `GameWins`; equal game wins ⇒ **draw** (`winner_id` NULL, result string kept). Byes are recorded (`is_bye=1`) but are never a "win against a person". |
 | **Attendance** | A player **attended week N** iff they appear in week N's regular standings. Regular nights only — cut/side attendance is not tracked. |
@@ -143,7 +144,7 @@ own row; a podium may exceed three entries (tie-aware); standard competition ran
 | **Galactic Champion** | Rank 1 of the chronologically last **cut** event of the season (the bracket winner — may differ from Ruler; S6: Champion=Filip, Ruler=Dennis) | impossible (bracket rank is strict); if a season has no cut data, no row |
 | **Galactic Schemer** | Most distinct leaders played (from votes) | share podium |
 | **Galactic Ambassador** | Most favorite-opponent votes received | share podium |
-| **A New Hope** | Biggest rank climb on the rolling season table from end-of-round ⌊length/2⌋ to final regular round; must appear in **both** snapshots | ties share the victory |
+| **A New Hope** | Biggest rank climb from accumulated standings at end-of-round ⌊length/2⌋ to derived season table at final regular round; must appear in **both** snapshots. Mid-season snapshot uses raw accumulated points (not best-X). | ties share the victory |
 | **Bounty Hunter** | Regular-season non-bye match wins against players who placed top-4 in the **previous** season's final regular season table | share podium; **none in S1** (no prior season) |
 
 **Reveal gating (display rules):** Ambassador names are **callsigns** while voting is live

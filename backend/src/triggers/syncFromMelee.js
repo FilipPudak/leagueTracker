@@ -260,16 +260,36 @@ export async function syncFromMelee(env, deps = {}) {
   }
 
   const midRound = Math.floor(seasonLength / 2);
-  const midTable = computeSeasonTable(
-    nights.filter(n => n.round <= midRound),
-    topResults
-  );
-  const midRankMap = new Map(midTable.map(r => [r.playerId, r.rank]));
 
-  const climbers = seasonTable
-    .map(r => ({
-      playerId: r.playerId,
-      climb: (midRankMap.get(r.playerId) || 0) - r.rank,
+  const regularRoundsForMid = await DB.prepare(
+    'SELECT DISTINCT round FROM melee_tournaments WHERE season_id = ? AND phase = ? AND round <= ?'
+  ).bind(activeSeasonId, 'regular', midRound).all();
+  const regularMidRoundSet = new Set((regularRoundsForMid.results || []).map(r => r.round));
+
+  const midStandings = await DB.prepare(
+    'SELECT player_id, match_points FROM season_standings WHERE season_id = ? AND round <= ?'
+  ).bind(activeSeasonId, midRound).all();
+
+  const midPointsMap = new Map();
+  for (const row of (midStandings.results || [])) {
+    if (!regularMidRoundSet.has(row.round)) continue;
+    midPointsMap.set(row.player_id, (midPointsMap.get(row.player_id) || 0) + (row.match_points || 0));
+  }
+
+  const midEntries = [...midPointsMap.entries()].sort((a, b) => b[1] - a[1]);
+  const midRankMap = new Map();
+  let midRank = 1;
+  for (const [pid] of midEntries) {
+    midRankMap.set(pid, midRank++);
+  }
+
+  const finalRankMap = new Map(seasonTable.map(r => [r.playerId, r.rank]));
+
+  const climbers = [...midRankMap.keys()]
+    .filter(pid => finalRankMap.has(pid))
+    .map(pid => ({
+      playerId: pid,
+      climb: (midRankMap.get(pid) || 0) - (finalRankMap.get(pid) || 0),
     }))
     .filter(c => c.climb > 0)
     .sort((a, b) => b.climb - a.climb)

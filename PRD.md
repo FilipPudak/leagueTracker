@@ -106,6 +106,8 @@ recorded 2-page real response shapes.
 
 ### M4 — Season-table engine + standings endpoint (the core domain logic)
 
+**Scoring:** Win = 3 points, Draw = 1 point, Loss = 0 points. Night points = 3W + D.
+
 **New `backend/src/lib/seasonTable.js`** (pure functions, no I/O — ownership: fully unit-testable):
 - `nightPoints(s)` = 3·wins + draws.
 - `seasonTableFor(nights, topResults)`: best-X selection by night points (boundary tie → earlier
@@ -147,7 +149,9 @@ round N without moving `CURRENT_WEEK`).
 - `lib/awards.js`: add `computeChampion(DB, season)` (rank 1 of chronologically last `cut`
   tournament) and `computeBountyHunter(DB, season)` (current-season non-bye wins vs previous
   season's top-4 from the final regular season table; returns `[]` for S1 / no-prev-season).
-- Ruler/New Hope switch from "final-round standings" to **M4 season-table semantics**.
+- Ruler uses **M4 season-table semantics** (best-X nights, `computeSeasonTable`).
+- New Hope uses **raw accumulated standings** at round ⌊L/2⌋ vs **derived season table** at final regular round.
+- Bounty Hunter uses **raw match data** (non-bye wins against previous season's top-4).
 - **`materializePastAwards(seasonId, {dryRun})`** admin action for S1–S5 only (hard refusal for
   ≥6): computes Ruler, New Hope, Champion, Bounty Hunter, writes via `writePodiumBlock`,
   skips Schemer/Ambassador (no historical votes). `dryRun` prints the podiums first.
