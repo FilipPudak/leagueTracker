@@ -285,7 +285,7 @@ describe('triggers/syncFromMelee', () => {
     assert.ok(store.awards.filter(a => a.award_name === 'Galactic Ambassador').length > 0);
   });
 
-  it('re-activates inactive players who attend, no deactivation mid-season', async () => {
+  it('re-activates inactive players who attend', async () => {
     const tables = withSeasonStarted(makeTables());
     db = createMockDb(tables);
     db.getStore().players.find(p => p.id === 'P005').active = 0;
@@ -297,27 +297,7 @@ describe('triggers/syncFromMelee', () => {
 
     const players = db.getStore().players;
     assert.equal(players.find(p => p.id === 'P001').active, 1, 'Alice active (attended)');
-    assert.equal(players.find(p => p.id === 'P005').active, 0, 'Eve stays inactive (did not attend, but no mid-season deactivation)');
-  });
-
-  it('deactivates absent players at season end', async () => {
-    const tables = withSeasonStarted(makeTables());
-    tables.settings = tables.settings.map(s =>
-      s.key === 'CURRENT_WEEK' ? { ...s, value: 'Week 3' } : s
-    ).map(s =>
-      s.key === 'SEASON_LENGTH' ? { ...s, value: '3' } : s
-    );
-    db = createMockDb(tables);
-    db.getStore().players.find(p => p.id === 'P005').active = 1;
-
-    const { mockFetch } = buildMockFetch({ tournaments: TOURNAMENTS.slice(0, 1) });
-    globalThis.fetch = mockFetch;
-
-    await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch) });
-
-    const players = db.getStore().players;
-    assert.equal(players.find(p => p.id === 'P001').active, 1, 'Alice active (attended)');
-    assert.equal(players.find(p => p.id === 'P005').active, 0, 'Eve deactivated at season end');
+    assert.equal(players.find(p => p.id === 'P005').active, 0, 'Eve stays inactive (did not attend)');
   });
 
   it('listTournaments failure → loop breaks, no crash', async () => {

@@ -30,8 +30,8 @@ export function basicTables() {
       { id: '4', name: 'Grand Inquisitor', set: 'LOF', active: 0 },
     ],
     seasons: [
-      { id: 6, name: 'Season 6', created_date: '2026-06-03' },
-      { id: 5, name: 'Season 5', created_date: '2026-01-15' },
+      { id: 6, name: 'Season 6', created_date: '2026-06-03', length: 11, top_results: 7 },
+      { id: 5, name: 'Season 5', created_date: '2026-01-15', length: 11, top_results: 7 },
     ],
     sessions: [
       { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com', created: '2026-06-01', last_active: recentActive },
@@ -46,6 +46,11 @@ export function basicTables() {
     opponent_votes: [
       { timestamp: now, season_id: 6, week: 1, opponent_id: 'P002' },
       { timestamp: now, season_id: 6, week: 1, opponent_id: 'P001' },
+    ],
+    votes: [
+      { id: 1, timestamp: now, updated_at: null, season_id: 6, week: 1, player_id: 'P001', leader_id: '1', opponent_id: 'P002' },
+      { id: 2, timestamp: now, updated_at: null, season_id: 6, week: 1, player_id: 'P002', leader_id: '2', opponent_id: 'P001' },
+      { id: 3, timestamp: now, updated_at: null, season_id: 6, week: 2, player_id: 'P001', leader_id: '3', opponent_id: 'P003' },
     ],
     awards: [
       { season_id: 6, award_name: 'Galactic Schemer', player_id: 'P001', score: 11 },
@@ -86,6 +91,7 @@ export function emptyTables() {
     sessions: [],
     leader_votes: [],
     opponent_votes: [],
+    votes: [],
     awards: [],
     attendance: [],
     melee_tournaments: [],

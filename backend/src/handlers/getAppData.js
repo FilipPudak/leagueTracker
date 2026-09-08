@@ -12,11 +12,11 @@ export async function handleGetAppData(body, env, session) {
   const votingOpen = isVotingOpen(settings.VOTING_OPEN);
 
   const seasons = await getAllSeasons(DB);
-  const allActivePlayersResult = await getAllActivePlayers(DB);
-  const allActivePlayers = allActivePlayersResult.results || [];
+  const allPlayersResult = await DB.prepare('SELECT * FROM players').all();
+  const allPlayers = allPlayersResult.results || [];
   const leaders = await getAllActiveLeaders(DB);
 
-  let players = allActivePlayers;
+  let players = allPlayers;
 
   if (votingOpen && session && activeSeasonId && currentWeek) {
     const matchRow = await DB.prepare(
@@ -34,7 +34,7 @@ export async function handleGetAppData(body, env, session) {
         if (m.player2_id === session.player_id && m.player1_id) opponentIds.add(m.player1_id);
       }
 
-      const filtered = allActivePlayers.filter(p => opponentIds.has(p.id));
+      const filtered = allPlayers.filter(p => opponentIds.has(p.id));
       if (filtered.length > 0) {
         players = filtered;
       }
@@ -72,7 +72,7 @@ export async function handleGetAppData(body, env, session) {
   let unlinkedPlayers = [];
   if (status === 'unlinked') {
     const allPlayers = await DB.prepare(
-      "SELECT id, name FROM players WHERE active = 1 AND (email IS NULL OR email = '') ORDER BY name"
+      "SELECT id, name FROM players WHERE (email IS NULL OR email = '') ORDER BY name"
     ).all();
     unlinkedPlayers = allPlayers.results || [];
   }

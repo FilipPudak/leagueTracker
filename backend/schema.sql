@@ -22,14 +22,16 @@ CREATE TABLE IF NOT EXISTS leaders (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   "set" TEXT,
-  active INTEGER DEFAULT 1
+  active INTEGER INTEGER DEFAULT 1
 );
 
 -- Season registry (replaces Seasons sheet)
 CREATE TABLE IF NOT EXISTS seasons (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,
-  created_date TEXT
+  created_date TEXT,
+  length INTEGER NOT NULL DEFAULT 11,
+  top_results INTEGER NOT NULL DEFAULT 7
 );
 
 -- Session tokens (replaces Sessions sheet)
@@ -69,6 +71,23 @@ CREATE TABLE IF NOT EXISTS opponent_votes (
   FOREIGN KEY (opponent_id) REFERENCES players(id)
 );
 
+-- Merged votes table (replaces leader_votes + opponent_votes)
+CREATE TABLE IF NOT EXISTS votes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  timestamp TEXT NOT NULL,
+  updated_at TEXT,
+  season_id INTEGER NOT NULL,
+  week INTEGER NOT NULL,
+  player_id TEXT NOT NULL,
+  leader_id TEXT NOT NULL,
+  opponent_id TEXT NOT NULL,
+  FOREIGN KEY (season_id) REFERENCES seasons(id),
+  FOREIGN KEY (player_id) REFERENCES players(id),
+  FOREIGN KEY (leader_id) REFERENCES leaders(id),
+  FOREIGN KEY (opponent_id) REFERENCES players(id),
+  UNIQUE(season_id, week, player_id)
+);
+
 -- Materialized award podium (replaces Awards sheet)
 CREATE TABLE IF NOT EXISTS awards (
   season_id INTEGER NOT NULL,
@@ -98,6 +117,8 @@ CREATE INDEX IF NOT EXISTS idx_sessions_player ON sessions(player_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_device ON sessions(device_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_season ON attendance(season_id, week);
 CREATE INDEX IF NOT EXISTS idx_attendance_season_player ON attendance(season_id, player_id);
+CREATE INDEX IF NOT EXISTS idx_votes_season_week ON votes(season_id, week);
+CREATE INDEX IF NOT EXISTS idx_votes_player ON votes(player_id);
 
 -- Melee.gg tournament mapping
 CREATE TABLE IF NOT EXISTS melee_tournaments (
@@ -106,7 +127,9 @@ CREATE TABLE IF NOT EXISTS melee_tournaments (
   round INTEGER NOT NULL,
   name TEXT NOT NULL,
   date TEXT,
-  FOREIGN KEY (season_id) REFERENCES seasons(id)
+  phase TEXT NOT NULL DEFAULT 'regular',
+  FOREIGN KEY (season_id) REFERENCES seasons(id),
+  UNIQUE(season_id, round)
 );
 
 -- Season standings from Melee.gg
@@ -137,7 +160,8 @@ CREATE TABLE IF NOT EXISTS match_results (
   is_bye INTEGER DEFAULT 0,
   FOREIGN KEY (season_id) REFERENCES seasons(id),
   FOREIGN KEY (player1_id) REFERENCES players(id),
-  FOREIGN KEY (player2_id) REFERENCES players(id)
+  FOREIGN KEY (player2_id) REFERENCES players(id),
+  UNIQUE(season_id, round, melee_match_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_melee_tournaments_season ON melee_tournaments(season_id);
