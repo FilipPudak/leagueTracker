@@ -74,12 +74,15 @@ describe('handleGetAppData', () => {
 
   it('detects alreadySubmitted when player voted this week', async () => {
     const tables = basicTables();
-    tables.leader_votes.push({
+    tables.votes.push({
+      id: 100,
       timestamp: new Date().toISOString(),
+      updated_at: null,
       season_id: 6,
       week: 3,
       player_id: 'P001',
       leader_id: '2',
+      opponent_id: 'P002',
     });
     const db = createMockDb(tables);
     const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };

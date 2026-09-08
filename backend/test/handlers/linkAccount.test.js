@@ -153,9 +153,9 @@ describe('handleLinkAccount', () => {
 
   it('alreadyVoted true when player has votes', async () => {
     const tables = linkTables();
-    tables.leader_votes = [
-      ...tables.leader_votes,
-      { timestamp: now, season_id: 6, week: 3, player_id: 'P001', leader_id: '2' },
+    tables.votes = [
+      ...tables.votes,
+      { id: 100, timestamp: now, updated_at: null, season_id: 6, week: 3, player_id: 'P001', leader_id: '2', opponent_id: 'P002' },
     ];
     DB = createMockDb(tables);
     env = { DB };

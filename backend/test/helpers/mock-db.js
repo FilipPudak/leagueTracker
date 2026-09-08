@@ -4,7 +4,6 @@
 // UNIQUE constraints per table: array of column arrays that must be unique
 const UNIQUE_CONSTRAINTS = {
   sessions: [['player_id', 'device_id']],
-  leader_votes: [['season_id', 'week', 'player_id']],
   votes: [['season_id', 'week', 'player_id']],
   melee_tournaments: [['season_id', 'round']],
   match_results: [['season_id', 'round', 'melee_match_id']],

@@ -218,10 +218,10 @@ describe('router/index.js – fetch handler', () => {
     assert.ok(after.last_active >= beforeActive, 'session timestamp updated');
 
     // Votes were inserted
-    const lv = store.leader_votes.filter(r => r.player_id === 'P001' && r.season_id === 6 && r.week === 3);
-    const ov = store.opponent_votes.filter(r => r.season_id === 6 && r.week === 3 && r.opponent_id === 'P002');
-    assert.equal(lv.length, 1, 'leader_votes row inserted');
-    assert.equal(ov.length, 1, 'opponent_votes row inserted');
+    const votes = store.votes.filter(r => r.player_id === 'P001' && r.season_id === 6 && r.week === 3);
+    assert.equal(votes.length, 1, 'vote row inserted');
+    assert.equal(votes[0].leader_id, '1');
+    assert.equal(votes[0].opponent_id, 'P002');
   });
 
   it('full flow: unlinkAccount resolves session and deletes it', async () => {

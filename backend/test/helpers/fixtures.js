@@ -38,15 +38,6 @@ export function basicTables() {
       { token: 'test-token-bob', player_id: 'P002', device_id: 'dev-bob', email: 'bob@test.com', created: '2026-06-01', last_active: recentActive },
       { token: 'test-token-expired', player_id: 'P003', device_id: 'dev-charlie', email: 'charlie@test.com', created: '2026-01-01', last_active: expiredActive },
     ],
-    leader_votes: [
-      { timestamp: now, season_id: 6, week: 1, player_id: 'P001', leader_id: '1' },
-      { timestamp: now, season_id: 6, week: 1, player_id: 'P002', leader_id: '2' },
-      { timestamp: now, season_id: 6, week: 2, player_id: 'P001', leader_id: '3' },
-    ],
-    opponent_votes: [
-      { timestamp: now, season_id: 6, week: 1, opponent_id: 'P002' },
-      { timestamp: now, season_id: 6, week: 1, opponent_id: 'P001' },
-    ],
     votes: [
       { id: 1, timestamp: now, updated_at: null, season_id: 6, week: 1, player_id: 'P001', leader_id: '1', opponent_id: 'P002' },
       { id: 2, timestamp: now, updated_at: null, season_id: 6, week: 1, player_id: 'P002', leader_id: '2', opponent_id: 'P001' },
@@ -89,8 +80,6 @@ export function emptyTables() {
     leaders: [],
     seasons: [],
     sessions: [],
-    leader_votes: [],
-    opponent_votes: [],
     votes: [],
     awards: [],
     attendance: [],

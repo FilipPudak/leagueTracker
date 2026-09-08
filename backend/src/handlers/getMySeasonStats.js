@@ -38,12 +38,12 @@ export async function handleGetMySeasonStats(body, env, session) {
     })
     .map(a => a.award_name);
 
-  // Get leaders played (per-leader play counts from leader_votes)
+  // Get leaders played (per-leader play counts from votes)
   const leadersRaw = await DB.prepare(`
-    SELECT l.id, l.name, l."set", COUNT(lv.id) as play_count
-    FROM leader_votes lv
-    JOIN leaders l ON lv.leader_id = l.id
-    WHERE lv.season_id = ? AND lv.player_id = ?
+    SELECT l.id, l.name, l."set", COUNT(v.id) as play_count
+    FROM votes v
+    JOIN leaders l ON v.leader_id = l.id
+    WHERE v.season_id = ? AND v.player_id = ?
     GROUP BY l.id, l.name, l."set"
     ORDER BY play_count DESC
   `).bind(sid, playerId).all();

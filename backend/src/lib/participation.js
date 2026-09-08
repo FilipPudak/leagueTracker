@@ -7,10 +7,10 @@ export async function getCompliance(db, seasonId, playerId) {
       COUNT(DISTINCT lv.week) as weeks_voted,
       COUNT(DISTINCT a.week) as weeks_attended
     FROM attendance a
-    LEFT JOIN leader_votes lv
-      ON lv.season_id = a.season_id
-      AND lv.week = a.week
-      AND lv.player_id = a.player_id
+    LEFT JOIN votes v
+      ON v.season_id = a.season_id
+      AND v.week = a.week
+      AND v.player_id = a.player_id
     WHERE a.season_id = ? AND a.player_id = ?
   `).bind(seasonId, playerId).first();
 
@@ -36,7 +36,7 @@ export async function getStreaks(db, seasonId, playerId) {
 
   // Get all weeks this player voted
   const votedWeeks = await db.prepare(`
-    SELECT DISTINCT week FROM leader_votes
+    SELECT DISTINCT week FROM votes
     WHERE season_id = ? AND player_id = ?
   `).bind(seasonId, playerId).all();
 
@@ -76,7 +76,7 @@ export async function getStreaks(db, seasonId, playerId) {
 // Get player's raffle ticket count for a season
 export async function getRaffleTickets(db, seasonId, playerId) {
   const row = await db.prepare(`
-    SELECT COUNT(*) as tickets FROM leader_votes
+    SELECT COUNT(*) as tickets FROM votes
     WHERE season_id = ? AND player_id = ?
   `).bind(seasonId, playerId).first();
   return row?.tickets || 0;
@@ -85,7 +85,7 @@ export async function getRaffleTickets(db, seasonId, playerId) {
 // Get weekly participation count (vote tab)
 export async function getWeeklyParticipation(db, seasonId, week) {
   const voted = await db.prepare(`
-    SELECT COUNT(DISTINCT player_id) as count FROM leader_votes
+    SELECT COUNT(DISTINCT player_id) as count FROM votes
     WHERE season_id = ? AND week = ?
   `).bind(seasonId, week).first();
 
@@ -104,15 +104,15 @@ export async function getSeasonParticipation(db, seasonId) {
   const row = await db.prepare(`
     SELECT
       COUNT(DISTINCT a.player_id) as players_with_attendance,
-      COUNT(DISTINCT lv.player_id) as players_who_voted
+      COUNT(DISTINCT v.player_id) as players_who_voted
     FROM attendance a
-    LEFT JOIN leader_votes lv
-      ON a.season_id = lv.season_id AND a.player_id = lv.player_id
+    LEFT JOIN votes v
+      ON a.season_id = v.season_id AND a.player_id = v.player_id
     WHERE a.season_id = ?
   `).bind(seasonId).first();
 
   const totalRow = await db.prepare(`
-    SELECT COUNT(*) as total_votes FROM leader_votes WHERE season_id = ?
+    SELECT COUNT(*) as total_votes FROM votes WHERE season_id = ?
   `).bind(seasonId).first();
 
   const total = await db.prepare(`

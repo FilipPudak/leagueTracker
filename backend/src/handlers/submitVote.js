@@ -59,23 +59,11 @@ export async function handleSubmitVote(body, env, session) {
 
   const now = new Date().toISOString();
 
-  // Insert votes atomically; catch constraint violation for duplicate guard
+  // Insert vote atomically; catch constraint violation for duplicate guard
   try {
-    const statements = [
-      DB.prepare(
-        'INSERT INTO leader_votes (timestamp, season_id, week, player_id, leader_id) VALUES (?, ?, ?, ?, ?)'
-      ).bind(now, seasonId, week, playerId, leader1Id),
-    ];
-
-    if (opponentId) {
-      statements.push(
-        DB.prepare(
-          'INSERT INTO opponent_votes (timestamp, season_id, week, opponent_id) VALUES (?, ?, ?, ?)'
-        ).bind(now, seasonId, week, opponentId)
-      );
-    }
-
-    await DB.batch(statements);
+    await DB.prepare(
+      'INSERT INTO votes (timestamp, season_id, week, player_id, leader_id, opponent_id) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(now, seasonId, week, playerId, leader1Id, opponentId || null).run();
   } catch (e) {
     if (e.message && e.message.includes('UNIQUE constraint')) {
       const err = new Error('You have already submitted votes for this week.');

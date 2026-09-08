@@ -238,7 +238,7 @@ list), `materializePastAwards` (M6). Router registration + `wrangler` invocation
 4. Re-backfill S1→S7 (`resync:true`, `maxTournaments=5`, loop until each season reports no new
    rows; cut/side events included with phase).
 5. Attendance rebuilt from regular standings (part of M3 runs).
-6. **Verification gates (all must pass before M7 of runbook proceeds):**
+6. **Verification gates (all must pass before step 7 proceeds):**
    - tournament counts per CONTEXT/§2 success list; `LEFT JOIN` orphan check = 0 rows;
      collision check (`GROUP BY season,round HAVING count>1`) = 0 rows;
    - per-tournament match totals vs API `RecordsTotal` (scripted sample of 10);
@@ -291,3 +291,20 @@ Present the following to the user for approval:
 
 This gate applies to every M0–M12 milestone. No milestone is "done" until the review
 is presented and the user approves.
+
+### M13 — Deferred work cleanup
+
+Items deferred from M5–M7 that must be completed before production use:
+
+- **`updateVote` handler** (M7): token-gated, `VOTING_OPEN`-gated, `CURRENT_WEEK`-only, full
+  replacement of both fields, self-vote re-check.
+- **`materializePastAwards`** (M6): admin action for S1–S5 only (hard refusal for ≥6); computes
+  Ruler, New Hope, Champion, Bounty Hunter; `dryRun` prints podiums first; real write on approval.
+- **Privacy guard test** (M7): lint-style test asserting no query joins `votes` into any response
+  containing `opponent_id` alongside the voter identity.
+- **Opponent mandatory enforcement** (M7): server-side validation that `opponent_id` is provided
+  in `submitVote` and `updateVote`.
+- **Attendance-based denominators** (M7/CONTEXT §11): weekly card Y = players who attended the
+  current round (not active players); season stat denominator = players with ≥1 attended night.
+- **Targeted sync of CURRENT_WEEK** (M5): revisit approach — sync only the round matching
+  `CURRENT_WEEK` instead of all unsynced rounds.

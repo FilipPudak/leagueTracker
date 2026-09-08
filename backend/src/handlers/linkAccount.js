@@ -71,7 +71,7 @@ export async function handleLinkAccount(body, env) {
   let alreadyVoted = false;
   if (activeSeasonId && weekNum) {
     const row = await DB.prepare(
-      'SELECT 1 FROM leader_votes WHERE season_id = ? AND week = ? AND player_id = ?'
+      'SELECT 1 FROM votes WHERE season_id = ? AND week = ? AND player_id = ?'
     ).bind(Number(activeSeasonId), weekNum, playerId).first();
     alreadyVoted = !!row;
   }

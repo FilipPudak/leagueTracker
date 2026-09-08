@@ -36,7 +36,7 @@ function tieAwareTop3(items) {
 export async function computeSchemer(db, seasonId) {
   const rows = await db.prepare(`
     SELECT player_id, COUNT(DISTINCT leader_id) as distinct_leaders
-    FROM leader_votes
+    FROM votes
     WHERE season_id = ?
     GROUP BY player_id
     ORDER BY distinct_leaders DESC
@@ -53,7 +53,7 @@ export async function computeSchemer(db, seasonId) {
 export async function computeAmbassador(db, seasonId) {
   const rows = await db.prepare(`
     SELECT opponent_id as player_id, COUNT(*) as votes
-    FROM opponent_votes
+    FROM votes
     WHERE season_id = ?
     GROUP BY opponent_id
     ORDER BY votes DESC

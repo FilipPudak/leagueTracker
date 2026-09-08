@@ -102,7 +102,7 @@ export async function findPlayerByMelee(db, meleeName) {
 // Duplicate vote check
 export async function hasPlayerVotedThisWeek(db, seasonId, week, playerId) {
   const row = await db.prepare(
-    'SELECT 1 FROM leader_votes WHERE season_id = ? AND week = ? AND player_id = ?'
+    'SELECT 1 FROM votes WHERE season_id = ? AND week = ? AND player_id = ?'
   ).bind(seasonId, week, playerId).first();
   return !!row;
 }
@@ -110,10 +110,10 @@ export async function hasPlayerVotedThisWeek(db, seasonId, week, playerId) {
 // Most played leaders
 export async function getMostPlayedLeaders(db, seasonId) {
   return db.prepare(`
-    SELECT l.id, l.name, l."set", COUNT(lv.id) as play_count
-    FROM leader_votes lv
-    JOIN leaders l ON lv.leader_id = l.id
-    WHERE lv.season_id = ?
+    SELECT l.id, l.name, l."set", COUNT(v.id) as play_count
+    FROM votes v
+    JOIN leaders l ON v.leader_id = l.id
+    WHERE v.season_id = ?
     GROUP BY l.id, l.name, l."set"
     ORDER BY play_count DESC
     LIMIT 10

@@ -92,17 +92,3 @@ export async function deleteSessionsByPlayerAndDevice(db, playerId, deviceId) {
     'DELETE FROM sessions WHERE player_id = ? AND device_id = ?'
   ).bind(playerId, deviceId).run();
 }
-
-export async function collapseDeviceSessions(db, playerId, deviceId) {
-  const rows = await db.prepare(
-    'SELECT token, last_active FROM sessions WHERE player_id = ? AND device_id = ? ORDER BY last_active DESC'
-  ).bind(playerId, deviceId).all();
-  const sessions = rows.results || [];
-  if (sessions.length <= 1) return;
-
-  // Keep the newest, delete all others
-  const keepToken = sessions[0].token;
-  for (let i = 1; i < sessions.length; i++) {
-    await db.prepare('DELETE FROM sessions WHERE token = ?').bind(sessions[i].token).run();
-  }
-}

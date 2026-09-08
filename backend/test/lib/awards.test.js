@@ -111,10 +111,10 @@ describe('computeSchemer', () => {
     assert.ok(result.length > 0);
     const calls = db.getCalls();
     assert.ok(calls.some(c => c.sql.includes('COUNT(DISTINCT leader_id)')));
-    assert.ok(calls.some(c => c.sql.includes('leader_votes')));
+    assert.ok(calls.some(c => c.sql.includes('votes')));
   });
 
-  it('returns array for empty leader_votes (mock returns count row)', async () => {
+  it('returns array for empty votes (mock returns count row)', async () => {
     const db = createMockDb(emptyTables());
     const result = await computeSchemer(db, 6);
     assert.ok(Array.isArray(result));
@@ -128,7 +128,7 @@ describe('computeAmbassador', () => {
     assert.ok(Array.isArray(result));
     assert.ok(result.length > 0);
     const calls = db.getCalls();
-    assert.ok(calls.some(c => c.sql.includes('opponent_votes')));
+    assert.ok(calls.some(c => c.sql.includes('votes')));
     assert.ok(calls.some(c => c.sql.includes('COUNT(*)')));
   });
 

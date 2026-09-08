@@ -9,7 +9,6 @@ import {
   touchSessionTimestamp,
   createSession,
   deleteSessionsByPlayerAndDevice,
-  collapseDeviceSessions,
   constantTimeEqual,
 } from '../../src/lib/auth.js';
 
@@ -291,47 +290,6 @@ describe('deleteSessionsByPlayerAndDevice', () => {
     const result = await findSessionByToken(db, 'test-token-alice');
     assert.ok(result);
     assert.equal(result.token, 'test-token-alice');
-  });
-});
-
-describe('collapseDeviceSessions', () => {
-  it('keeps newest session and deletes duplicates', async () => {
-    const tables = basicTables();
-    tables.sessions.push(
-      { token: 'dup-token-1', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com', created: '2026-06-01', last_active: '2026-06-01T10:00:00Z' },
-      { token: 'dup-token-2', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com', created: '2026-06-01', last_active: '2026-06-02T10:00:00Z' }
-    );
-    const db = createMockDb(tables);
-    await collapseDeviceSessions(db, 'P001', 'dev-alice');
-    const store = db.getStore();
-    const remaining = store.sessions.filter(s => s.player_id === 'P001' && s.device_id === 'dev-alice');
-    assert.equal(remaining.length, 1);
-    assert.equal(remaining[0].token, 'test-token-alice');
-  });
-
-  it('does nothing when only one session exists', async () => {
-    const db = createMockDb(basicTables());
-    await collapseDeviceSessions(db, 'P001', 'dev-alice');
-    const store = db.getStore();
-    const remaining = store.sessions.filter(s => s.player_id === 'P001' && s.device_id === 'dev-alice');
-    assert.equal(remaining.length, 1);
-  });
-
-  it('does nothing when no sessions exist', async () => {
-    const db = createMockDb(basicTables());
-    await assert.doesNotReject(() => collapseDeviceSessions(db, 'P999', 'dev-nonexistent'));
-  });
-
-  it('does not affect sessions for other players', async () => {
-    const tables = basicTables();
-    tables.sessions.push(
-      { token: 'alice-dup', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com', created: '2026-06-01', last_active: '2026-06-01T10:00:00Z' }
-    );
-    const db = createMockDb(tables);
-    await collapseDeviceSessions(db, 'P002', 'dev-bob');
-    const store = db.getStore();
-    const aliceSessions = store.sessions.filter(s => s.player_id === 'P001' && s.device_id === 'dev-alice');
-    assert.equal(aliceSessions.length, 2, 'Alice sessions untouched');
   });
 });
 

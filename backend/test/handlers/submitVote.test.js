@@ -65,12 +65,15 @@ describe('handleSubmitVote', () => {
 
   it('duplicate vote (same season/week/player) → 409', async () => {
     const tables = submitVoteTables();
-    tables.leader_votes.push({
+    tables.votes.push({
+      id: 100,
       timestamp: new Date().toISOString(),
+      updated_at: null,
       season_id: 6,
       week: 3,
       player_id: 'P001',
       leader_id: '1',
+      opponent_id: 'P002',
     });
     const db = createMockDb(tables);
     await assert.rejects(
@@ -150,7 +153,7 @@ describe('handleSubmitVote', () => {
     const origPrepare = db.prepare.bind(db);
     db.prepare = function(sql) {
       const stmt = origPrepare(sql);
-      if (sql.includes('INSERT INTO leader_votes')) {
+      if (sql.includes('INSERT INTO votes')) {
         const failRun = async function() {
           throw new Error('UNIQUE constraint failed');
         };
@@ -200,7 +203,7 @@ describe('handleSubmitVote', () => {
     );
   });
 
-  it('both leader_votes and opponent_votes rows inserted', async () => {
+  it('vote row inserted with both leader and opponent', async () => {
     await handleSubmitVote(
       {
         voteData: { leader1Id: '1', opponentId: 'P002' },
@@ -210,10 +213,10 @@ describe('handleSubmitVote', () => {
       aliceSession
     );
     const store = DB.getStore();
-    const lv = store.leader_votes.filter(r => r.player_id === 'P001' && r.season_id === 6 && r.week === 3);
-    const ov = store.opponent_votes.filter(r => r.season_id === 6 && r.week === 3 && r.opponent_id === 'P002');
-    assert.equal(lv.length, 1, 'leader_votes row inserted');
-    assert.equal(ov.length, 1, 'opponent_votes row inserted');
+    const votes = store.votes.filter(r => r.player_id === 'P001' && r.season_id === 6 && r.week === 3);
+    assert.equal(votes.length, 1, 'vote row inserted');
+    assert.equal(votes[0].leader_id, '1');
+    assert.equal(votes[0].opponent_id, 'P002');
   });
 
   it('accepts leaderId as field alias', async () => {
