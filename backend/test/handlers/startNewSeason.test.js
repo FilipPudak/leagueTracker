@@ -77,4 +77,21 @@ describe('handleStartNewSeason', () => {
     assert.equal(result.seasonId, 1);
     assert.equal(result.seasonName, 'Season 1');
   });
+
+  it('activates existing season when seasonId is provided', async () => {
+    const tables = basicTables();
+    tables.seasons.push({ id: 7, name: 'Season 7', created_date: null });
+    db = createMockDb(tables);
+    env = { DB: db, ADMIN_SECRET: 'test-secret-123' };
+
+    const result = await handleStartNewSeason({ adminToken: 'test-secret-123', seasonId: 7 }, env);
+    assert.equal(result.seasonId, 7);
+
+    const store = db.getStore();
+    const seasons7 = store.seasons.filter(s => s.id === 7);
+    assert.equal(seasons7.length, 1, 'should not create duplicate season 7');
+
+    const activeSeason = store.settings.find(s => s.key === 'ACTIVE_SEASON_ID');
+    assert.equal(activeSeason.value, '7');
+  });
 });

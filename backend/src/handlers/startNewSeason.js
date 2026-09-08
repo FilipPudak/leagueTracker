@@ -11,14 +11,20 @@ export async function handleStartNewSeason(body, env) {
     throw err;
   }
 
+  const { seasonId: requestedId } = body;
   const maxId = await getMaxSeasonId(DB);
-  const nextSeasonId = maxId + 1;
+  const nextSeasonId = requestedId || maxId + 1;
   const nextSeasonName = `Season ${nextSeasonId}`;
   const today = new Date().toISOString().split('T')[0];
 
-  await DB.prepare(
-    'INSERT INTO seasons (id, name, created_date) VALUES (?, ?, ?)'
-  ).bind(nextSeasonId, nextSeasonName, today).run();
+  const existing = await DB.prepare('SELECT id FROM seasons WHERE id = ?')
+    .bind(nextSeasonId).first();
+
+  if (!existing) {
+    await DB.prepare(
+      'INSERT INTO seasons (id, name, created_date) VALUES (?, ?, ?)'
+    ).bind(nextSeasonId, nextSeasonName, today).run();
+  }
 
   await updateSetting(DB, 'ACTIVE_SEASON_ID', String(nextSeasonId));
   await updateSetting(DB, 'CURRENT_WEEK', 'Week 1');

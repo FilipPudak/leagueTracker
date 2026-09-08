@@ -254,6 +254,23 @@ describe('triggers/syncFromMelee', () => {
     assert.equal(settings.SEASON_STARTED, 'FALSE');
   });
 
+  it('does not end season early when few tournaments exist on Melee yet (M0 guard)', async () => {
+    const tables = withSeasonStarted(makeTables());
+    tables.settings = tables.settings.map(s =>
+      s.key === 'CURRENT_WEEK' ? { ...s, value: 'Week 2' } : s
+    );
+    db = createMockDb(tables);
+    const { mockFetch } = buildMockFetch({ tournaments: TOURNAMENTS.slice(0, 1) });
+    globalThis.fetch = mockFetch;
+
+    await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch) });
+
+    const settings = await getSettings(db);
+    assert.equal(settings.CURRENT_WEEK, 'Week 3', 'must advance, not end — SEASON_LENGTH=11 floors the dynamic count');
+    assert.equal(settings.SEASON_STARTED, 'TRUE');
+    assert.equal(settings.VOTING_OPEN, 'TRUE');
+  });
+
   it('refreshes awards after sync', async () => {
     const tables = withSeasonStarted(makeTables());
     tables.awards = [];
@@ -287,6 +304,8 @@ describe('triggers/syncFromMelee', () => {
     const tables = withSeasonStarted(makeTables());
     tables.settings = tables.settings.map(s =>
       s.key === 'CURRENT_WEEK' ? { ...s, value: 'Week 3' } : s
+    ).map(s =>
+      s.key === 'SEASON_LENGTH' ? { ...s, value: '3' } : s
     );
     db = createMockDb(tables);
     db.getStore().players.find(p => p.id === 'P005').active = 1;

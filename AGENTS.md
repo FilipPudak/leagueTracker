@@ -45,7 +45,7 @@ Every handler: `export async function handleXxx(body, env)` where `env = { DB }`
 Router wraps in `{ success: true, data: result }` or `{ success: false, error: msg }`.
 
 ## Admin Actions
-- `startNewSeason` — requires `adminToken` in request body matching `env.ADMIN_SECRET`
+- `startNewSeason` — requires `adminToken` in request body matching `env.ADMIN_SECRET`; optional `seasonId` to activate an existing season instead of creating the next one
 - Trigger manually via Cloudflare Workers dashboard (Preview tab → POST with JSON body)
 - `ADMIN_SECRET` is an encrypted env var in `wrangler.toml`
 
@@ -62,7 +62,7 @@ Router wraps in `{ success: true, data: result }` or `{ success: false, error: m
 - **Mock Fetch**: `backend/test/helpers/mock-fetch.js` — URL-to-response mapping
 - **Mock Crypto**: `backend/test/helpers/mock-crypto.js` — sequential UUID stubs
 - **Fixtures**: `backend/test/helpers/fixtures.js` — `basicTables()`, `emptyTables()`, `closedVotingTables()`
-- **244 Worker tests** across: lib, handlers, queries, triggers, router
+- **306 Worker tests** across: lib, handlers, queries, triggers, router
 
 ## Git Conventions
 - Commit messages: `type: description` (e.g. `fix:`, `feat:`, `test:`, `chore:`)

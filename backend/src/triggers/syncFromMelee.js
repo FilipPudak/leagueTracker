@@ -98,7 +98,8 @@ export async function syncFromMelee(env, deps = {}) {
     weekMap.set(t.ID, { meleeId: t.ID, round, name: t.Name, date: t.StartDate || t.LastPairDateTime || null });
   }
 
-  const seasonLength = weekMap.size || 11;
+  const configuredLength = parseWeek(settings.SEASON_LENGTH) || 11;
+  const seasonLength = Math.max(weekMap.size, configuredLength);
 
   for (const [, info] of weekMap) {
     if (existingIds.has(info.meleeId)) continue;
