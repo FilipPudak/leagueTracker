@@ -3,9 +3,24 @@ import { getSettings, updateSetting, parseSeasonId, parseWeek, isSeasonStarted, 
 import { computeSchemer, computeAmbassador, writePodiumBlock } from '../lib/awards.js';
 import { fetchLeagueTournaments, buildWeekMap } from '../lib/meleeLeague.js';
 
+export function shouldAdvance(isoNow, marker, weekKey) {
+  const date = new Date(isoNow);
+  const stockholmTime = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Stockholm',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  }).format(date);
+  const [hours, minutes] = stockholmTime.split(':').map(Number);
+  const isLateEnough = hours > 22 || (hours === 22 && minutes >= 10);
+  const notYetAdvanced = marker !== weekKey;
+  return isLateEnough && notYetAdvanced;
+}
+
 export async function syncFromMelee(env, deps = {}) {
   const { DB } = env;
   const ClientClass = deps.MeleeClient || MeleeClient;
+  const now = deps.now || new Date().toISOString();
 
   console.log('[SyncFromMelee] Starting weekly sync...');
 
@@ -20,6 +35,8 @@ export async function syncFromMelee(env, deps = {}) {
   const activeSeasonId = parseSeasonId(settings.ACTIVE_SEASON_ID);
   const currentWeek = parseWeek(settings.CURRENT_WEEK);
   const votingOpen = isVotingOpen(settings.VOTING_OPEN);
+  const isPaused = settings.SEASON_PAUSED === 'TRUE';
+  const lastAdvanced = settings.LAST_ADVANCED || '';
 
   if (!activeSeasonId) {
     console.log('[SyncFromMelee] No active season; skipping.');
@@ -40,37 +57,43 @@ export async function syncFromMelee(env, deps = {}) {
 
   const matchedTournaments = await fetchLeagueTournaments(client, { targetSeason: activeSeasonId });
 
-  const configuredLength = parseWeek(settings.SEASON_LENGTH) || 11;
-  const weekMap = buildWeekMap(matchedTournaments);
-  const seasonLength = Math.max(weekMap.size, configuredLength);
+  const season = await DB.prepare('SELECT length, top_results FROM seasons WHERE id = ?').bind(activeSeasonId).first();
+  const seasonLength = season?.length || 11;
 
-  for (const [, info] of weekMap) {
-    if (existingIds.has(info.meleeId)) continue;
+  const weekMap = buildWeekMap(matchedTournaments);
+
+  for (const [meleeId, info] of weekMap) {
+    if (existingIds.has(meleeId)) continue;
     try {
       await DB.prepare(
-        'INSERT OR IGNORE INTO melee_tournaments (melee_id, season_id, round, name, date) VALUES (?, ?, ?, ?, ?)'
-      ).bind(info.meleeId, activeSeasonId, info.round, info.name, info.date).run();
+        'INSERT OR IGNORE INTO melee_tournaments (melee_id, season_id, round, name, date, phase) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(meleeId, activeSeasonId, info.round, info.name, info.date, info.phase || 'regular').run();
     } catch (err) {
-      console.error(`[SyncFromMelee] Failed to insert tournament ${info.meleeId}: ${err.message}`);
+      console.error(`[SyncFromMelee] Failed to insert tournament ${meleeId}: ${err.message}`);
     }
   }
 
   const standingsInSeason = await DB.prepare(
     'SELECT DISTINCT round FROM season_standings WHERE season_id = ?'
   ).bind(activeSeasonId).all();
-  const alreadySyncedRounds = new Set((standingsInSeason.results || []).map(r => r.round));
+  const syncedStandingsRounds = new Set((standingsInSeason.results || []).map(r => r.round));
+
+  const matchesInSeason = await DB.prepare(
+    'SELECT DISTINCT round FROM match_results WHERE season_id = ?'
+  ).bind(activeSeasonId).all();
+  const syncedMatchesRounds = new Set((matchesInSeason.results || []).map(r => r.round));
 
   const playerMap = new Map(allPlayers.map(p => [p.melee_name?.toLowerCase(), p]));
   const roundAttendance = new Map();
 
-  for (const [, info] of weekMap) {
-    if (alreadySyncedRounds.has(info.round)) continue;
+  for (const [meleeId, info] of weekMap) {
+    if (syncedStandingsRounds.has(info.round) && syncedMatchesRounds.has(info.round)) continue;
 
     let standingsResp;
     try {
-      standingsResp = await client.getStandings(info.meleeId);
+      standingsResp = await client.getStandings(meleeId);
     } catch (err) {
-      console.error(`[SyncFromMelee] Failed to get standings for tournament ${info.meleeId}: ${err.message}`);
+      console.error(`[SyncFromMelee] Failed to get standings for tournament ${meleeId}: ${err.message}`);
       continue;
     }
 
@@ -109,9 +132,9 @@ export async function syncFromMelee(env, deps = {}) {
 
     let matchesResp;
     try {
-      matchesResp = await client.getMatches(info.meleeId);
+      matchesResp = await client.getMatches(meleeId);
     } catch (err) {
-      console.error(`[SyncFromMelee] Failed to get matches for tournament ${info.meleeId}: ${err.message}`);
+      console.error(`[SyncFromMelee] Failed to get matches for tournament ${meleeId}: ${err.message}`);
       continue;
     }
 
@@ -183,6 +206,12 @@ export async function syncFromMelee(env, deps = {}) {
     }
   }
 
+  if (isPaused) {
+    console.log('[SyncFromMelee] Season paused; data synced, skipping advance/open/close.');
+    console.log('[SyncFromMelee] Sync complete.');
+    return;
+  }
+
   const schemer = await computeSchemer(DB, activeSeasonId);
   if (schemer.length > 0) {
     await writePodiumBlock(DB, activeSeasonId, 'Galactic Schemer', schemer);
@@ -228,10 +257,14 @@ export async function syncFromMelee(env, deps = {}) {
     })));
   }
 
-  if (!votingOpen) {
+  const weekKey = `S${activeSeasonId}-W${currentWeek}`;
+  const canAdvance = shouldAdvance(now, lastAdvanced, weekKey);
+
+  if (!votingOpen && canAdvance) {
     await updateSetting(DB, 'VOTING_OPEN', 'TRUE');
+    await updateSetting(DB, 'LAST_ADVANCED', weekKey);
     console.log('[SyncFromMelee] First run — voting opened.');
-  } else {
+  } else if (canAdvance) {
     const nextWeek = (currentWeek || 0) + 1;
     if (nextWeek > seasonLength) {
       await updateSetting(DB, 'CURRENT_WEEK', 'Season Ended');
@@ -240,8 +273,11 @@ export async function syncFromMelee(env, deps = {}) {
       console.log('[SyncFromMelee] Season ended.');
     } else {
       await updateSetting(DB, 'CURRENT_WEEK', `Week ${nextWeek}`);
+      await updateSetting(DB, 'LAST_ADVANCED', weekKey);
       console.log(`[SyncFromMelee] Advanced to Week ${nextWeek}.`);
     }
+  } else {
+    console.log('[SyncFromMelee] Gate not met; data synced, no advance.');
   }
 
   console.log('[SyncFromMelee] Sync complete.');

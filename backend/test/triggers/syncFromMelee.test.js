@@ -215,7 +215,8 @@ describe('triggers/syncFromMelee', () => {
     const { mockFetch } = buildMockFetch({ tournaments: TOURNAMENTS.slice(0, 1) });
     globalThis.fetch = mockFetch;
 
-    await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch) });
+    const lateTime = '2026-07-01T20:15:00Z';
+    await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch), now: lateTime });
 
     const settings = await getSettings(db);
     assert.equal(settings.VOTING_OPEN, 'TRUE');
@@ -231,7 +232,8 @@ describe('triggers/syncFromMelee', () => {
     const { mockFetch } = buildMockFetch();
     globalThis.fetch = mockFetch;
 
-    await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch) });
+    const lateTime = '2026-07-01T20:15:00Z';
+    await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch), now: lateTime });
 
     const settings = await getSettings(db);
     assert.equal(settings.CURRENT_WEEK, 'Week 3');
@@ -246,7 +248,8 @@ describe('triggers/syncFromMelee', () => {
     const { mockFetch } = buildMockFetch();
     globalThis.fetch = mockFetch;
 
-    await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch) });
+    const lateTime = '2026-07-01T20:15:00Z';
+    await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch), now: lateTime });
 
     const settings = await getSettings(db);
     assert.equal(settings.CURRENT_WEEK, 'Season Ended');
@@ -254,7 +257,7 @@ describe('triggers/syncFromMelee', () => {
     assert.equal(settings.SEASON_STARTED, 'FALSE');
   });
 
-  it('does not end season early when few tournaments exist on Melee yet (M0 guard)', async () => {
+  it('advances when few tournaments exist on Melee yet', async () => {
     const tables = withSeasonStarted(makeTables());
     tables.settings = tables.settings.map(s =>
       s.key === 'CURRENT_WEEK' ? { ...s, value: 'Week 2' } : s
@@ -263,7 +266,8 @@ describe('triggers/syncFromMelee', () => {
     const { mockFetch } = buildMockFetch({ tournaments: TOURNAMENTS.slice(0, 1) });
     globalThis.fetch = mockFetch;
 
-    await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch) });
+    const lateTime = '2026-07-01T20:15:00Z';
+    await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch), now: lateTime });
 
     const settings = await getSettings(db);
     assert.equal(settings.CURRENT_WEEK, 'Week 3', 'must advance, not end — SEASON_LENGTH=11 floors the dynamic count');
@@ -348,5 +352,59 @@ describe('triggers/syncFromMelee', () => {
     const store = db.getStore();
     assert.ok(store.season_standings.length > 0, 'Standings still stored');
     assert.equal(store.match_results.length, 0, 'No matches stored');
+  });
+
+  it('syncs data only when SEASON_PAUSED=TRUE, no advance/open/close', async () => {
+    const tables = withSeasonStarted(makeTables());
+    tables.settings = tables.settings.map(s =>
+      s.key === 'VOTING_OPEN' ? { ...s, value: 'TRUE' } : s
+    ).map(s =>
+      s.key === 'CURRENT_WEEK' ? { ...s, value: 'Week 1' } : s
+    );
+    tables.settings.push({ key: 'SEASON_PAUSED', value: 'TRUE' });
+    db = createMockDb(tables);
+    const { mockFetch } = buildMockFetch({ tournaments: TOURNAMENTS.slice(0, 1) });
+    globalThis.fetch = mockFetch;
+
+    await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch) });
+
+    const settings = await getSettings(db);
+    assert.equal(settings.CURRENT_WEEK, 'Week 1', 'Week not advanced when paused');
+    assert.equal(settings.VOTING_OPEN, 'TRUE', 'Voting not opened/closed when paused');
+    const store = db.getStore();
+    assert.ok(store.season_standings.length > 0, 'Data still synced');
+  });
+
+  it('does not advance when shouldAdvance gate rejects (too early)', async () => {
+    const tables = withSeasonStarted(makeTables());
+    tables.settings = tables.settings.map(s =>
+      s.key === 'CURRENT_WEEK' ? { ...s, value: 'Week 2' } : s
+    );
+    db = createMockDb(tables);
+    const { mockFetch } = buildMockFetch({ tournaments: TOURNAMENTS.slice(0, 1) });
+    globalThis.fetch = mockFetch;
+
+    const earlyTime = '2026-07-01T19:00:00Z';
+    await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch), now: earlyTime });
+
+    const settings = await getSettings(db);
+    assert.equal(settings.CURRENT_WEEK, 'Week 2', 'Week not advanced before 22:10 Stockholm');
+  });
+
+  it('does not advance when LAST_ADVANCED matches current weekKey', async () => {
+    const tables = withSeasonStarted(makeTables());
+    tables.settings = tables.settings.map(s =>
+      s.key === 'CURRENT_WEEK' ? { ...s, value: 'Week 2' } : s
+    );
+    tables.settings.push({ key: 'LAST_ADVANCED', value: 'S6-W2' });
+    db = createMockDb(tables);
+    const { mockFetch } = buildMockFetch({ tournaments: TOURNAMENTS.slice(0, 1) });
+    globalThis.fetch = mockFetch;
+
+    const lateTime = '2026-07-01T20:15:00Z';
+    await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch), now: lateTime });
+
+    const settings = await getSettings(db);
+    assert.equal(settings.CURRENT_WEEK, 'Week 2', 'Week not advanced when LAST_ADVANCED matches');
   });
 });
