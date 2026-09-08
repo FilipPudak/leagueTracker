@@ -111,7 +111,6 @@ recorded 2-page real response shapes.
 - `seasonTableFor(nights, topResults)`: best-X selection by night points (boundary tie → earlier
   night), aggregate P/W/D/L, points, rank chain per CONTEXT §7 (points → undefeated nights →
   night-rank sum → shared).
-- `rollingTables(rounds)` for New Hope snapshots at ⌊L/2⌋ and L.
 
 **New action `getStandingsData(body, env)`** (no token): returns for a season (+optional
 `asOfRound`): the cumulative season table; and per-round night results incl. labeled cut/side

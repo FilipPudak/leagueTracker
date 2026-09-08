@@ -4,6 +4,7 @@ import { handleUnlinkAccount } from './handlers/unlinkAccount.js';
 import { handleSubmitVote } from './handlers/submitVote.js';
 import { handleGetLeaderboardData } from './handlers/getLeaderboardData.js';
 import { handleGetMySeasonStats } from './handlers/getMySeasonStats.js';
+import { handleGetStandingsData } from './handlers/getStandingsData.js';
 import { handleStartNewSeason } from './handlers/startNewSeason.js';
 import { handleBackfillFromMelee } from './handlers/handleBackfillFromMelee.js';
 import { findSessionByToken, touchSessionTimestamp } from './lib/auth.js';
@@ -73,6 +74,7 @@ export default {
       submitVote: handleSubmitVote,
       getLeaderboardData: handleGetLeaderboardData,
       getMySeasonStats: handleGetMySeasonStats,
+      getStandingsData: handleGetStandingsData,
       startNewSeason: handleStartNewSeason,
       backfillFromMelee: handleBackfillFromMelee,
     };
