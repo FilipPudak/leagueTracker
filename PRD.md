@@ -278,3 +278,17 @@ changing the 6 award names without a CONTEXT.md edit first.
 No `git commit`, `git push`, `wrangler deploy`, or **any D1 write** (`--remote` execute) happens
 without an explicit per-action approval in the moment. `--remote` read queries are allowed.
 M12 steps 3–8 are individually gated; backups precede every destructive step.
+
+## 7. Product Readiness Reviews
+
+After each milestone completes, conduct a **product readiness review** before moving on.
+Present the following to the user for approval:
+
+1. **What changed** — files modified/added, function signatures, schema changes.
+2. **Test results** — total count, pass/fail, new tests added for this milestone.
+3. **Behavioral verification** — does the implementation match the PRD acceptance criteria?
+4. **Risks & tradeoffs** — anything deferred, edge cases not covered, known limitations.
+5. **Ready to commit?** — explicit go/no-go before staging changes.
+
+This gate applies to every M0–M12 milestone. No milestone is "done" until the review
+is presented and the user approves.

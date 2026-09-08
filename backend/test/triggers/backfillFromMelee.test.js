@@ -207,4 +207,108 @@ describe('triggers/backfillFromMelee', () => {
     assert.ok(result.standings > 0, 'Standings stored');
     assert.equal(result.matches, 0, 'No matches stored');
   });
+
+  it('resync:true wipes existing standings/matches/attendance for target season', async () => {
+    const tables = makeTables();
+    tables.season_standings = [
+      { season_id: 5, round: 1, player_id: 'P999', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+    ];
+    tables.match_results = [
+      { id: 1, season_id: 5, round: 1, melee_match_id: 'old-match', player1_id: 'P999', player2_id: 'P002', winner_id: 'P999', result: '2-0', is_bye: 0 },
+    ];
+    tables.attendance = [
+      { season_id: 5, week: 1, player_id: 'P999' },
+    ];
+    db = createMockDb(tables);
+    globalThis.fetch = buildMockFetch();
+
+    await backfillFromMelee({ DB: db }, { MeleeClient: makeMockClient(globalThis.fetch), seasonId: 5, resync: true });
+
+    const store = db.getStore();
+    const oldStanding = store.season_standings.find(s => s.player_id === 'P999');
+    assert.ok(!oldStanding, 'Old standing wiped');
+    const oldMatch = store.match_results.find(m => m.melee_match_id === 'old-match');
+    assert.ok(!oldMatch, 'Old match wiped');
+    const oldAttendance = store.attendance.find(a => a.player_id === 'P999');
+    assert.ok(!oldAttendance, 'Old attendance wiped');
+  });
+
+  it('skips round only when both standings and matches exist', async () => {
+    const tables = makeTables();
+    tables.season_standings = [
+      { season_id: 5, round: 1, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+    ];
+    tables.match_results = [];
+    db = createMockDb(tables);
+    let standingsFetched = false;
+    globalThis.fetch = async (url) => {
+      if (url.includes('/api/standing/list/current/')) standingsFetched = true;
+      return buildMockFetch()(url);
+    };
+
+    await backfillFromMelee({ DB: db }, { MeleeClient: makeMockClient(globalThis.fetch), seasonId: 5 });
+
+    assert.ok(standingsFetched, 'Standings re-fetched when only standings exist (no matches)');
+  });
+
+  it('skips round when both standings and matches exist', async () => {
+    const tables = makeTables();
+    tables.melee_tournaments = [
+      { melee_id: 100, season_id: 5, round: 1, name: 'SWU Wednesday league season 5 01/01 (week 1)', date: '2025-01-01T19:00:00' },
+    ];
+    tables.season_standings = [
+      { season_id: 5, round: 1, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+    ];
+    tables.match_results = [
+      { id: 1, season_id: 5, round: 1, melee_match_id: 'match-1', player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: '2-0', is_bye: 0 },
+    ];
+    db = createMockDb(tables);
+    let fetchCount = 0;
+    globalThis.fetch = async (url) => {
+      if (url.includes('/api/standing/list/current/') || url.includes('/api/match/list/')) fetchCount++;
+      return { ok: true, status: 200, text: async () => JSON.stringify({ Content: [{ ID: 100, Name: 'SWU Wednesday league season 5 01/01 (week 1)', StartDate: '2025-01-01T19:00:00' }], TotalCount: 1 }) };
+    };
+
+    await backfillFromMelee({ DB: db }, { MeleeClient: makeMockClient(globalThis.fetch), seasonId: 5 });
+
+    assert.equal(fetchCount, 0, 'No standings/matches fetched when both exist');
+  });
+
+  it('rebuilds attendance from regular standings during backfill', async () => {
+    const tables = makeTables();
+    db = createMockDb(tables);
+    globalThis.fetch = buildMockFetch();
+
+    await backfillFromMelee({ DB: db }, { MeleeClient: makeMockClient(globalThis.fetch), seasonId: 5 });
+
+    const store = db.getStore();
+    const attendance = store.attendance.filter(a => a.season_id === 5);
+    assert.ok(attendance.length > 0, 'Attendance rebuilt from standings');
+  });
+
+  it('defaults maxTournaments to 5', async () => {
+    const tables = makeTables();
+    db = createMockDb(tables);
+    let tournamentsProcessed = 0;
+    globalThis.fetch = async (url) => {
+      if (url.includes('/api/standing/list/current/') || url.includes('/api/match/list/')) tournamentsProcessed++;
+      return buildMockFetch()(url);
+    };
+
+    await backfillFromMelee({ DB: db }, { MeleeClient: makeMockClient(globalThis.fetch), seasonId: 5 });
+
+    assert.ok(tournamentsProcessed <= 10, 'At most 5 tournaments processed (standings + matches each)');
+  });
+
+  it('tags phase on tournament insert', async () => {
+    const tables = makeTables();
+    db = createMockDb(tables);
+    globalThis.fetch = buildMockFetch();
+
+    await backfillFromMelee({ DB: db }, { MeleeClient: makeMockClient(globalThis.fetch), seasonId: 5 });
+
+    const store = db.getStore();
+    const tournaments = store.melee_tournaments.filter(t => t.season_id === 5);
+    assert.ok(tournaments.every(t => t.phase), 'All tournaments have phase');
+  });
 });
