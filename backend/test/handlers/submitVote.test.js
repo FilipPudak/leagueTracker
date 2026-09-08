@@ -258,4 +258,30 @@ describe('handleSubmitVote', () => {
       }
     );
   });
+
+  it('leader field alias works', async () => {
+    const result = await handleSubmitVote(
+      {
+        voteData: { leader: '1', opponentId: 'P002' },
+        deviceId: 'dev-alice',
+      },
+      env,
+      aliceSession
+    );
+    assert.ok(result);
+    assert.equal(typeof result.raffleTickets, 'number');
+  });
+
+  it('opponent field alias works', async () => {
+    const result = await handleSubmitVote(
+      {
+        voteData: { leader1Id: '1', opponent: 'P002' },
+        deviceId: 'dev-alice',
+      },
+      env,
+      aliceSession
+    );
+    assert.ok(result);
+    assert.equal(typeof result.raffleTickets, 'number');
+  });
 });

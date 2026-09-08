@@ -363,6 +363,46 @@ describe('router/index.js – fetch handler', () => {
     assert.ok(json.error);
   });
 
+  it('backfillFromMelee routes to handler with valid admin token', async () => {
+    const resp = await worker.fetch(
+      post({ action: 'backfillFromMelee', adminToken: 'test-secret-123' }),
+      env(basicTables(), { ADMIN_SECRET: 'test-secret-123' })
+    );
+
+    assert.equal(resp.status, 200);
+    const json = await resp.json();
+    assert.equal(json.success, true);
+    assert.ok(json.data);
+    assert.equal(typeof json.data.tournaments, 'number');
+  });
+
+  it('backfillFromMelee missing adminToken → 403', async () => {
+    const resp = await worker.fetch(
+      post({ action: 'backfillFromMelee' }),
+      env(basicTables(), { ADMIN_SECRET: 'test-secret-123' })
+    );
+
+    assert.equal(resp.status, 403);
+    const json = await resp.json();
+    assert.equal(json.success, false);
+    assert.match(json.error, /Unauthorized/i);
+  });
+
+  it('backfillFromMelee wrong adminToken → 403', async () => {
+    const resp = await worker.fetch(
+      post({ action: 'backfillFromMelee', adminToken: 'wrong-token' }),
+      env(basicTables(), { ADMIN_SECRET: 'test-secret-123' })
+    );
+
+    assert.equal(resp.status, 403);
+    const json = await resp.json();
+    assert.equal(json.success, false);
+  });
+
+  it('scheduled handler exists and is a function', () => {
+    assert.equal(typeof worker.scheduled, 'function');
+  });
+
   it('rate limit: requests within limit succeed', async () => {
     const testEnv = env();
     const resp = await worker.fetch(
@@ -370,5 +410,20 @@ describe('router/index.js – fetch handler', () => {
       testEnv
     );
     assert.equal(resp.status, 200);
+  });
+
+  it('rate limit: exceeded returns 429', async () => {
+    const testEnv = env();
+    for (let i = 0; i < 30; i++) {
+      await worker.fetch(post({ action: 'getAppData' }), testEnv);
+    }
+    const resp = await worker.fetch(
+      post({ action: 'getAppData' }),
+      testEnv
+    );
+    assert.equal(resp.status, 429);
+    const json = await resp.json();
+    assert.equal(json.success, false);
+    assert.match(json.error, /Rate limit/i);
   });
 });

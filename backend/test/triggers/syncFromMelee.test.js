@@ -298,4 +298,54 @@ describe('triggers/syncFromMelee', () => {
     assert.equal(players.find(p => p.id === 'P001').active, 1, 'Alice active (attended)');
     assert.equal(players.find(p => p.id === 'P005').active, 0, 'Eve deactivated at season end');
   });
+
+  it('listTournaments failure → loop breaks, no crash', async () => {
+    db = createMockDb(withSeasonStarted(makeTables()));
+    const failingClient = class {
+      async listTournaments() { throw new Error('API down'); }
+      async getStandings() { return { Content: [] }; }
+      async getMatches() { return { Content: [] }; }
+    };
+
+    await syncFromMelee({ DB: db }, { MeleeClient: failingClient });
+
+    const store = db.getStore();
+    assert.equal(store.melee_tournaments.length, 0, 'No tournaments stored');
+  });
+
+  it('getStandings failure → skips tournament, continues', async () => {
+    db = createMockDb(withSeasonStarted(makeTables()));
+    const partialClient = class {
+      async listTournaments() {
+        return { Content: [TOURNAMENTS[0]], TotalCount: 1 };
+      }
+      async getStandings() { throw new Error('Standings API down'); }
+      async getMatches() { return { Content: [] }; }
+    };
+
+    await syncFromMelee({ DB: db }, { MeleeClient: partialClient });
+
+    const store = db.getStore();
+    assert.equal(store.season_standings.length, 0, 'No standings stored');
+    assert.equal(store.match_results.length, 0, 'Matches skipped too (continue skips entire tournament)');
+  });
+
+  it('getMatches failure → skips matches, continues', async () => {
+    db = createMockDb(withSeasonStarted(makeTables()));
+    const partialClient = class {
+      async listTournaments() {
+        return { Content: [TOURNAMENTS[0]], TotalCount: 1 };
+      }
+      async getStandings() {
+        return { Content: STANDINGS };
+      }
+      async getMatches() { throw new Error('Matches API down'); }
+    };
+
+    await syncFromMelee({ DB: db }, { MeleeClient: partialClient });
+
+    const store = db.getStore();
+    assert.ok(store.season_standings.length > 0, 'Standings still stored');
+    assert.equal(store.match_results.length, 0, 'No matches stored');
+  });
 });

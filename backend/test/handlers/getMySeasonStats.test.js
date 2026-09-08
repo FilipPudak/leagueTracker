@@ -115,4 +115,18 @@ describe('handleGetMySeasonStats', () => {
       }
     );
   });
+
+  it('no active season → 400', async () => {
+    const tables = basicTables();
+    tables.settings = tables.settings.filter(s => s.key !== 'ACTIVE_SEASON_ID');
+    const db = createMockDb(tables);
+    await assert.rejects(
+      () => handleGetMySeasonStats({}, { DB: db }, aliceSession),
+      (err) => {
+        assert.equal(err.status, 400);
+        assert.match(err.message, /No active season/i);
+        return true;
+      }
+    );
+  });
 });

@@ -19,6 +19,8 @@ import {
   parseSeasonId,
   parseWeek,
   isSeasonStarted,
+  findPlayerByMelee,
+  hasPlayerVotedThisWeek,
 } from '../../src/db/queries.js';
 
 describe('db/queries', () => {
@@ -194,5 +196,29 @@ describe('db/queries', () => {
     it('rejects null', () => assert.equal(isSeasonStarted(null), false));
     it('rejects undefined', () => assert.equal(isSeasonStarted(undefined), false));
     it('rejects missing key (undefined from getSetting)', () => assert.equal(isSeasonStarted(undefined), false));
+  });
+
+  describe('findPlayerByMelee', () => {
+    it('found → returns player ID', async () => {
+      const result = await findPlayerByMelee(db, 'alice42');
+      assert.equal(result, 'P001');
+    });
+
+    it('not found → returns null', async () => {
+      const result = await findPlayerByMelee(db, 'nonexistent');
+      assert.equal(result, null);
+    });
+  });
+
+  describe('hasPlayerVotedThisWeek', () => {
+    it('has voted → returns true', async () => {
+      const result = await hasPlayerVotedThisWeek(db, 6, 1, 'P001');
+      assert.equal(result, true);
+    });
+
+    it('has not voted → returns false', async () => {
+      const result = await hasPlayerVotedThisWeek(db, 6, 1, 'P005');
+      assert.equal(result, false);
+    });
   });
 });

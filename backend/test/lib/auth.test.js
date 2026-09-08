@@ -10,6 +10,7 @@ import {
   createSession,
   deleteSessionsByPlayerAndDevice,
   collapseDeviceSessions,
+  constantTimeEqual,
 } from '../../src/lib/auth.js';
 
 function mockCrypto() {
@@ -331,5 +332,30 @@ describe('collapseDeviceSessions', () => {
     const store = db.getStore();
     const aliceSessions = store.sessions.filter(s => s.player_id === 'P001' && s.device_id === 'dev-alice');
     assert.equal(aliceSessions.length, 2, 'Alice sessions untouched');
+  });
+});
+
+describe('constantTimeEqual', () => {
+  it('returns true for exact match', () => {
+    assert.equal(constantTimeEqual('secret123', 'secret123'), true);
+  });
+
+  it('returns false for different strings', () => {
+    assert.equal(constantTimeEqual('secret123', 'secret124'), false);
+  });
+
+  it('returns false for different lengths', () => {
+    assert.equal(constantTimeEqual('secret', 'secret123'), false);
+  });
+
+  it('returns false for non-string inputs', () => {
+    assert.equal(constantTimeEqual(null, 'test'), false);
+    assert.equal(constantTimeEqual('test', null), false);
+    assert.equal(constantTimeEqual(123, 'test'), false);
+    assert.equal(constantTimeEqual(undefined, 'test'), false);
+  });
+
+  it('returns true for both empty strings', () => {
+    assert.equal(constantTimeEqual('', ''), true);
   });
 });

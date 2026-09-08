@@ -183,4 +183,15 @@ describe('handleLinkAccount', () => {
     assert.equal(typeof result.weeklyParticipation.voted, 'number');
     assert.equal(typeof result.weeklyParticipation.total, 'number');
   });
+
+  it('missing deviceId → 400', async () => {
+    await assert.rejects(
+      () => handleLinkAccount({ playerId: 'P001', email: 'alice@test.com' }, env),
+      (err) => {
+        assert.equal(err.status, 400);
+        assert.match(err.message, /device/i);
+        return true;
+      }
+    );
+  });
 });

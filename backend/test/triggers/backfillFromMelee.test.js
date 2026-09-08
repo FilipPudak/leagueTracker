@@ -155,4 +155,55 @@ describe('triggers/backfillFromMelee', () => {
 
     assert.equal(fetchCount, 0, 'No API calls for already-synced tournaments');
   });
+
+  it('listTournaments failure → loop breaks, returns zeros', async () => {
+    const tables = makeTables();
+    db = createMockDb(tables);
+    const failingClient = class {
+      async listTournaments() { throw new Error('API down'); }
+      async getStandings() { return { Content: [] }; }
+      async getMatches() { return { Content: [] }; }
+    };
+
+    const result = await backfillFromMelee({ DB: db }, { MeleeClient: failingClient, seasonId: 5 });
+
+    assert.equal(result.tournaments, 0);
+    assert.equal(result.standings, 0);
+    assert.equal(result.matches, 0);
+  });
+
+  it('getStandings failure → skips standings, continues', async () => {
+    const tables = makeTables();
+    db = createMockDb(tables);
+    const partialClient = class {
+      async listTournaments() {
+        return { Content: ALL_TOURNAMENTS.filter(t => t.ID === 100), TotalCount: 1 };
+      }
+      async getStandings() { throw new Error('Standings API down'); }
+      async getMatches() { return { Content: [] }; }
+    };
+
+    const result = await backfillFromMelee({ DB: db }, { MeleeClient: partialClient, seasonId: 5 });
+
+    assert.ok(result.tournaments > 0, 'Tournament stored before standings fetch');
+    assert.equal(result.standings, 0, 'No standings stored');
+  });
+
+  it('getMatches failure → skips matches, continues', async () => {
+    const tables = makeTables();
+    db = createMockDb(tables);
+    const partialClient = class {
+      async listTournaments() {
+        return { Content: ALL_TOURNAMENTS.filter(t => t.ID === 100), TotalCount: 1 };
+      }
+      async getStandings() { return { Content: STANDINGS }; }
+      async getMatches() { throw new Error('Matches API down'); }
+    };
+
+    const result = await backfillFromMelee({ DB: db }, { MeleeClient: partialClient, seasonId: 5 });
+
+    assert.ok(result.tournaments > 0, 'Tournament stored');
+    assert.ok(result.standings > 0, 'Standings stored');
+    assert.equal(result.matches, 0, 'No matches stored');
+  });
 });
