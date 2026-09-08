@@ -10,9 +10,9 @@ front end on GitHub Pages backed by a Cloudflare Worker + D1 database backend.
   favorite opponent) through a mobile-styled web app.
 - A Cloudflare Worker backend tracks votes, compiles leaderboards, advances weeks, and
   calculates end-of-season awards. Data is stored in a D1 (SQLite) database.
-- Player rosters are synced from the league website (`https://stockholm.sw-unlimited.com/`)
-  on a weekly cron trigger.
-- Gamification features: raffle tickets (1 per vote), compliance tracking, and streak tracking.
+- Player data is synced from the Melee.gg API on a weekly cron trigger (dual-cron for DST handling).
+- Gamification features: raffle tickets (1 per vote), compliance tracking, streak tracking, and voting milestones.
+- 4 tabs: Vote | Standings | Awards | My Stats
 
 ## Architecture
 
@@ -49,12 +49,13 @@ cd backend && node --test "test/**/*.test.js"
 
 | Category | Files | Tests |
 |----------|-------|-------|
-| Library (awards, auth, scraping, participation) | 4 files | 83 |
-| Handlers (getAppData, submitVote, linkAccount, etc.) | 6 files | 42 |
+| Library (awards, auth, meleeLeague, participation, seasonTable) | 6 files | 120+ |
+| Handlers (getAppData, submitVote, linkAccount, getStandingsData, etc.) | 13 files | 150+ |
 | Database queries | 1 file | 17 |
-| Triggers (syncPlayers, advanceWeek) | 2 files | 11 |
-| Router (CORS, routing, error handling) | 1 file | 6 |
-| **Total** | **14 files** | **159** |
+| Triggers (syncFromMelee, backfillFromMelee) | 2 files | 35+ |
+| Router (CORS, routing, error handling) | 1 file | 30+ |
+| Schema tests | 1 file | 10+ |
+| **Total** | **24 files** | **391** |
 
 Test infrastructure: `backend/test/helpers/mock-db.js` (D1 mock), `mock-fetch.js`,
 `mock-crypto.js`, `fixtures.js`, `test-utils.js`.
