@@ -93,26 +93,29 @@ export function generateSQL() {
 
   // 5. LeaderVotes (may be empty)
   const leaderVotes = parseCSV(join(TMP_DIR, 'SWU DL League Sheets - LeaderVotes.csv'));
+  const opponentVotes = parseCSV(join(TMP_DIR, 'SWU DL League Sheets - OpponentVotes.csv'));
+
+  // Build a map of opponent votes by (season_id, week) for merging
+  const opponentMap = new Map();
+  for (const row of opponentVotes) {
+    const seasonId = extractSeasonNumber(row['Season ID']);
+    const week = parseInt(row['Week'], 10);
+    const opponentId = row['Favorite Opponent ID'] || row['Opponent ID'];
+    if (seasonId && week && opponentId) {
+      opponentMap.set(`${seasonId}-${week}`, opponentId);
+    }
+  }
+
+  // Insert into merged votes table
   for (const row of leaderVotes) {
     const timestamp = row['Timestamp'];
     const seasonId = extractSeasonNumber(row['Season ID']);
     const week = parseInt(row['Week'], 10);
     const playerId = row['Player ID'];
     const leaderId = row['Leader ID'];
+    const opponentId = opponentMap.get(`${seasonId}-${week}`) || null;
     if (seasonId && week && playerId && leaderId) {
-      statements.push(`INSERT OR IGNORE INTO leader_votes (timestamp, season_id, week, player_id, leader_id) VALUES (${sqlEscape(timestamp)}, ${seasonId}, ${week}, ${sqlEscape(playerId)}, ${sqlEscape(leaderId)});`);
-    }
-  }
-
-  // 6. OpponentVotes (may be empty)
-  const opponentVotes = parseCSV(join(TMP_DIR, 'SWU DL League Sheets - OpponentVotes.csv'));
-  for (const row of opponentVotes) {
-    const timestamp = row['Timestamp'];
-    const seasonId = extractSeasonNumber(row['Season ID']);
-    const week = parseInt(row['Week'], 10);
-    const opponentId = row['Favorite Opponent ID'] || row['Opponent ID'];
-    if (seasonId && week && opponentId) {
-      statements.push(`INSERT OR IGNORE INTO opponent_votes (timestamp, season_id, week, opponent_id) VALUES (${sqlEscape(timestamp)}, ${seasonId}, ${week}, ${sqlEscape(opponentId)});`);
+      statements.push(`INSERT OR IGNORE INTO votes (timestamp, season_id, week, player_id, leader_id, opponent_id) VALUES (${sqlEscape(timestamp)}, ${seasonId}, ${week}, ${sqlEscape(playerId)}, ${sqlEscape(leaderId)}, ${sqlEscape(opponentId)});`);
     }
   }
 

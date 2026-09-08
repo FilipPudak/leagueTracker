@@ -4,7 +4,7 @@
 export async function getCompliance(db, seasonId, playerId) {
   const row = await db.prepare(`
     SELECT
-      COUNT(DISTINCT lv.week) as weeks_voted,
+      COUNT(DISTINCT v.week) as weeks_voted,
       COUNT(DISTINCT a.week) as weeks_attended
     FROM attendance a
     LEFT JOIN votes v
