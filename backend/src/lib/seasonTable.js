@@ -2,7 +2,7 @@ export function nightPoints(s) {
   return 3 * (s.wins || 0) + (s.draws || 0);
 }
 
-export function seasonTableFor(entries, topResults) {
+export function computeSeasonTable(entries, topResults) {
   const playerMap = new Map();
 
   for (const entry of entries) {

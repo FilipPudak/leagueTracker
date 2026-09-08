@@ -1,4 +1,4 @@
-import { seasonTableFor } from '../lib/seasonTable.js';
+import { computeSeasonTable } from '../lib/seasonTable.js';
 
 export async function handleGetStandingsData(body, env) {
   const { DB } = env;
@@ -40,7 +40,7 @@ export async function handleGetStandingsData(body, env) {
     rank: s.rank,
   }));
 
-  const table = seasonTableFor(nights, topResults);
+  const table = computeSeasonTable(nights, topResults);
 
   const roundMap = new Map();
   for (const t of tournamentList) {

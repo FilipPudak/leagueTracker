@@ -1,7 +1,8 @@
 import { MeleeClient } from '../lib/melee.js';
 import { getSettings, updateSetting, parseSeasonId, parseWeek, isSeasonStarted, isVotingOpen, findPlayerByMelee, getAllActivePlayers } from '../db/queries.js';
-import { computeSchemer, computeAmbassador, writePodiumBlock } from '../lib/awards.js';
+import { computeSchemer, computeAmbassador, computeChampion, computeBountyHunter, writePodiumBlock } from '../lib/awards.js';
 import { fetchLeagueTournaments, buildWeekMap } from '../lib/meleeLeague.js';
+import { computeSeasonTable } from '../lib/seasonTable.js';
 
 export function shouldAdvance(isoNow, marker, weekKey) {
   const date = new Date(isoNow);
@@ -59,6 +60,7 @@ export async function syncFromMelee(env, deps = {}) {
 
   const season = await DB.prepare('SELECT length, top_results FROM seasons WHERE id = ?').bind(activeSeasonId).first();
   const seasonLength = season?.length || 11;
+  const topResults = season?.top_results || 7;
 
   const weekMap = buildWeekMap(matchedTournaments);
 
@@ -222,30 +224,45 @@ export async function syncFromMelee(env, deps = {}) {
     await writePodiumBlock(DB, activeSeasonId, 'Galactic Ambassador', ambassador);
   }
 
-  const finalStandings = await DB.prepare(
-    'SELECT player_id, rank, match_points FROM season_standings WHERE season_id = ? AND round = (SELECT MAX(round) FROM season_standings WHERE season_id = ?)'
-  ).bind(activeSeasonId, activeSeasonId).all();
-
-  const top3 = (finalStandings.results || []).filter(s => s.rank <= 3).slice(0, 3);
-  const rulerEntries = [];
-  for (const s of top3) {
-    if (s.player_id) rulerEntries.push({ playerId: s.player_id, score: s.match_points, name: '' });
+  const bountyHunter = await computeBountyHunter(DB, activeSeasonId);
+  if (bountyHunter.length > 0) {
+    await writePodiumBlock(DB, activeSeasonId, 'Bounty Hunter', bountyHunter);
   }
+
+  const allStandings = await DB.prepare(
+    'SELECT round, player_id, wins, losses, draws, match_points, rank FROM season_standings WHERE season_id = ?'
+  ).bind(activeSeasonId).all();
+
+  const nights = (allStandings.results || []).map(s => ({
+    playerId: s.player_id,
+    round: s.round,
+    wins: s.wins || 0,
+    draws: s.draws || 0,
+    losses: s.losses || 0,
+    rank: s.rank,
+  }));
+
+  const seasonTable = computeSeasonTable(nights, topResults);
+
+  const rulerEntries = seasonTable
+    .filter(r => r.rank <= 3)
+    .map(r => ({ playerId: r.playerId, score: r.points, name: '' }));
+
   if (rulerEntries.length > 0) {
     await writePodiumBlock(DB, activeSeasonId, 'Galactic Ruler', rulerEntries);
   }
 
   const midRound = Math.floor(seasonLength / 2);
-  const midStandings = await DB.prepare(
-    'SELECT player_id, rank FROM season_standings WHERE season_id = ? AND round = ?'
-  ).bind(activeSeasonId, midRound).all();
-  const midMap = new Map((midStandings.results || []).map(s => [s.player_id, s.rank]));
+  const midTable = computeSeasonTable(
+    nights.filter(n => n.round <= midRound),
+    topResults
+  );
+  const midRankMap = new Map(midTable.map(r => [r.playerId, r.rank]));
 
-  const finalAll = finalStandings.results || [];
-  const climbers = finalAll
-    .map(s => ({
-      playerId: s.player_id,
-      climb: (midMap.get(s.player_id) || 0) - s.rank,
+  const climbers = seasonTable
+    .map(r => ({
+      playerId: r.playerId,
+      climb: (midRankMap.get(r.playerId) || 0) - r.rank,
     }))
     .filter(c => c.climb > 0)
     .sort((a, b) => b.climb - a.climb)
@@ -267,6 +284,10 @@ export async function syncFromMelee(env, deps = {}) {
   } else if (canAdvance) {
     const nextWeek = (currentWeek || 0) + 1;
     if (nextWeek > seasonLength) {
+      const champion = await computeChampion(DB, activeSeasonId);
+      if (champion.length > 0) {
+        await writePodiumBlock(DB, activeSeasonId, 'Galactic Champion', champion);
+      }
       await updateSetting(DB, 'CURRENT_WEEK', 'Season Ended');
       await updateSetting(DB, 'VOTING_OPEN', 'FALSE');
       await updateSetting(DB, 'SEASON_STARTED', 'FALSE');

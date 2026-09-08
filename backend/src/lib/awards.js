@@ -94,4 +94,65 @@ export async function writePodiumBlock(db, seasonId, awardName, entries) {
   }
 }
 
+export async function computeChampion(db, seasonId) {
+  const lastCutTournament = await db.prepare(
+    'SELECT melee_id, round FROM melee_tournaments WHERE season_id = ? AND phase = ? ORDER BY date DESC, melee_id DESC LIMIT 1'
+  ).bind(seasonId, 'cut').first();
+
+  if (!lastCutTournament) return [];
+
+  const standings = await db.prepare(
+    'SELECT player_id, rank FROM season_standings WHERE season_id = ? AND round = ?'
+  ).bind(seasonId, lastCutTournament.round).all();
+
+  const winners = (standings.results || [])
+    .filter(s => s.rank === 1)
+    .map(s => ({ playerId: s.player_id, score: s.rank }));
+
+  return tieAwareTop3(winners);
+}
+
+export async function computeBountyHunter(db, seasonId) {
+  const allSeasons = await db.prepare('SELECT id FROM seasons ORDER BY id DESC').all();
+  const seasonIds = (allSeasons.results || []).map(s => s.id);
+  const prevSeasonId = seasonIds.find(id => id < seasonId);
+
+  if (!prevSeasonId) return [];
+
+  const maxRound = await db.prepare(
+    'SELECT MAX(round) as max_round FROM season_standings WHERE season_id = ?'
+  ).bind(prevSeasonId).first();
+
+  if (!maxRound?.max_round) return [];
+
+  const prevStandings = await db.prepare(
+    'SELECT player_id FROM season_standings WHERE season_id = ? AND round = ? AND rank <= 4'
+  ).bind(prevSeasonId, maxRound.max_round).all();
+
+  const top4Ids = (prevStandings.results || []).map(s => s.player_id);
+  if (top4Ids.length === 0) return [];
+
+  const allMatches = await db.prepare(
+    'SELECT player1_id, player2_id, winner_id, is_bye FROM match_results WHERE season_id = ?'
+  ).bind(seasonId).all();
+
+  const wins = new Map();
+  for (const m of (allMatches.results || [])) {
+    if (m.is_bye || !m.winner_id) continue;
+    if (m.winner_id === m.player1_id && top4Ids.includes(m.player1_id)) {
+      wins.set(m.player1_id, (wins.get(m.player1_id) || 0) + 1);
+    }
+    if (m.winner_id === m.player2_id && top4Ids.includes(m.player2_id)) {
+      wins.set(m.player2_id, (wins.get(m.player2_id) || 0) + 1);
+    }
+  }
+
+  const allWins = [];
+  for (const [pid, score] of wins) {
+    allWins.push({ playerId: pid, score });
+  }
+
+  return tieAwareTop3(allWins);
+}
+
 export { AWARD_NAMES };

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { nightPoints, seasonTableFor } from '../../src/lib/seasonTable.js';
+import { nightPoints, computeSeasonTable } from '../../src/lib/seasonTable.js';
 
 describe('seasonTable', () => {
   describe('nightPoints', () => {
@@ -12,14 +12,14 @@ describe('seasonTable', () => {
     });
   });
 
-  describe('seasonTableFor', () => {
+  describe('computeSeasonTable', () => {
     it('picks best X nights by points', () => {
       const nights = [
         { playerId: 'P1', round: 1, wins: 3, draws: 0, losses: 0, rank: 1 },
         { playerId: 'P1', round: 2, wins: 2, draws: 1, losses: 0, rank: 2 },
         { playerId: 'P1', round: 3, wins: 1, draws: 0, losses: 2, rank: 5 },
       ];
-      const result = seasonTableFor(nights, 2);
+      const result = computeSeasonTable(nights, 2);
       assert.equal(result.length, 1);
       assert.equal(result[0].rounds.length, 2);
       assert.equal(result[0].points, 16);
@@ -31,7 +31,7 @@ describe('seasonTable', () => {
         { playerId: 'P1', round: 1, wins: 2, draws: 1, losses: 0, rank: 2 },
         { playerId: 'P1', round: 2, wins: 2, draws: 1, losses: 0, rank: 2 },
       ];
-      const result = seasonTableFor(nights, 2);
+      const result = computeSeasonTable(nights, 2);
       assert.equal(result[0].rounds[0].round, 1);
       assert.equal(result[0].rounds[1].round, 2);
     });
@@ -41,7 +41,7 @@ describe('seasonTable', () => {
         { playerId: 'P1', round: 1, wins: 3, draws: 0, losses: 0, rank: 1 },
         { playerId: 'P1', round: 2, wins: 2, draws: 1, losses: 0, rank: 2 },
       ];
-      const result = seasonTableFor(nights, 2);
+      const result = computeSeasonTable(nights, 2);
       assert.equal(result[0].played, 6);
       assert.equal(result[0].won, 5);
       assert.equal(result[0].drawn, 1);
@@ -55,7 +55,7 @@ describe('seasonTable', () => {
         { playerId: 'P2', round: 1, wins: 3, draws: 0, losses: 0, rank: 1 },
         { playerId: 'P2', round: 2, wins: 2, draws: 1, losses: 0, rank: 2 },
       ];
-      const result = seasonTableFor(nights, 2);
+      const result = computeSeasonTable(nights, 2);
       assert.equal(result[0].playerId, 'P1');
       assert.equal(result[1].playerId, 'P2');
     });
@@ -69,7 +69,7 @@ describe('seasonTable', () => {
         { playerId: 'P3', round: 1, wins: 2, draws: 1, losses: 0, rank: 2 },
         { playerId: 'P3', round: 2, wins: 2, draws: 1, losses: 0, rank: 2 },
       ];
-      const result = seasonTableFor(nights, 2);
+      const result = computeSeasonTable(nights, 2);
       assert.equal(result[0].rank, 1);
       assert.equal(result[1].rank, 1);
       assert.equal(result[2].rank, 3);
@@ -79,7 +79,7 @@ describe('seasonTable', () => {
       const nights = [
         { playerId: 'P1', round: 1, wins: 3, draws: 0, losses: 0, rank: 1 },
       ];
-      const result = seasonTableFor(nights, 3);
+      const result = computeSeasonTable(nights, 3);
       assert.equal(result[0].rounds.length, 1);
       assert.equal(result[0].played, 3);
     });
