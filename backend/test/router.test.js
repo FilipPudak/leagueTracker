@@ -26,7 +26,7 @@ describe('router/index.js – fetch handler', () => {
     const resp = await worker.fetch(req, env());
 
     assert.equal(resp.status, 200);
-    assert.equal(resp.headers.get('Access-Control-Allow-Origin'), 'https://filip-pudak.github.io');
+    assert.equal(resp.headers.get('Access-Control-Allow-Origin'), 'https://filippudak.github.io');
     assert.equal(resp.headers.get('Access-Control-Allow-Methods'), 'POST, OPTIONS');
     assert.equal(resp.headers.get('Access-Control-Allow-Headers'), 'Content-Type');
   });

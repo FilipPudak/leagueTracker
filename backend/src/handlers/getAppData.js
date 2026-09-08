@@ -20,12 +20,12 @@ export async function handleGetAppData(body, env, session) {
 
   if (votingOpen && session && activeSeasonId && currentWeek) {
     const matchRow = await DB.prepare(
-      'SELECT 1 FROM match_results WHERE season_id = ? AND round = ? AND (player1_id = ? OR player2_id = ?) LIMIT 1'
+      'SELECT 1 FROM match_results WHERE season_id = ? AND round = ? AND (player1_id = ? OR player2_id = ?) AND is_bye = 0 LIMIT 1'
     ).bind(activeSeasonId, currentWeek, session.player_id, session.player_id).first();
 
     if (matchRow) {
       const matches = await DB.prepare(
-        'SELECT player1_id, player2_id FROM match_results WHERE season_id = ? AND round = ? AND (player1_id = ? OR player2_id = ?)'
+        'SELECT player1_id, player2_id FROM match_results WHERE season_id = ? AND round = ? AND (player1_id = ? OR player2_id = ?) AND is_bye = 0'
       ).bind(activeSeasonId, currentWeek, session.player_id, session.player_id).all();
 
       const opponentIds = new Set();

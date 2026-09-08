@@ -5,6 +5,7 @@ import { handleSubmitVote } from './handlers/submitVote.js';
 import { handleGetLeaderboardData } from './handlers/getLeaderboardData.js';
 import { handleGetMySeasonStats } from './handlers/getMySeasonStats.js';
 import { handleStartNewSeason } from './handlers/startNewSeason.js';
+import { handleBackfillFromMelee } from './handlers/handleBackfillFromMelee.js';
 import { findSessionByToken, touchSessionTimestamp } from './lib/auth.js';
 
 const TOKEN_REQUIRED = ['submitVote', 'unlinkAccount', 'getMySeasonStats'];
@@ -27,7 +28,7 @@ function checkRateLimit(ip) {
 
 export default {
   async fetch(request, env) {
-    const allowedOrigin = env.ALLOWED_ORIGIN || 'https://filip-pudak.github.io';
+    const allowedOrigin = env.ALLOWED_ORIGIN || 'https://filippudak.github.io';
     const corsHeaders = {
       'Access-Control-Allow-Origin': allowedOrigin,
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -73,6 +74,7 @@ export default {
       getLeaderboardData: handleGetLeaderboardData,
       getMySeasonStats: handleGetMySeasonStats,
       startNewSeason: handleStartNewSeason,
+      backfillFromMelee: handleBackfillFromMelee,
     };
 
     const handler = handlers[action];

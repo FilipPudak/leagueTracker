@@ -1,4 +1,4 @@
-import { getSettings, getAwardsForSeason, getMostPlayedLeaders, parseSeasonId, isVotingOpen } from '../db/queries.js';
+import { getSettings, getAwardsForSeason, getMostPlayedLeaders, parseSeasonId, parseWeek, isVotingOpen } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, assignStandardRanks } from '../lib/awards.js';
 import { getSeasonParticipation } from '../lib/participation.js';
 
@@ -13,9 +13,8 @@ export async function handleGetLeaderboardData(body, env) {
 
   const settings = await getSettings(DB);
   const activeSeasonId = parseSeasonId(settings.ACTIVE_SEASON_ID);
-  const currentWeek = settings.CURRENT_WEEK ? parseInt(settings.CURRENT_WEEK.replace(/\D/g, ''), 10) : 1;
+  const currentWeek = parseWeek(settings.CURRENT_WEEK);
   const votingOpen = isVotingOpen(settings.VOTING_OPEN);
-  const seasonLength = settings.SEASON_LENGTH ? Number(settings.SEASON_LENGTH) : 11;
 
   const seasonId = requestedSeasonId ? Number(requestedSeasonId) : activeSeasonId;
 
@@ -68,7 +67,11 @@ export async function handleGetLeaderboardData(body, env) {
   // Galactic Ruler: stored or live from season_standings
   let ruler = awardsMap['Galactic Ruler'] || null;
   if ((!ruler || ruler.length === 0) && isActiveSeason) {
-    const round = votingOpen ? currentWeek : seasonLength;
+    const lengthRow = await DB.prepare(
+      'SELECT COUNT(*) as count FROM melee_tournaments WHERE season_id = ?'
+    ).bind(seasonId).first();
+    const seasonLength = lengthRow?.count || 11;
+    const round = votingOpen && currentWeek ? currentWeek : seasonLength;
     const standings = await DB.prepare(
       'SELECT player_id, rank, match_points FROM season_standings WHERE season_id = ? AND round = ?'
     ).bind(seasonId, round).all();
@@ -86,8 +89,12 @@ export async function handleGetLeaderboardData(body, env) {
   // A New Hope: stored or live from season_standings
   let newHope = awardsMap['A New Hope'] || null;
   if ((!newHope || newHope.length === 0) && isActiveSeason) {
+    const lengthRow = await DB.prepare(
+      'SELECT COUNT(*) as count FROM melee_tournaments WHERE season_id = ?'
+    ).bind(seasonId).first();
+    const seasonLength = lengthRow?.count || 11;
     const midRound = Math.floor(seasonLength / 2);
-    const finalRound = votingOpen ? currentWeek : seasonLength;
+    const finalRound = votingOpen && currentWeek ? currentWeek : seasonLength;
     const midStandings = await DB.prepare(
       'SELECT player_id, rank FROM season_standings WHERE season_id = ? AND round = ?'
     ).bind(seasonId, midRound).all();

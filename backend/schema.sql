@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS match_results (
   player2_id TEXT NOT NULL,
   winner_id TEXT,
   result TEXT,
+  is_bye INTEGER DEFAULT 0,
   FOREIGN KEY (season_id) REFERENCES seasons(id),
   FOREIGN KEY (player1_id) REFERENCES players(id),
   FOREIGN KEY (player2_id) REFERENCES players(id)

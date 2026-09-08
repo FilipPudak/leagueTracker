@@ -30,6 +30,7 @@ export class MeleeClient {
       if (res.status === 429) {
         const retryAfter = parseInt(res.headers.get('retry-after') || '1', 10);
         const delay = (retryAfter || 1) * RETRY_DELAY_MS;
+        console.warn(`[Melee] 429 rate limited, retry ${attempt + 1}/${MAX_RETRIES}, retry-after: ${retryAfter}s`);
         await sleep(delay);
         lastError = new Error(`Melee API rate limited (429)`);
         continue;
@@ -38,7 +39,7 @@ export class MeleeClient {
       const body = await res.text().catch(() => '');
       lastError = new Error(`Melee API request failed: ${res.status} ${body}`);
       if (res.status >= 500) {
-        await sleep(RETRY_DELAY_MS * (attempt + 1));
+        await sleep(RETRY_DELAY_MS * Math.pow(2, attempt));
         continue;
       }
       throw lastError;
@@ -48,12 +49,9 @@ export class MeleeClient {
   }
 
   async listTournaments(orgId, skip, take) {
-    return this._fetch('/api/tournament/list', {
-      Game: 'StarWarsUnlimited',
-      OrganizationId: orgId,
-      Skip: skip,
-      Take: take,
-    });
+    const params = { Game: 'StarWarsUnlimited', Skip: skip, Take: take };
+    if (orgId != null) params.OrganizationId = orgId;
+    return this._fetch('/api/tournament/list', params);
   }
 
   async getStandings(tournamentId) {

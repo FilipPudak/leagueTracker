@@ -13,4 +13,4 @@ database_id = "ccf38d5e-1639-4eb3-8447-9f3644127e4b"
 crons = ["15 22 * * 3"]
 
 [vars]
-ALLOWED_ORIGIN = "https://filip-pudak.github.io"
+ALLOWED_ORIGIN = "https://filippudak.github.io"

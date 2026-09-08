@@ -81,15 +81,15 @@ export async function writePodiumBlock(db, seasonId, awardName, entries) {
     'DELETE FROM awards WHERE season_id = ? AND award_name = ?'
   ).bind(seasonId, awardName).run();
 
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < topN.length; i++) {
     const entry = topN[i];
     await db.prepare(
       'INSERT INTO awards (season_id, award_name, player_id, score) VALUES (?, ?, ?, ?)'
     ).bind(
       seasonId,
       awardName,
-      entry ? entry.playerId : '',
-      entry ? entry.score : null
+      entry.playerId,
+      entry.score
     ).run();
   }
 }

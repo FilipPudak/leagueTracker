@@ -43,7 +43,6 @@ export async function syncFromMelee(env, deps = {}) {
   const activeSeasonId = parseSeasonId(settings.ACTIVE_SEASON_ID);
   const currentWeek = parseWeek(settings.CURRENT_WEEK);
   const votingOpen = isVotingOpen(settings.VOTING_OPEN);
-  const seasonLength = settings.SEASON_LENGTH ? Number(settings.SEASON_LENGTH) : 11;
 
   if (!activeSeasonId) {
     console.log('[SyncFromMelee] No active season; skipping.');
@@ -98,6 +97,8 @@ export async function syncFromMelee(env, deps = {}) {
     const round = t.extractedWeek || seq++;
     weekMap.set(t.ID, { meleeId: t.ID, round, name: t.Name, date: t.StartDate });
   }
+
+  const seasonLength = weekMap.size || 11;
 
   for (const [, info] of weekMap) {
     if (existingIds.has(info.meleeId)) continue;
@@ -232,13 +233,7 @@ export async function syncFromMelee(env, deps = {}) {
   const allAttended = new Set([...roundAttendance.values()].flatMap(s => [...s]));
 
   for (const player of allPlayers) {
-    if (!allAttended.has(player.id)) {
-      try {
-        await DB.prepare('UPDATE players SET active = ? WHERE id = ?').bind(0, player.id).run();
-      } catch (err) {
-        console.error(`[SyncFromMelee] Failed to deactivate player ${player.id}: ${err.message}`);
-      }
-    } else if (player.active !== 1) {
+    if (allAttended.has(player.id) && player.active !== 1) {
       try {
         await DB.prepare('UPDATE players SET active = ? WHERE id = ?').bind(1, player.id).run();
       } catch (err) {
@@ -298,6 +293,15 @@ export async function syncFromMelee(env, deps = {}) {
   } else {
     const nextWeek = (currentWeek || 0) + 1;
     if (nextWeek > seasonLength) {
+      for (const player of allPlayers) {
+        if (!allAttended.has(player.id)) {
+          try {
+            await DB.prepare('UPDATE players SET active = ? WHERE id = ?').bind(0, player.id).run();
+          } catch (err) {
+            console.error(`[SyncFromMelee] Failed to deactivate player ${player.id}: ${err.message}`);
+          }
+        }
+      }
       await updateSetting(DB, 'CURRENT_WEEK', 'Season Ended');
       await updateSetting(DB, 'VOTING_OPEN', 'FALSE');
       await updateSetting(DB, 'SEASON_STARTED', 'FALSE');

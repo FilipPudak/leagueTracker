@@ -140,7 +140,7 @@ describe('computeAmbassador', () => {
 });
 
 describe('writePodiumBlock', () => {
-  it('deletes existing award entries and inserts up to 5 rows', async () => {
+  it('deletes existing award entries and inserts only provided rows', async () => {
     const db = createMockDb(basicTables());
     const entries = [
       { playerId: 'P001', score: 10 },
@@ -153,17 +153,13 @@ describe('writePodiumBlock', () => {
     const awardRows = store.awards.filter(
       r => r.award_name === 'Galactic Schemer' && r.season_id === 6
     );
-    assert.equal(awardRows.length, 5);
+    assert.equal(awardRows.length, 3);
     assert.equal(awardRows[0].player_id, 'P001');
     assert.equal(awardRows[0].score, 10);
     assert.equal(awardRows[1].player_id, 'P002');
     assert.equal(awardRows[1].score, 8);
     assert.equal(awardRows[2].player_id, 'P003');
     assert.equal(awardRows[2].score, 6);
-    assert.equal(awardRows[3].player_id, '');
-    assert.equal(awardRows[3].score, null);
-    assert.equal(awardRows[4].player_id, '');
-    assert.equal(awardRows[4].score, null);
   });
 
   it('does not affect other awards in the same season', async () => {
@@ -184,7 +180,7 @@ describe('writePodiumBlock', () => {
     assert.equal(ambassadorBefore, ambassadorAfter);
   });
 
-  it('handles fewer than 5 entries with empty placeholders', async () => {
+  it('handles fewer than 5 entries without padding', async () => {
     const db = createMockDb(basicTables());
     const entries = [{ playerId: 'P001', score: 10 }];
     await writePodiumBlock(db, 6, 'Bounty Hunter', entries);
@@ -193,17 +189,9 @@ describe('writePodiumBlock', () => {
     const awardRows = store.awards.filter(
       r => r.award_name === 'Bounty Hunter' && r.season_id === 6
     );
-    assert.equal(awardRows.length, 5);
+    assert.equal(awardRows.length, 1);
     assert.equal(awardRows[0].player_id, 'P001');
     assert.equal(awardRows[0].score, 10);
-    assert.equal(awardRows[1].player_id, '');
-    assert.equal(awardRows[1].score, null);
-    assert.equal(awardRows[2].player_id, '');
-    assert.equal(awardRows[2].score, null);
-    assert.equal(awardRows[3].player_id, '');
-    assert.equal(awardRows[3].score, null);
-    assert.equal(awardRows[4].player_id, '');
-    assert.equal(awardRows[4].score, null);
   });
 
   it('handles empty entries array — preserves existing data when block exists', async () => {
@@ -221,7 +209,7 @@ describe('writePodiumBlock', () => {
     assert.equal(awardRows.length, existingCount);
   });
 
-  it('handles empty entries array — writes skeleton when no block exists', async () => {
+  it('handles empty entries array — no rows written when no block exists', async () => {
     const tables = emptyTables();
     const db = createMockDb(tables);
     await writePodiumBlock(db, 6, 'Bounty Hunter', []);
@@ -230,12 +218,7 @@ describe('writePodiumBlock', () => {
     const awardRows = store.awards.filter(
       r => r.award_name === 'Bounty Hunter' && r.season_id === 6
     );
-    assert.equal(awardRows.length, 5);
-    assert.equal(awardRows[0].player_id, '');
-    assert.equal(awardRows[1].player_id, '');
-    assert.equal(awardRows[2].player_id, '');
-    assert.equal(awardRows[3].player_id, '');
-    assert.equal(awardRows[4].player_id, '');
+    assert.equal(awardRows.length, 0);
   });
 
   it('truncates entries to top 5', async () => {
@@ -252,7 +235,7 @@ describe('writePodiumBlock', () => {
     const awardRows = store.awards.filter(
       r => r.award_name === 'Galactic Schemer' && r.season_id === 6
     );
-    assert.equal(awardRows.length, 5);
+    assert.equal(awardRows.length, 4);
     assert.equal(awardRows[2].player_id, 'P003');
   });
 
@@ -269,7 +252,7 @@ describe('writePodiumBlock', () => {
     const deleteCalls = calls.filter(c => c.sql.toUpperCase().startsWith('DELETE'));
     const insertCalls = calls.filter(c => c.sql.toUpperCase().startsWith('INSERT'));
     assert.equal(deleteCalls.length, 1);
-    assert.equal(insertCalls.length, 5);
+    assert.equal(insertCalls.length, 3);
   });
 });
 
