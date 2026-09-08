@@ -1,21 +1,5 @@
 import { MeleeClient } from '../lib/melee.js';
-
-const LEAGUE_REGEX = /^SWU Wednesday league(?: season (\d+))?(?:\s+\d{1,2}\/\d{1,2}|\s+(?:top [48]|best of the rest|playoff|championship|finale))/i;
-const EXCLUDED_KEYWORDS = ['prerelease', 'draft', 'clone', 'budget draft'];
-
-function isLeagueTournament(name) {
-  if (!LEAGUE_REGEX.test(name)) return false;
-  const lower = name.toLowerCase();
-  return !EXCLUDED_KEYWORDS.some(kw => lower.includes(kw));
-}
-
-function extractSeasonAndRound(name) {
-  const match = name.match(LEAGUE_REGEX);
-  if (!match) return null;
-  const weekMatch = name.match(/\(week (\d+)\)/i);
-  const week = weekMatch ? parseInt(weekMatch[1], 10) : null;
-  return { seasonNum: match[1] ? parseInt(match[1], 10) : null, week };
-}
+import { fetchLeagueTournaments, buildWeekMap, createPlayerFinder } from '../lib/meleeLeague.js';
 
 export async function backfillFromMelee(env, deps = {}) {
   const { DB } = env;
@@ -29,69 +13,9 @@ export async function backfillFromMelee(env, deps = {}) {
   const clientSecret = env.MELEE_CLIENT_SECRET || '';
   const client = new ClientClass(clientId, clientSecret);
 
-  const allPlayersResult = await DB.prepare('SELECT * FROM players').all();
-  const allPlayers = allPlayersResult.results || [];
-  const playerMap = new Map(allPlayers.map(p => [p.melee_name?.toLowerCase(), p]));
+  const finder = createPlayerFinder(DB);
 
-  let nextPlayerNum = allPlayers.reduce((max, p) => {
-    const m = p.id?.match(/^P(\d+)$/);
-    return m ? Math.max(max, parseInt(m[1], 10)) : max;
-  }, 0) + 1;
-
-  async function findOrCreatePlayer(username, displayName) {
-    const key = username.toLowerCase();
-    if (playerMap.has(key)) {
-      const cached = playerMap.get(key);
-      const dbCheck = await DB.prepare('SELECT id FROM players WHERE id = ?').bind(cached.id).first();
-      if (dbCheck) return cached.id;
-      playerMap.delete(key);
-    }
-    const existing = await DB.prepare('SELECT id FROM players WHERE melee_name = ?').bind(username).first();
-    if (existing) {
-      const player = { id: existing.id, name: displayName || username, melee_name: username, active: 1 };
-      playerMap.set(key, player);
-      return existing.id;
-    }
-    const id = `P${String(nextPlayerNum++).padStart(3, '0')}`;
-    const name = displayName || username;
-    await DB.prepare('INSERT INTO players (id, name, melee_name, active) VALUES (?, ?, ?, 1)')
-      .bind(id, name, username).run();
-    const player = { id, name, melee_name: username, active: 1 };
-    playerMap.set(key, player);
-    allPlayers.push(player);
-    return id;
-  }
-
-  let page = 0;
-  const pageSize = 50;
-  let hasMore = true;
-  const allTournaments = [];
-
-  while (hasMore) {
-    let response;
-    try {
-      response = await client.listTournaments(null, page, pageSize);
-    } catch (err) {
-      console.error(`[Backfill] Failed to list tournaments: ${err.message}`);
-      break;
-    }
-
-    const content = response.Content || [];
-    for (const t of content) {
-      if (!isLeagueTournament(t.Name)) continue;
-      const info = extractSeasonAndRound(t.Name);
-      if (!info) continue;
-      const seasonNum = info.seasonNum || 1;
-      if (targetSeasonId && seasonNum !== targetSeasonId) continue;
-      allTournaments.push({ ...t, extractedWeek: info.week, seasonNum });
-    }
-
-    const total = response.RecordsTotal || response.TotalCount || 0;
-    page++;
-    hasMore = page * pageSize < total && content.length > 0;
-  }
-
-  allTournaments.sort((a, b) => a.seasonNum - b.seasonNum || new Date(a.StartDate || a.LastPairDateTime) - new Date(b.StartDate || b.LastPairDateTime));
+  const allTournaments = await fetchLeagueTournaments(client, { targetSeason: targetSeasonId });
 
   const seasonGroups = new Map();
   for (const t of allTournaments) {
@@ -118,12 +42,7 @@ export async function backfillFromMelee(env, deps = {}) {
     ).bind(seasonNum).all();
     const syncedRounds = new Set((syncedStandings.results || []).map(r => r.round));
 
-    const weekMap = new Map();
-    let seq = 1;
-    for (const t of tournaments) {
-      const round = t.extractedWeek || seq++;
-      weekMap.set(t.ID, { meleeId: t.ID, round, name: t.Name, date: t.StartDate || t.LastPairDateTime || null });
-    }
+    const weekMap = buildWeekMap(tournaments);
 
     for (const [, info] of weekMap) {
       if (!existingIds.has(info.meleeId)) {
@@ -154,7 +73,7 @@ export async function backfillFromMelee(env, deps = {}) {
         const username = s.Team?.Players?.[0]?.Username;
         if (!username) continue;
         const displayName = s.Team?.Players?.[0]?.DisplayName || s.Team?.Players?.[0]?.Name || username;
-        const playerId = await findOrCreatePlayer(username, displayName);
+        const playerId = await finder.find(username, displayName);
 
         try {
           await DB.prepare(
@@ -187,8 +106,8 @@ export async function backfillFromMelee(env, deps = {}) {
 
         const p1Name = comps[0].Team?.Players?.[0]?.DisplayName || comps[0].Team?.Players?.[0]?.Name || p1Username;
         const p2Name = comps[1].Team?.Players?.[0]?.DisplayName || comps[1].Team?.Players?.[0]?.Name || p2Username;
-        const p1Id = await findOrCreatePlayer(p1Username, p1Name);
-        const p2Id = await findOrCreatePlayer(p2Username, p2Name);
+        const p1Id = await finder.find(p1Username, p1Name);
+        const p2Id = await finder.find(p2Username, p2Name);
         if (!p1Id || !p2Id) continue;
 
         const p1Wins = comps[0].GameWins || 0;

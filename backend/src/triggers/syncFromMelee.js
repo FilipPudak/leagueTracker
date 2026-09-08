@@ -1,30 +1,7 @@
 import { MeleeClient } from '../lib/melee.js';
 import { getSettings, updateSetting, parseSeasonId, parseWeek, isSeasonStarted, isVotingOpen, findPlayerByMelee, getAllActivePlayers } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, writePodiumBlock } from '../lib/awards.js';
-
-const LEAGUE_REGEX = /^SWU Wednesday league(?: season (\d+))?(?:\s+\d{1,2}\/\d{1,2}|\s+(?:top [48]|best of the rest|playoff|championship|finale))/i;
-const EXCLUDED_KEYWORDS = ['prerelease', 'draft', 'clone', 'budget draft'];
-
-function isLeagueTournament(name) {
-  if (!LEAGUE_REGEX.test(name)) return false;
-  const lower = name.toLowerCase();
-  return !EXCLUDED_KEYWORDS.some(kw => lower.includes(kw));
-}
-
-function extractSeasonAndRound(name) {
-  const match = name.match(LEAGUE_REGEX);
-  if (!match) return null;
-
-  const weekMatch = name.match(/\(week (\d+)\)/i);
-  const week = weekMatch ? parseInt(weekMatch[1], 10) : null;
-
-  return { seasonNum: match[1] ? parseInt(match[1], 10) : null, week };
-}
-
-function findPlayerIdByMelee(players, meleeUsername) {
-  const found = players.find(p => p.melee_name && p.melee_name.toLowerCase() === meleeUsername.toLowerCase());
-  return found ? found.id : null;
-}
+import { fetchLeagueTournaments, buildWeekMap } from '../lib/meleeLeague.js';
 
 export async function syncFromMelee(env, deps = {}) {
   const { DB } = env;
@@ -61,44 +38,10 @@ export async function syncFromMelee(env, deps = {}) {
   ).bind(activeSeasonId).all();
   const existingIds = new Set((storedTournaments.results || []).map(t => t.melee_id));
 
-  let page = 0;
-  const pageSize = 50;
-  let hasMore = true;
-  const matchedTournaments = [];
-
-  while (hasMore) {
-    let response;
-    try {
-      response = await client.listTournaments(null, page, pageSize);
-    } catch (err) {
-      console.error(`[SyncFromMelee] Failed to list tournaments: ${err.message}`);
-      break;
-    }
-
-    const content = response.Content || [];
-    for (const t of content) {
-      if (!isLeagueTournament(t.Name)) continue;
-      const info = extractSeasonAndRound(t.Name);
-      if (!info) continue;
-      if (info.seasonNum !== activeSeasonId) continue;
-      matchedTournaments.push({ ...t, extractedWeek: info.week });
-    }
-
-    const total = response.RecordsTotal || response.TotalCount || 0;
-    page++;
-    hasMore = page * pageSize < total && content.length > 0;
-  }
-
-  matchedTournaments.sort((a, b) => new Date(a.StartDate || a.LastPairDateTime) - new Date(b.StartDate || b.LastPairDateTime));
-
-  const weekMap = new Map();
-  let seq = 1;
-  for (const t of matchedTournaments) {
-    const round = t.extractedWeek || seq++;
-    weekMap.set(t.ID, { meleeId: t.ID, round, name: t.Name, date: t.StartDate || t.LastPairDateTime || null });
-  }
+  const matchedTournaments = await fetchLeagueTournaments(client, { targetSeason: activeSeasonId });
 
   const configuredLength = parseWeek(settings.SEASON_LENGTH) || 11;
+  const weekMap = buildWeekMap(matchedTournaments);
   const seasonLength = Math.max(weekMap.size, configuredLength);
 
   for (const [, info] of weekMap) {
@@ -311,4 +254,9 @@ export async function syncFromMelee(env, deps = {}) {
   }
 
   console.log('[SyncFromMelee] Sync complete.');
+}
+
+function findPlayerIdByMelee(players, meleeUsername) {
+  const found = players.find(p => p.melee_name && p.melee_name.toLowerCase() === meleeUsername.toLowerCase());
+  return found ? found.id : null;
 }

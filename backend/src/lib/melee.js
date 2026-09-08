@@ -55,11 +55,29 @@ export class MeleeClient {
   }
 
   async getStandings(tournamentId) {
-    return this._fetch(`/api/standing/list/current/${tournamentId}`);
+    return this._fetchAllPages(`/api/standing/list/current/${tournamentId}`);
   }
 
   async getMatches(tournamentId) {
-    return this._fetch(`/api/match/list/${tournamentId}`);
+    return this._fetchAllPages(`/api/match/list/${tournamentId}`);
+  }
+
+  async _fetchAllPages(path) {
+    const allContent = [];
+    let hasMore = true;
+    let page = 1;
+
+    while (hasMore) {
+      const sep = path.includes('?') ? '&' : '?';
+      const url = `${path}${sep}variables.page=${page}&variables.pageSize=25`;
+      const res = await this._fetch(url);
+      const content = res.Content || [];
+      allContent.push(...content);
+      hasMore = res.HasMore === true;
+      page++;
+    }
+
+    return { Content: allContent };
   }
 
   async getPlayer(username) {
