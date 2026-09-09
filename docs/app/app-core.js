@@ -29,7 +29,13 @@ const LeagueCore = (() => {
     return (boot && boot.players) || [];
   }
 
-  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, CACHE_TTL_MS };
+  function linkModeFor(savedEmail, status) {
+    if (savedEmail) return 'email';
+    if (status === 'invalid-token') return 'email';
+    return 'pick';
+  }
+
+  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, linkModeFor, CACHE_TTL_MS };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.LeagueCore = LeagueCore;

@@ -275,15 +275,29 @@ describe('router/index.js – fetch handler', () => {
     assert.equal(json.data.linkedPlayer.id, 'P002');
   });
 
-  it('linkAccount missing playerId → 400', async () => {
+  it('linkAccount missing playerId with unknown email → 404', async () => {
     const resp = await worker.fetch(
       post({ action: 'linkAccount', email: 'test@test.com', deviceId: 'dev' }),
       env()
     );
 
-    assert.equal(resp.status, 400);
+    assert.equal(resp.status, 404);
     const json = await resp.json();
     assert.equal(json.success, false);
+  });
+
+  it('linkAccount email-only re-link for claimed player → 200 (multi-device)', async () => {
+    installCryptoMock();
+    const resp = await worker.fetch(
+      post({ action: 'linkAccount', email: 'charlie@test.com', deviceId: 'dev-tablet' }),
+      env()
+    );
+
+    assert.equal(resp.status, 200);
+    const json = await resp.json();
+    assert.equal(json.success, true);
+    assert.ok(json.data.token);
+    assert.equal(json.data.linkedPlayer.id, 'P003');
   });
 
   it('getLeaderboardData routes to handler', async () => {

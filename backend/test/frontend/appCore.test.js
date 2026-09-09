@@ -118,6 +118,21 @@ describe('frontend/app-core', () => {
       assert.deepEqual(core.resolvePlayerChoices(null), []);
     });
   });
+
+  describe('linkModeFor (multi-device: claimed players are absent from the unlinked picker)', () => {
+    it('defaults to name picking for brand-new devices', () => {
+      assert.equal(core.linkModeFor('', 'unlinked'), 'pick');
+      assert.equal(core.linkModeFor(null, undefined), 'pick');
+    });
+
+    it('switches to email sign-in when this device remembers an email', () => {
+      assert.equal(core.linkModeFor('alice@test.com', 'unlinked'), 'email');
+    });
+
+    it('switches to email sign-in when a stored token went stale', () => {
+      assert.equal(core.linkModeFor('', 'invalid-token'), 'email');
+    });
+  });
 });
 
 describe('frontend wiring', () => {
@@ -144,5 +159,14 @@ describe('frontend wiring', () => {
   it('deadline banner reads camelCase settings that mapSettings produces (R7)', () => {
     assert.match(app, /appState\.settings\.weeklyDeadlineDay/);
     assert.match(app, /LeagueCore\.mapSettings/);
+  });
+
+  it('link view exposes the pick/email dual mode for multi-device relinking', () => {
+    assert.ok(html.includes('id="link-picker-group"'), 'picker group wraps name search+select');
+    assert.ok(html.includes('id="link-mode-toggle"'), 'toggle button present');
+    assert.ok(html.includes('id="link-email-hint"'), 'email-mode hint present');
+    assert.match(app, /function toggleLinkMode\(/);
+    assert.match(app, /LeagueCore\.linkModeFor/);
+    assert.match(app, /linkMode === 'email' \? '' :/);
   });
 });

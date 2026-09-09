@@ -45,14 +45,36 @@ describe('handleLinkAccount', () => {
     assert.equal(result1.token, 'test-token-alice');
   });
 
-  it('missing playerId → 400', async () => {
+  it('missing playerId + unknown email → 404 with guidance', async () => {
     await assert.rejects(
       () => handleLinkAccount({ email: 'test@test.com', deviceId: 'dev' }, env),
       (err) => {
-        assert.equal(err.status, 400);
+        assert.equal(err.status, 404);
+        assert.match(err.message, /No linked account/);
         return true;
       }
     );
+  });
+
+  it('multi-device: email-only link resolves player by claimed email', async () => {
+    const result = await handleLinkAccount(
+      { email: 'alice@test.com', deviceId: 'dev-phone' },
+      env
+    );
+    assert.ok(result.token);
+    assert.equal(result.linkedPlayer.id, 'P001');
+    assert.notEqual(result.token, 'test-token-alice', 'new device gets a new token');
+    const store = DB.getStore();
+    const sessions = store.sessions.filter(s => s.player_id === 'P001');
+    assert.equal(sessions.length, 2, 'second session row for second device');
+  });
+
+  it('multi-device: email-only link on known device reuses token', async () => {
+    const result = await handleLinkAccount(
+      { email: 'alice@test.com', deviceId: 'dev-alice' },
+      env
+    );
+    assert.equal(result.token, 'test-token-alice');
   });
 
   it('invalid email → 400', async () => {

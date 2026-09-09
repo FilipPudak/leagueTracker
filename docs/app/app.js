@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.0.5';
+const APP_VERSION = '4.0.6';
 
 let appState = {
   status: 'unlinked',
@@ -269,6 +269,7 @@ function applyBoot(boot) {
     showTabs(false);
     setActiveView('link-view', 0);
     populateLinkPicker(LeagueCore.resolvePlayerChoices(boot));
+    setLinkMode(LeagueCore.linkModeFor(readPrefill().email, boot.status));
     if (boot.status === 'invalid-token') {
       showStatus('Your session expired. Please re-link to continue.', false);
     }
@@ -324,17 +325,33 @@ function filterLinkPicker() {
 /* ---------------------------------------------------------------- intents -- */
 
 let linkInFlight = false;
+let linkMode = 'pick';
+
+function setLinkMode(mode) {
+  linkMode = mode;
+  const picking = mode === 'pick';
+  const picker = $('link-picker-group');
+  const hint = $('link-email-hint');
+  const toggle = $('link-mode-toggle');
+  if (picker) picker.style.display = picking ? '' : 'none';
+  if (hint) hint.style.display = picking ? 'none' : '';
+  if (toggle) toggle.textContent = picking ? 'Already linked? Sign in with your email' : 'First time here? Choose your name';
+}
+
+function toggleLinkMode() {
+  setLinkMode(linkMode === 'pick' ? 'email' : 'pick');
+}
 
 function submitAccountLink() {
   if (linkInFlight) return;
   const emailEl = $('link-email');
   const email = emailEl ? emailEl.value.trim() : '';
   const selectEl = $('link-player-select');
-  const playerId = selectEl ? selectEl.value : '';
+  const playerId = linkMode === 'email' ? '' : (selectEl ? selectEl.value : '');
 
   if (!email) { showStatus('Please enter your email address.', false); return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showStatus('Please enter a valid email address.', false); return; }
-  if (!playerId) { showStatus('Please select your player name.', false); return; }
+  if (linkMode === 'pick' && !playerId) { showStatus('Please select your player name.', false); return; }
 
   linkInFlight = true;
   showSpinner(true, 'link'); clearStatus();

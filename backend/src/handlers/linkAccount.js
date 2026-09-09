@@ -4,13 +4,7 @@ import { getWeeklyParticipation } from '../lib/participation.js';
 
 export async function handleLinkAccount(body, env) {
   const { DB } = env;
-  const { playerId, email, deviceId } = body;
-
-  if (!playerId) {
-    const err = new Error('Please select your player name.');
-    err.status = 400;
-    throw err;
-  }
+  const { playerId: rawPlayerId, email, deviceId } = body;
 
   if (!deviceId) {
     const err = new Error('Missing device ID. Please try again.');
@@ -22,6 +16,19 @@ export async function handleLinkAccount(body, env) {
     const err = new Error('Please enter a valid email address.');
     err.status = 400;
     throw err;
+  }
+
+  // Multi-device: when no name is picked, an already-claimed account can be
+  // re-linked on a new device by presenting the email it was claimed with.
+  let playerId = rawPlayerId;
+  if (!playerId) {
+    const claimed = await getPlayerByEmail(DB, email);
+    if (!claimed) {
+      const err = new Error('No linked account found for that email. Choose your name from the list instead.');
+      err.status = 404;
+      throw err;
+    }
+    playerId = claimed.id;
   }
 
   // Verify player exists
