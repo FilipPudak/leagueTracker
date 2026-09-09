@@ -158,4 +158,34 @@ describe('MeleeClient', () => {
       { message: /Melee API request failed/ }
     );
   });
+
+  it('every request carries a timeout signal', async () => {
+    const client = new MeleeClient('id', 'secret');
+    await client.listTournaments(1, 0, 10);
+    assert.ok(fetchCalls.length > 0);
+    for (const call of fetchCalls) {
+      assert.ok(call.opts?.signal instanceof AbortSignal, 'fetch must pass AbortSignal');
+      assert.equal(call.opts.signal.aborted, false);
+    }
+  });
+
+  it('_fetchAllPages throws after exceeding the page cap (no runaway loop)', async () => {
+    let pages = 0;
+    globalThis.fetch = async () => {
+      pages++;
+      return {
+        ok: true, status: 200,
+        text: async () => JSON.stringify({ Content: [{ ID: pages }], HasMore: true }),
+      };
+    };
+    const client = new MeleeClient('id', 'secret');
+    await assert.rejects(
+      () => client.getStandings(999),
+      (err) => {
+        assert.match(err.message, /pagination exceeded/i);
+        assert.ok(pages <= 25, `must stop looping near the cap, made ${pages} requests`);
+        return true;
+      }
+    );
+  });
 });

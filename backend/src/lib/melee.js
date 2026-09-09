@@ -2,6 +2,8 @@ const BASE_URL = 'https://melee.gg';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
+const REQUEST_TIMEOUT_MS = 15_000;
+const MAX_PAGES = 20;
 
 export class MeleeClient {
   constructor(clientId, clientSecret) {
@@ -20,6 +22,7 @@ export class MeleeClient {
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const res = await fetch(url.toString(), {
         headers: { 'Authorization': this._authHeader },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
 
       if (res.ok) {
@@ -68,6 +71,9 @@ export class MeleeClient {
     let page = 1;
 
     while (hasMore) {
+      if (page > MAX_PAGES) {
+        throw new Error(`Melee pagination exceeded ${MAX_PAGES} pages at ${path} — aborting to avoid runaway loop`);
+      }
       const sep = path.includes('?') ? '&' : '?';
       const url = `${path}${sep}variables.page=${page}&variables.pageSize=25`;
       const res = await this._fetch(url);

@@ -48,6 +48,7 @@ export async function fetchLeagueTournaments(client, { targetSeason } = {}) {
     const response = await client.listTournaments(null, page, pageSize);
 
     const content = response.Content || [];
+    if (!content.length) break;
     for (const t of content) {
       if (!isLeagueTournament(t.Name)) continue;
       const info = extractSeasonAndRound(t.Name);

@@ -116,4 +116,24 @@ describe('handleGetStandingsData', () => {
 
     assert.equal(result.asOfRound, 2);
   });
+
+  it('missing seasonId → 400', async () => {
+    const db = createMockDb(makeTables());
+    await assert.rejects(
+      () => handleGetStandingsData({}, { DB: db }),
+      (err) => {
+        assert.equal(err.status, 400);
+        assert.match(err.message, /seasonId is required/);
+        return true;
+      }
+    );
+  });
+
+  it('null seasonId → 400', async () => {
+    const db = createMockDb(makeTables());
+    await assert.rejects(
+      () => handleGetStandingsData({ seasonId: null }, { DB: db }),
+      (err) => { assert.equal(err.status, 400); return true; }
+    );
+  });
 });

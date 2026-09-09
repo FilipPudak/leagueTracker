@@ -94,6 +94,7 @@ export async function syncFromMelee(env, deps = {}) {
 
   const playerMap = new Map(allPlayers.map(p => [p.melee_name?.toLowerCase(), p]));
   const roundAttendance = new Map();
+  const unknownUsernames = new Set();
 
   for (const [meleeId, info] of weekMap) {
     if (syncedStandingsRounds.has(info.round) && syncedMatchesRounds.has(info.round)) continue;
@@ -113,6 +114,11 @@ export async function syncFromMelee(env, deps = {}) {
       if (!username) continue;
       const player = playerMap.get(username.toLowerCase());
       const playerId = player ? player.id : null;
+
+      if (!playerId) {
+        unknownUsernames.add(username);
+        continue;
+      }
 
       try {
         await DB.prepare(
@@ -134,7 +140,7 @@ export async function syncFromMelee(env, deps = {}) {
         console.error(`[SyncFromMelee] Failed to insert standing: ${err.message}`);
       }
 
-      if (playerId) attendedThisRound.add(playerId);
+      attendedThisRound.add(playerId);
     }
 
     roundAttendance.set(info.round, attendedThisRound);
@@ -158,7 +164,11 @@ export async function syncFromMelee(env, deps = {}) {
 
       const p1Id = findPlayerIdByMelee(allPlayers, p1Username);
       const p2Id = findPlayerIdByMelee(allPlayers, p2Username);
-      if (!p1Id || !p2Id) continue;
+      if (!p1Id || !p2Id) {
+        if (!p1Id) unknownUsernames.add(p1Username);
+        if (!p2Id) unknownUsernames.add(p2Username);
+        continue;
+      }
 
       const p1Wins = comps[0].GameWins || 0;
       const p2Wins = comps[1].GameWins || 0;
@@ -189,6 +199,10 @@ export async function syncFromMelee(env, deps = {}) {
         console.error(`[SyncFromMelee] Failed to insert match: ${err.message}`);
       }
     }
+  }
+
+  if (unknownUsernames.size > 0) {
+    console.warn(`[SyncFromMelee] ${unknownUsernames.size} melee username(s) not in roster (standings skipped, run backfill to adopt): ${[...unknownUsernames].join(', ')}`);
   }
 
   for (const [round, players] of roundAttendance) {
@@ -274,7 +288,7 @@ export async function syncFromMelee(env, deps = {}) {
   const regularMidRoundSet = new Set((regularRoundsForMid.results || []).map(r => r.round));
 
   const midStandings = await DB.prepare(
-    'SELECT player_id, match_points FROM season_standings WHERE season_id = ? AND round <= ?'
+    'SELECT player_id, round, match_points FROM season_standings WHERE season_id = ? AND round <= ?'
   ).bind(activeSeasonId, midRound).all();
 
   const midPointsMap = new Map();
@@ -306,6 +320,12 @@ export async function syncFromMelee(env, deps = {}) {
     await writePodiumBlock(DB, activeSeasonId, 'A New Hope', climbers.map(c => ({
       playerId: c.playerId, score: c.climb, name: '',
     })));
+  }
+
+  const fresh = await getSettings(DB);
+  if ((fresh.LAST_ADVANCED || '') !== lastAdvanced || isVotingOpen(fresh.VOTING_OPEN) !== votingOpen) {
+    console.warn('[SyncFromMelee] Race guard: lifecycle settings changed during this run (concurrent sync?); skipping advance.');
+    return { status: 'synced-no-advance', reason: 'race-guard' };
   }
 
   const today = now.split('T')[0];
