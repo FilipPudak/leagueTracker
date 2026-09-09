@@ -16,6 +16,7 @@ export async function handleGetLeaderboardData(body, env) {
   const activeSeasonId = parseSeasonId(settings.ACTIVE_SEASON_ID);
   const currentWeek = parseWeek(settings.CURRENT_WEEK);
   const votingOpen = isVotingOpen(settings.VOTING_OPEN);
+  const seasonEnded = settings.CURRENT_WEEK === 'Season Ended';
 
   const seasonId = requestedSeasonId ? parseSeasonId(requestedSeasonId) : activeSeasonId;
 
@@ -70,7 +71,7 @@ export async function handleGetLeaderboardData(body, env) {
   if ((!ruler || ruler.length === 0) && isActiveSeason) {
     const season = await DB.prepare('SELECT length, top_results FROM seasons WHERE id = ?').bind(seasonId).first();
     const seasonLength = season?.length || 11;
-    const round = votingOpen && currentWeek ? currentWeek : seasonLength;
+    const round = seasonEnded ? seasonLength : (votingOpen && currentWeek ? currentWeek : seasonLength);
     const standings = await DB.prepare(
       'SELECT player_id, rank, match_points FROM season_standings WHERE season_id = ? AND round = ?'
     ).bind(seasonId, round).all();
@@ -117,7 +118,7 @@ export async function handleGetLeaderboardData(body, env) {
     }
 
     // Final: derived season table (best-X)
-    const finalRound = votingOpen && currentWeek ? currentWeek : seasonLength;
+    const finalRound = seasonEnded ? seasonLength : (votingOpen && currentWeek ? currentWeek : seasonLength);
     const allStandings = await DB.prepare(
       'SELECT round, player_id, wins, losses, draws, match_points, rank FROM season_standings WHERE season_id = ? AND round <= ?'
     ).bind(seasonId, finalRound).all();
@@ -229,8 +230,10 @@ function resolveNames(items, nameMap) {
 
 function formatScore(items, formatter) {
   if (!items || items.length === 0) return items;
-  return items.map(item => ({
-    ...item,
-    score: formatter(item),
-  }));
+  return items
+    .map(item => {
+      const formatted = formatter(item);
+      return formatted ? { ...item, score: formatted } : null;
+    })
+    .filter(item => item !== null);
 }

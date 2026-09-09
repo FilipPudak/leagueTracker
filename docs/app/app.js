@@ -558,14 +558,14 @@ function loadStandingsData() {
     return;
   }
 
-  if (appState.standingsInFlight && appState.standingsInFlightSeason === selectedSeasonId) {
+  if (appState.standingsInFlight && appState.standingsInFlightSeason === selectedSeasonId + '-' + asOfRound) {
     showSpinner(true, 'standings');
     return;
   }
 
   const token = ++appState.standingsToken;
   appState.standingsInFlight = true;
-  appState.standingsInFlightSeason = selectedSeasonId;
+  appState.standingsInFlightSeason = selectedSeasonId + '-' + asOfRound;
   showSpinner(true, 'standings');
 
   const payload = { seasonId: selectedSeasonId };
