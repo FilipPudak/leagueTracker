@@ -12,7 +12,7 @@ export async function handleSyncNow(body, env) {
   }
 
   const runSync = env.syncFromMelee || syncFromMelee;
-  const result = await runSync({ DB });
+  const result = await runSync(env);
 
   return { synced: true, result: result || { status: 'ok' } };
 }
