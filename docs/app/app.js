@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.0.1';
+const APP_VERSION = '4.0.2';
 
 // How long a loaded leaderboard/stats payload stays fresh before a re-entry
 // refetches it. Flicking between tabs is sub-second, so a tiny TTL is enough to
@@ -602,6 +602,7 @@ function loadStandingsData() {
 }
 
 function renderStandings(res) {
+  standingsShowAll = false;
   updateRoundFilter(res.allRegularRounds || res.rounds, res.asOfRound);
   renderStandingsTable(res.table);
   renderRoundResults(res.rounds);
@@ -616,11 +617,14 @@ function updateRoundFilter(rounds, asOfRound) {
   (rounds || []).forEach(r => {
     const opt = document.createElement('option');
     opt.value = r.round;
-    opt.textContent = 'Round ' + r.round;
+    opt.textContent = 'R' + r.round;
     if (String(r.round) === String(asOfRound)) opt.selected = true;
     sel.appendChild(opt);
   });
 }
+
+const STANDINGS_PAGE_SIZE = 12;
+let standingsShowAll = false;
 
 function renderStandingsTable(table) {
   const tbody = $('standings-table-body');
@@ -633,10 +637,10 @@ function renderStandingsTable(table) {
   const nameMap = {};
   players.forEach(p => { nameMap[p.id] = p.name; });
 
-  tbody.innerHTML = table.map(row => {
+  const rows = table.map(row => {
     const rankClass = row.rank <= 3 ? ' rank-' + row.rank : '';
     const playerName = nameMap[row.playerId] || row.playerId;
-    return `<tr class="standings-row${rankClass}">
+    return `<tr class="standings-row${rankClass}" ${row.rank > STANDINGS_PAGE_SIZE && !standingsShowAll ? 'style="display:none;"' : ''}>
       <td style="font-weight:700;">${escapeHtml(row.rank)}</td>
       <td style="font-weight:600;">${escapeHtml(playerName)}</td>
       <td style="text-align:center;">${escapeHtml(row.played)}</td>
@@ -645,7 +649,25 @@ function renderStandingsTable(table) {
       <td style="text-align:center;">${escapeHtml(row.lost)}</td>
       <td style="text-align:center; font-weight:700; color:#38bdf8;">${escapeHtml(row.points)}</td>
     </tr>`;
-  }).join('');
+  });
+  tbody.innerHTML = rows.join('');
+
+  const wrap = $('standings-table-wrap');
+  if (!wrap) return;
+  const existing = $('show-more-standings');
+  if (existing) existing.remove();
+
+  if (table.length > STANDINGS_PAGE_SIZE) {
+    const btn = document.createElement('button');
+    btn.id = 'show-more-standings';
+    btn.className = 'show-more-btn';
+    btn.textContent = standingsShowAll ? 'Show less' : 'Show all ' + table.length + ' players';
+    btn.onclick = () => {
+      standingsShowAll = !standingsShowAll;
+      renderStandingsTable(table);
+    };
+    wrap.appendChild(btn);
+  }
 }
 
 function renderRoundResults(rounds) {
@@ -664,10 +686,9 @@ function renderRoundResults(rounds) {
     const phaseClass = 'round-phase-' + round.phase;
     const isCut = round.phase === 'cut';
     const isSide = round.phase === 'side';
-    const phaseLabel = isCut ? 'Championship Cut' : (isSide ? 'Side Event' : 'Regular');
-    const title = (isCut || isSide)
-      ? `${escapeHtml(phaseLabel)} — ${escapeHtml(round.name || '')}`
-      : `Round ${escapeHtml(round.round)}${round.name ? ' — ' + escapeHtml(round.name) : ''}`;
+    const phaseLabel = isCut ? 'Top Cut' : (isSide ? 'Side Event' : 'Regular');
+    const dateStr = formatNightDate(round.date);
+    const title = 'R' + round.round + (dateStr ? ' — ' + dateStr : '');
     const playerRows = (round.players || [])
       .sort((a, b) => (a.rank || 999) - (b.rank || 999))
       .map(p => {
@@ -869,6 +890,14 @@ function renderMySeasonStats(res) {
 }
 
 /* -------------------------------------------------------------- utilities -- */
+
+function formatNightDate(iso) {
+  if (!iso) return null;
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm', day: 'numeric', month: 'numeric' });
+  } catch { return null; }
+}
 
 function isFreshCache(viewCache, seasonId) {
   const entry = viewCache[seasonId];
