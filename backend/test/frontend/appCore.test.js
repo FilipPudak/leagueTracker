@@ -1,0 +1,148 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const APP_DIR = join(__dirname, '../../../docs/app');
+
+function loadCore() {
+  const src = readFileSync(join(APP_DIR, 'app-core.js'), 'utf-8');
+  const sandbox = {};
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox);
+  const raw = sandbox.LeagueCore;
+  const wrapped = {};
+  for (const [name, value] of Object.entries(raw)) {
+    if (typeof value === 'function') {
+      wrapped[name] = (...args) => {
+        const result = value(...args);
+        return result === undefined ? undefined : structuredClone(result);
+      };
+    } else {
+      wrapped[name] = value;
+    }
+  }
+  return wrapped;
+}
+
+const core = loadCore();
+
+describe('frontend/app-core', () => {
+  it('core is DOM-free and side-effect-free (testable in a bare sandbox)', () => {
+    const src = readFileSync(join(APP_DIR, 'app-core.js'), 'utf-8');
+    assert.ok(!/\bdocument\b|\bwindow\b|\blocalStorage\b/.test(src), 'app-core.js must not touch DOM globals');
+    assert.equal(typeof core.mapSettings, 'function');
+    assert.equal(typeof core.computeSubtitle, 'function');
+    assert.equal(typeof core.isFreshCache, 'function');
+    assert.equal(typeof core.resolvePlayerChoices, 'function');
+  });
+
+  describe('mapSettings (R7: backend sends UPPER_SNAKE keys)', () => {
+    it('maps WEEKLY_DEADLINE_DAY/TIME and TIMEZONE to camelCase', () => {
+      const mapped = core.mapSettings({
+        WEEKLY_DEADLINE_DAY: 'Wednesday',
+        WEEKLY_DEADLINE_TIME: '17:45',
+        TIMEZONE: 'Europe/Stockholm',
+      });
+      assert.equal(mapped.weeklyDeadlineDay, 'Wednesday');
+      assert.equal(mapped.weeklyDeadlineTime, '17:45');
+      assert.equal(mapped.timezone, 'Europe/Stockholm');
+    });
+
+    it('passes through already-camelCase keys (backward compat)', () => {
+      const mapped = core.mapSettings({ weeklyDeadlineDay: 'Thursday', weeklyDeadlineTime: '18:00' });
+      assert.equal(mapped.weeklyDeadlineDay, 'Thursday');
+      assert.equal(mapped.weeklyDeadlineTime, '18:00');
+    });
+
+    it('returns empty strings for missing settings', () => {
+      assert.deepEqual(core.mapSettings(undefined), { weeklyDeadlineDay: '', weeklyDeadlineTime: '', timezone: '' });
+      assert.deepEqual(core.mapSettings({}), { weeklyDeadlineDay: '', weeklyDeadlineTime: '', timezone: '' });
+    });
+  });
+
+  describe('computeSubtitle (R9: Season Ended was unreachable)', () => {
+    it('renders week for live season', () => {
+      assert.equal(core.computeSubtitle({ seasonName: 'Season 7', week: 3 }), 'Season 7 • Week 3');
+    });
+
+    it('renders Season Ended when week is null', () => {
+      assert.equal(core.computeSubtitle({ seasonName: 'Season 6', week: null }), 'Season 6 — Season Ended');
+    });
+
+    it('renders empty subtitle when no season name', () => {
+      assert.equal(core.computeSubtitle({ seasonName: null, week: 2 }), '');
+      assert.equal(core.computeSubtitle({}), '');
+      assert.equal(core.computeSubtitle(null), '');
+    });
+  });
+
+  describe('isFreshCache', () => {
+    it('fresh within TTL', () => {
+      const cache = { s6: { ts: 1000, data: {} } };
+      assert.equal(core.isFreshCache(cache, 's6', 1000 + core.CACHE_TTL_MS - 1), true);
+    });
+
+    it('stale at or past TTL', () => {
+      const cache = { s6: { ts: 1000, data: {} } };
+      assert.equal(core.isFreshCache(cache, 's6', 1000 + core.CACHE_TTL_MS), false);
+    });
+
+    it('missing key or cache is never fresh', () => {
+      assert.equal(core.isFreshCache({}, 's6', Date.now()), false);
+      assert.equal(core.isFreshCache(null, 's6', Date.now()), false);
+    });
+  });
+
+  describe('resolvePlayerChoices (R15: link picker must use unlinkedPlayers)', () => {
+    it('prefers unlinkedPlayers when present', () => {
+      const boot = { unlinkedPlayers: [{ id: 'P004', name: 'Diana' }], players: [{ id: 'P001', name: 'Alice' }] };
+      assert.deepEqual(core.resolvePlayerChoices(boot), [{ id: 'P004', name: 'Diana' }]);
+    });
+
+    it('empty unlinkedPlayers array is respected, not fallen through', () => {
+      const boot = { unlinkedPlayers: [], players: [{ id: 'P001', name: 'Alice' }] };
+      assert.deepEqual(core.resolvePlayerChoices(boot), []);
+    });
+
+    it('falls back to full players list for older backends without the field', () => {
+      const boot = { players: [{ id: 'P001', name: 'Alice' }] };
+      assert.deepEqual(core.resolvePlayerChoices(boot), [{ id: 'P001', name: 'Alice' }]);
+    });
+
+    it('missing everything returns empty list', () => {
+      assert.deepEqual(core.resolvePlayerChoices({}), []);
+      assert.deepEqual(core.resolvePlayerChoices(null), []);
+    });
+  });
+});
+
+describe('frontend wiring', () => {
+  const html = readFileSync(join(APP_DIR, 'index.html'), 'utf-8');
+  const app = readFileSync(join(APP_DIR, 'app.js'), 'utf-8');
+
+  it('index.html loads app-core.js before app.js', () => {
+    const corePos = html.indexOf('app-core.js');
+    const appPos = html.indexOf('<script src="app.js">');
+    assert.ok(corePos > -1, 'app-core.js script tag present');
+    assert.ok(appPos > -1, 'app.js script tag present');
+    assert.ok(corePos < appPos, 'core loads first');
+  });
+
+  it('app.js consumes LeagueCore and no longer compares week to the never-sent Season Ended string', () => {
+    assert.ok(app.includes('LeagueCore.'), 'app.js wired to core');
+    assert.ok(!app.includes("=== 'Season Ended'"), 'stale season-ended comparison removed (R9)');
+  });
+
+  it('confirmUnlink resets its reentrancy flag in the success path (R8)', () => {
+    assert.match(app, /callApi\('unlinkAccount'[\s\S]{0,250}?unlinkInFlight = false;/);
+  });
+
+  it('deadline banner reads camelCase settings that mapSettings produces (R7)', () => {
+    assert.match(app, /appState\.settings\.weeklyDeadlineDay/);
+    assert.match(app, /LeagueCore\.mapSettings/);
+  });
+});

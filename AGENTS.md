@@ -94,7 +94,7 @@ Router wraps in `{ success: true, data: result }` or `{ success: false, error: m
 
 **Pre-release tags:** Use `-beta.1` or `-rc.1` for testing (e.g., `4.1.0-beta.1`).
 
-**Current version:** 4.0.4
+**Current version:** 4.0.5
 
 ## What NOT to Do
 - Don't add external test dependencies (mocha, jest, etc.) — use `node:test` only

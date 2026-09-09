@@ -15,13 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.0.4';
-
-// How long a loaded leaderboard/stats payload stays fresh before a re-entry
-// refetches it. Flicking between tabs is sub-second, so a tiny TTL is enough to
-// avoid refetch-spam (and repeated slow SWU standings fetches) while genuine
-// returns still get fresh data. Value is seconds.
-const CACHE_TTL_SECONDS = 15;
+const APP_VERSION = '4.0.5';
 
 let appState = {
   status: 'unlinked',
@@ -185,7 +179,7 @@ function setActiveView(viewId, tabIndex) {
 
 function applyBoot(boot) {
   appState.status = boot.status || 'unlinked';
-  appState.settings = boot.settings || {};
+  appState.settings = LeagueCore.mapSettings(boot.settings);
   appState.linkedPlayer = boot.currentPlayer || boot.linkedPlayer || null;
   appState.votingOpen = Boolean(boot.votingOpen);
   appState.seasons = boot.seasons || [];
@@ -195,12 +189,8 @@ function applyBoot(boot) {
   appState.week = boot.week;
   appState.seasonId = boot.seasonId;
 
-  const seasonName = boot.seasonName || ('Season ' + (appState.settings.activeSeasonId || ''));
   const subtitleEl = $('app-subtitle');
-  if (subtitleEl) {
-    const week = boot.week || 1;
-    subtitleEl.textContent = seasonName + (week === 'Season Ended' ? ' — Season Ended' : ' • Week ' + week);
-  }
+  if (subtitleEl) subtitleEl.textContent = LeagueCore.computeSubtitle(boot);
 
   const badge = $('voting-badge');
   if (badge) {
@@ -278,7 +268,7 @@ function applyBoot(boot) {
     showLinkedPresence(null);
     showTabs(false);
     setActiveView('link-view', 0);
-    populateLinkPicker(boot.players || []);
+    populateLinkPicker(LeagueCore.resolvePlayerChoices(boot));
     if (boot.status === 'invalid-token') {
       showStatus('Your session expired. Please re-link to continue.', false);
     }
@@ -416,6 +406,7 @@ function confirmUnlink() {
 
   callApi('unlinkAccount', { token: token })
     .then(() => {
+      unlinkInFlight = false;
       clearSession();
       appState.linkedPlayer = null;
       appState.status = 'unlinked';
@@ -900,9 +891,7 @@ function formatNightDate(iso) {
 }
 
 function isFreshCache(viewCache, seasonId) {
-  const entry = viewCache[seasonId];
-  if (!entry) return false;
-  return (Date.now() - entry.ts) < (CACHE_TTL_SECONDS * 1000);
+  return LeagueCore.isFreshCache(viewCache, seasonId, Date.now());
 }
 
 function escapeHtml(value) {
