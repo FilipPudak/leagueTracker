@@ -17,11 +17,13 @@ All configuration lives in `backend/wrangler.toml` and the D1 `settings` table:
 | Setting | Location | Description |
 |---------|----------|-------------|
 | D1 Database ID | `wrangler.toml` | `ccf38d5e-1639-4eb3-8447-9f3644127e4b` |
-| Cron triggers | `wrangler.toml` | `30 8 * * 1` (syncPlayers), `0 9 * * 1` (advanceWeek) |
+| Cron triggers | `wrangler.toml` | `15 20 * * 3` and `15 21 * * 3` (UTC) — dual Wednesday cron for DST handling |
 | `ACTIVE_SEASON_ID` | D1 `settings` table | Current season number |
 | `CURRENT_WEEK` | D1 `settings` table | e.g. `Week 3` or `Season Ended` |
 | `VOTING_OPEN` | D1 `settings` table | `TRUE` or `FALSE` |
-| `SEASON_LENGTH` | D1 `settings` table | Number of weeks per season |
+| `SEASON_STARTED` | D1 `settings` table | Gates whether the weekly sync runs |
+| `SEASON_PAUSED` | D1 `settings` table | Sync keeps running but week advance/open/close is skipped |
+| `LAST_ADVANCED` | D1 `settings` table | Date marker (`YYYY-MM-DD`) preventing double-advance on dual-cron Wednesdays |
 
 ## Deploying the backend (Cloudflare Workers)
 

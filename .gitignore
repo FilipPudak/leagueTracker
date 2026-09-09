@@ -19,3 +19,6 @@ tmp/
 # DB dumps / data snapshots — never commit (contains PII and session tokens)
 backend/backup-*.sql
 backend/src/db/data.sql
+
+# Third-party reference downloads
+Melee.gg API Documentation.htm
