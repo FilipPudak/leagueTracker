@@ -143,6 +143,18 @@ describe('handleGetLeaderboardData', () => {
     assert.ok(/\d+ Pts/.test(result.ruler[0].score));
   });
 
+  it('live Ruler excludes rows with null rank', async () => {
+    const tables = tablesWithStandings();
+    tables.season_standings.push(
+      { season_id: 6, round: 3, player_id: 'P004', wins: 0, losses: 0, draws: 0, match_points: 0, rank: null }
+    );
+    const db = createMockDb(tables);
+    const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
+    const ids = result.ruler.map(e => e.playerId);
+    assert.ok(!ids.includes('P004'), 'null-rank player must not sneak onto podium');
+    assert.ok(ids.includes('P002') && ids.includes('P003'), 'ranked players still present');
+  });
+
   it('live New Hope from mid+final standings when no stored award', async () => {
     const tables = tablesWithStandings();
     tables.settings = tables.settings.map(s =>

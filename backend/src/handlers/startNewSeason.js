@@ -1,5 +1,6 @@
-import { getMaxSeasonId, updateSetting } from '../db/queries.js';
+import { getMaxSeasonId, updateSetting, parseSeasonId } from '../db/queries.js';
 import { constantTimeEqual } from '../lib/auth.js';
+import { badRequest } from '../lib/errors.js';
 
 export async function handleStartNewSeason(body, env) {
   const { DB } = env;
@@ -13,7 +14,13 @@ export async function handleStartNewSeason(body, env) {
 
   const { seasonId: requestedId } = body;
   const maxId = await getMaxSeasonId(DB);
-  const nextSeasonId = requestedId || maxId + 1;
+  let nextSeasonId;
+  if (requestedId != null && requestedId !== '') {
+    nextSeasonId = parseSeasonId(requestedId);
+    if (nextSeasonId == null) throw badRequest('Invalid seasonId. Use a number or prefix like "S7".');
+  } else {
+    nextSeasonId = maxId + 1;
+  }
   const nextSeasonName = `Season ${nextSeasonId}`;
   const today = new Date().toISOString().split('T')[0];
 

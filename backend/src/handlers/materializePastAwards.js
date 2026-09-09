@@ -1,16 +1,21 @@
 import { constantTimeEqual } from '../lib/auth.js';
 import { computeChampion, computeBountyHunter, writePodiumBlock } from '../lib/awards.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';
+import { parseSeasonId } from '../db/queries.js';
+import { badRequest } from '../lib/errors.js';
 
 export async function handleMaterializePastAwards(body, env) {
   const { DB, ADMIN_SECRET } = env;
-  const { adminToken, seasonId, dryRun } = body;
+  const { adminToken, seasonId: rawSeasonId, dryRun } = body;
 
   if (!adminToken || !constantTimeEqual(adminToken, ADMIN_SECRET || '')) {
     const err = new Error('Unauthorized. Invalid admin token.');
     err.status = 403;
     throw err;
   }
+
+  const seasonId = parseSeasonId(rawSeasonId);
+  if (seasonId == null) throw badRequest('Invalid or missing seasonId.');
 
   if (seasonId >= 6) {
     const err = new Error('materializePastAwards is only for seasons S1-S5. Use close sequence for S6+.');

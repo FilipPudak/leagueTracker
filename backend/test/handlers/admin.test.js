@@ -84,6 +84,22 @@ describe('handleResumeSeason', () => {
 });
 
 describe('handleAddLeaders', () => {
+  it('rejects missing admin token', async () => {
+    const db = createMockDb(adminTables());
+    await assert.rejects(
+      () => handleAddLeaders({ leaders: [{ name: 'Yoda' }] }, { DB: db, ADMIN_SECRET }),
+      (err) => { assert.equal(err.status, 403); return true; }
+    );
+  });
+
+  it('rejects wrong admin token', async () => {
+    const db = createMockDb(adminTables());
+    await assert.rejects(
+      () => handleAddLeaders({ adminToken: 'nope', leaders: [{ name: 'Yoda' }] }, { DB: db, ADMIN_SECRET }),
+      (err) => { assert.equal(err.status, 403); return true; }
+    );
+  });
+
   it('adds new leaders with generated IDs', async () => {
     const db = createMockDb(adminTables());
     const result = await handleAddLeaders(
@@ -112,6 +128,14 @@ describe('handleAddLeaders', () => {
 });
 
 describe('handleSetLeadersActive', () => {
+  it('rejects missing admin token', async () => {
+    const db = createMockDb(adminTables());
+    await assert.rejects(
+      () => handleSetLeadersActive({ leaderIds: ['1'], active: 0 }, { DB: db, ADMIN_SECRET }),
+      (err) => { assert.equal(err.status, 403); return true; }
+    );
+  });
+
   it('sets active status for leaders', async () => {
     const db = createMockDb(adminTables());
     await handleSetLeadersActive(
@@ -125,6 +149,14 @@ describe('handleSetLeadersActive', () => {
 });
 
 describe('handleRemoveLeaders', () => {
+  it('rejects wrong admin token', async () => {
+    const db = createMockDb(adminTables());
+    await assert.rejects(
+      () => handleRemoveLeaders({ adminToken: 'nope', leaderIds: ['4'] }, { DB: db, ADMIN_SECRET }),
+      (err) => { assert.equal(err.status, 403); return true; }
+    );
+  });
+
   it('removes leaders not referenced by votes', async () => {
     const db = createMockDb(adminTables());
     const result = await handleRemoveLeaders(
@@ -148,6 +180,14 @@ describe('handleRemoveLeaders', () => {
 });
 
 describe('handleMaterializePastAwards', () => {
+  it('rejects missing admin token', async () => {
+    const db = createMockDb(adminTables());
+    await assert.rejects(
+      () => handleMaterializePastAwards({ seasonId: 5 }, { DB: db, ADMIN_SECRET }),
+      (err) => { assert.equal(err.status, 403); return true; }
+    );
+  });
+
   it('computes awards for past seasons (S1-S5)', async () => {
     const tables = adminTables();
     tables.seasons = [
@@ -175,6 +215,31 @@ describe('handleMaterializePastAwards', () => {
         return true;
       }
     );
+  });
+
+  it('rejects unparseable seasonId with 400', async () => {
+    const db = createMockDb(adminTables());
+    await assert.rejects(
+      () => handleMaterializePastAwards(
+        { adminToken: ADMIN_SECRET, seasonId: 'banana', dryRun: true },
+        { DB: db, ADMIN_SECRET }
+      ),
+      (err) => { assert.equal(err.status, 400); return true; }
+    );
+  });
+
+  it('normalizes prefixed string seasonId "S5" (was string-comparable against guard)', async () => {
+    const tables = adminTables();
+    tables.seasons = [
+      { id: 5, name: 'Season 5', created_date: '2026-01-15', length: 11, top_results: 7 },
+      { id: 6, name: 'Season 6', created_date: '2026-06-03', length: 11, top_results: 7 },
+    ];
+    const db = createMockDb(tables);
+    const result = await handleMaterializePastAwards(
+      { adminToken: ADMIN_SECRET, seasonId: 'S5', dryRun: true },
+      { DB: db, ADMIN_SECRET }
+    );
+    assert.ok(result.podiums, 'S5 string form parses to season 5 and passes the guard');
   });
 
   it('refuses to materialize awards for S1 when no previous season', async () => {

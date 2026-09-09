@@ -94,4 +94,26 @@ describe('handleStartNewSeason', () => {
     const activeSeason = store.settings.find(s => s.key === 'ACTIVE_SEASON_ID');
     assert.equal(activeSeason.value, '7');
   });
+
+  it('normalizes prefixed string seasonId "S7"', async () => {
+    const tables = basicTables();
+    tables.seasons.push({ id: 7, name: 'Season 7', created_date: null });
+    db = createMockDb(tables);
+    env = { DB: db, ADMIN_SECRET: 'test-secret-123' };
+
+    const result = await handleStartNewSeason({ adminToken: 'test-secret-123', seasonId: 'S7' }, env);
+    assert.equal(result.seasonId, 7, 'string prefix form accepted');
+    assert.equal(db.getStore().settings.find(s => s.key === 'ACTIVE_SEASON_ID').value, '7');
+  });
+
+  it('rejects unparseable seasonId with 400', async () => {
+    await assert.rejects(
+      () => handleStartNewSeason({ adminToken: 'test-secret-123', seasonId: 'banana' }, env),
+      (err) => {
+        assert.equal(err.status, 400);
+        assert.match(err.message, /seasonId/i);
+        return true;
+      }
+    );
+  });
 });

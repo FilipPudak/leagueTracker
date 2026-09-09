@@ -76,7 +76,7 @@ export async function handleGetLeaderboardData(body, env) {
       'SELECT player_id, rank, match_points FROM season_standings WHERE season_id = ? AND round = ?'
     ).bind(seasonId, round).all();
     const rows = (standings.results || []).sort((a, b) => (a.rank || 999) - (b.rank || 999));
-    const top3 = rows.filter(s => s.rank <= 3).slice(0, 3);
+    const top3 = rows.filter(s => s.rank != null && s.rank <= 3).slice(0, 3);
     ruler = top3.length > 0 ? assignStandardRanks(top3.map(s => ({
       playerId: s.player_id,
       score: s.match_points || 0,
