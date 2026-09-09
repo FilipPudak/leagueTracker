@@ -551,9 +551,9 @@ describe('triggers/syncFromMelee', () => {
     const { mockFetch } = buildMockFetch({ tournaments: TOURNAMENTS.slice(0, 1), standings: ghostStandings, matches: ghostMatches });
     globalThis.fetch = mockFetch;
 
-    const result = await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch) });
+    const result = await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch), now: '2026-07-01T15:00:00Z' });
 
-    assert.equal(result.status, 'synced-no-advance', 'gate not met at default now, but ran through');
+    assert.equal(result.status, 'synced-no-advance', 'gate not met at pinned afternoon time');
     const store = db.getStore();
     assert.ok(store.season_standings.every(r => r.player_id), 'no null-player standings rows');
     assert.equal(store.season_standings.length, 1, 'only the roster-matched standing stored');

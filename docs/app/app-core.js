@@ -25,14 +25,8 @@ const LeagueCore = (() => {
   }
 
   function resolvePlayerChoices(boot) {
-    if (boot && Array.isArray(boot.unlinkedPlayers)) return boot.unlinkedPlayers;
-    return (boot && boot.players) || [];
-  }
-
-  function linkModeFor(savedEmail, status) {
-    if (savedEmail) return 'email';
-    if (status === 'invalid-token') return 'email';
-    return 'pick';
+    if (boot && Array.isArray(boot.players) && boot.players.length) return boot.players;
+    return (boot && boot.unlinkedPlayers) || [];
   }
 
   function gamificationViewFor(isCurrentSeason, hasVoteData) {
@@ -48,7 +42,7 @@ const LeagueCore = (() => {
     return !isRetry && typeof message === 'string' && message.includes('No vote to update');
   }
 
-  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, linkModeFor, gamificationViewFor, voteSubmitAction, shouldRetryAsNewVote, CACHE_TTL_MS };
+  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, gamificationViewFor, voteSubmitAction, shouldRetryAsNewVote, CACHE_TTL_MS };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.LeagueCore = LeagueCore;

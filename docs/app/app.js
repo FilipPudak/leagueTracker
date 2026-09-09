@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.0.10';
+const APP_VERSION = '4.0.11';
 
 let appState = {
   status: 'unlinked',
@@ -269,7 +269,7 @@ function applyBoot(boot) {
     showTabs(false);
     setActiveView('link-view', 0);
     populateLinkPicker(LeagueCore.resolvePlayerChoices(boot));
-    setLinkMode(LeagueCore.linkModeFor(readPrefill().email, boot.status));
+    setLinkMode('pick');
     if (boot.status === 'invalid-token') {
       showStatus('Your session expired. Please re-link to continue.', false);
     }

@@ -97,40 +97,21 @@ describe('frontend/app-core', () => {
     });
   });
 
-  describe('resolvePlayerChoices (R15: link picker must use unlinkedPlayers)', () => {
-    it('prefers unlinkedPlayers when present', () => {
-      const boot = { unlinkedPlayers: [{ id: 'P004', name: 'Diana' }], players: [{ id: 'P001', name: 'Alice' }] };
+  describe('resolvePlayerChoices (CONTEXT: all roster players are shown in the link picker)', () => {
+    it('uses the full players roster', () => {
+      const boot = { players: [{ id: 'P001', name: 'Alice' }, { id: 'P003', name: 'Charlie' }], unlinkedPlayers: [{ id: 'P004', name: 'Diana' }] };
+      assert.equal(core.resolvePlayerChoices(boot).length, 2);
+      assert.equal(core.resolvePlayerChoices(boot)[0].id, 'P001');
+    });
+
+    it('falls back to unlinkedPlayers when roster missing', () => {
+      const boot = { unlinkedPlayers: [{ id: 'P004', name: 'Diana' }] };
       assert.deepEqual(core.resolvePlayerChoices(boot), [{ id: 'P004', name: 'Diana' }]);
-    });
-
-    it('empty unlinkedPlayers array is respected, not fallen through', () => {
-      const boot = { unlinkedPlayers: [], players: [{ id: 'P001', name: 'Alice' }] };
-      assert.deepEqual(core.resolvePlayerChoices(boot), []);
-    });
-
-    it('falls back to full players list for older backends without the field', () => {
-      const boot = { players: [{ id: 'P001', name: 'Alice' }] };
-      assert.deepEqual(core.resolvePlayerChoices(boot), [{ id: 'P001', name: 'Alice' }]);
     });
 
     it('missing everything returns empty list', () => {
       assert.deepEqual(core.resolvePlayerChoices({}), []);
       assert.deepEqual(core.resolvePlayerChoices(null), []);
-    });
-  });
-
-  describe('linkModeFor (multi-device: claimed players are absent from the unlinked picker)', () => {
-    it('defaults to name picking for brand-new devices', () => {
-      assert.equal(core.linkModeFor('', 'unlinked'), 'pick');
-      assert.equal(core.linkModeFor(null, undefined), 'pick');
-    });
-
-    it('switches to email sign-in when this device remembers an email', () => {
-      assert.equal(core.linkModeFor('alice@test.com', 'unlinked'), 'email');
-    });
-
-    it('switches to email sign-in when a stored token went stale', () => {
-      assert.equal(core.linkModeFor('', 'invalid-token'), 'email');
     });
   });
 
@@ -202,7 +183,7 @@ describe('frontend wiring', () => {
     assert.ok(html.includes('id="link-mode-toggle"'), 'toggle button present');
     assert.ok(html.includes('id="link-email-hint"'), 'email-mode hint present');
     assert.match(app, /function toggleLinkMode\(/);
-    assert.match(app, /LeagueCore\.linkModeFor/);
+    assert.match(app, /setLinkMode\('pick'\)/, 'picker is always the default, even with remembered email');
     assert.match(app, /linkMode === 'email' \? '' :/);
   });
 });
