@@ -6,6 +6,7 @@ docs/phase2-*
 
 # AI assistant workspace
 .opencode/
+/opencode.json
 
 # Node dependencies
 node_modules/
