@@ -18,7 +18,7 @@ front end on GitHub Pages backed by a Cloudflare Worker + D1 database backend.
 
 | Folder | Role |
 |--------|------|
-| `backend/src/` | **Cloudflare Worker** backend. Modular ES modules handling API requests, weekly lifecycle triggers, and SWU site scraping. Data stored in D1. |
+| `backend/src/` | **Cloudflare Worker** backend. Modular ES modules handling API requests, vote validation, and weekly Melee.gg-sync lifecycle triggers. Data stored in D1. |
 | `docs/app/` | **Static client** (plain HTML/CSS/JS) served from GitHub Pages. Calls the Worker URL directly with `fetch`. |
 
 The backend is protected by **per-device session tokens** (see `docs/SECURITY.md`).
@@ -49,13 +49,14 @@ cd backend && node --test "test/**/*.test.js"
 
 | Category | Files | Tests |
 |----------|-------|-------|
-| Library (awards, auth, meleeLeague, participation, seasonTable) | 6 files | 120+ |
-| Handlers (getAppData, submitVote, linkAccount, getStandingsData, etc.) | 13 files | 150+ |
-| Database queries | 1 file | 17 |
-| Triggers (syncFromMelee, backfillFromMelee) | 2 files | 35+ |
-| Router (CORS, routing, error handling) | 1 file | 30+ |
-| Schema tests | 1 file | 10+ |
-| **Total** | **24 files** | **391** |
+| Library (awards, auth, melee, meleeLeague, pagination, participation, seasonTable) | 7 | 150+ |
+| Handlers (getAppData, submitVote, linkAccount, getStandingsData, admin, etc.) | 11 | 170+ |
+| Database (queries, schema) | 2 | 30+ |
+| Triggers (syncFromMelee, backfillFromMelee) | 2 | 45+ |
+| Router & rate limiter | 2 | 40+ |
+| Frontend core (`docs/app/app-core.js`) | 1 | 20+ |
+| Privacy guard | 1 | 5+ |
+| **Total** | **26 files** | **470** |
 
 Test infrastructure: `backend/test/helpers/mock-db.js` (D1 mock), `mock-fetch.js`,
 `mock-crypto.js`, `fixtures.js`, `test-utils.js`.
