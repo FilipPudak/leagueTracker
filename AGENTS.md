@@ -71,6 +71,31 @@ Router wraps in `{ success: true, data: result }` or `{ success: false, error: m
 - Frontend changes go in `docs/app/`
 - Backend changes go in `backend/src/`
 
+## Versioning
+
+**Semantic Versioning (SemVer):** `MAJOR.MINOR.PATCH`
+
+- **PATCH**: Bug fixes, minor tweaks (fix standings filter, fix subtitle bug)
+- **MINOR**: New features, backward compatible (add Standings tab, add Champion award)
+- **MAJOR**: Breaking changes, major milestones (schema migration, API redesign)
+
+**Single version** for both frontend and backend (deployed together from same repo).
+
+**Source of truth:** `APP_VERSION` in `docs/app/app.js` (visible to users in footer).
+
+**Backend exposes version** via `getAppData` response (`appVersion` field) for debugging.
+
+**Release flow:**
+1. Make changes, commit with conventional messages (`fix:`, `feat:`, `chore:`)
+2. Bump `APP_VERSION` in `app.js` when ready to release
+3. Deploy backend (`wrangler deploy`)
+4. Push frontend (GitHub Pages auto-deploys)
+5. Tag release in git (`git tag v4.1.0`)
+
+**Pre-release tags:** Use `-beta.1` or `-rc.1` for testing (e.g., `4.1.0-beta.1`).
+
+**Current version:** 4.0.0
+
 ## What NOT to Do
 - Don't add external test dependencies (mocha, jest, etc.) — use `node:test` only
 - Don't use `&&` in shell commands (PowerShell) — use `;` or separate commands
