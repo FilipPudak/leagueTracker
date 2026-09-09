@@ -87,12 +87,6 @@ export async function getMaxSeasonId(db) {
   return row ? row.max_id || 0 : 0;
 }
 
-// Session helpers
-export async function getSessionByToken(db, token) {
-  if (!token) return null;
-  return db.prepare('SELECT * FROM sessions WHERE token = ?').bind(token).first();
-}
-
 // Award helpers
 export async function getAwardsForSeason(db, seasonId) {
   return db.prepare(

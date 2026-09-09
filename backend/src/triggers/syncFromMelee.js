@@ -1,5 +1,5 @@
 import { MeleeClient } from '../lib/melee.js';
-import { getSettings, updateSetting, parseSeasonId, parseWeek, isSeasonStarted, isSeasonPaused, isVotingOpen, findPlayerByMelee, getAllActivePlayers } from '../db/queries.js';
+import { getSettings, updateSetting, parseSeasonId, parseWeek, isSeasonStarted, isSeasonPaused, isVotingOpen } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, computeChampion, computeBountyHunter, writePodiumBlock } from '../lib/awards.js';
 import { fetchLeagueTournaments, buildWeekMap } from '../lib/meleeLeague.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';

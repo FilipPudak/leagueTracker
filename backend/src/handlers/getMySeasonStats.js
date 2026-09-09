@@ -1,5 +1,6 @@
 import { getSetting, getAwardsForSeason, parseSeasonId } from '../db/queries.js';
 import { getStreaks, getRaffleTickets } from '../lib/participation.js';
+import { badRequest } from '../lib/errors.js';
 
 export async function handleGetMySeasonStats(body, env, session) {
   const { DB } = env;
@@ -13,7 +14,9 @@ export async function handleGetMySeasonStats(body, env, session) {
 
   const playerId = session.player_id;
   const activeSeasonId = parseSeasonId(await getSetting(DB, 'ACTIVE_SEASON_ID'));
-  let sid = seasonId ? parseSeasonId(seasonId) : null;
+  const hasSeasonParam = seasonId !== undefined && seasonId !== null && seasonId !== '';
+  let sid = hasSeasonParam ? parseSeasonId(seasonId) : null;
+  if (hasSeasonParam && sid == null) throw badRequest('Invalid seasonId.');
 
   if (!sid) {
     sid = activeSeasonId;

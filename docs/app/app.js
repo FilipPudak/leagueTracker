@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.0.13';
+const APP_VERSION = '4.0.14';
 
 let appState = {
   status: 'unlinked',
@@ -189,6 +189,7 @@ function applyBoot(boot) {
   appState.seasonName = boot.seasonName;
   appState.week = boot.week;
   appState.seasonId = boot.seasonId;
+  appState.leaders = boot.leaders || [];
 
   const subtitleEl = $('app-subtitle');
   if (subtitleEl) subtitleEl.textContent = LeagueCore.computeSubtitle(boot);
@@ -501,6 +502,14 @@ function populateVotingDropdowns(leaders, players, currentUserId) {
   });
 }
 
+function ensureOption(selectId, value, label) {
+  const sel = $(selectId);
+  if (!sel || !value) return;
+  const exists = Array.prototype.some.call(sel.options, (o) => o.value === String(value));
+  if (!exists) sel.insertBefore(new Option(label || String(value), value), sel.options[1] || null);
+  sel.value = String(value);
+}
+
 function changeVote() {
   const voteForm = $('vote-form');
   const votedCard = $('already-voted-card');
@@ -509,10 +518,10 @@ function changeVote() {
   clearStatus();
 
   if (appState.currentVote) {
-    const l1El = $('leader-1');
-    const oppEl = $('favorite-opponent');
-    if (l1El && appState.currentVote.leaderId) l1El.value = appState.currentVote.leaderId;
-    if (oppEl && appState.currentVote.opponentId) oppEl.value = appState.currentVote.opponentId;
+    const leader = (appState.leaders || []).find(l => String(l.id) === String(appState.currentVote.leaderId));
+    const player = (appState.roster || []).find(p => String(p.id) === String(appState.currentVote.opponentId));
+    ensureOption('leader-1', appState.currentVote.leaderId, LeagueCore.leaderOptionLabel(leader));
+    ensureOption('favorite-opponent', appState.currentVote.opponentId, player ? player.name : appState.currentVote.opponentId);
   }
 }
 
@@ -550,12 +559,13 @@ function submitVotes(isRetry) {
     if (changeBtn) changeBtn.style.display = appState.votingOpen ? 'inline-block' : 'none';
     clearStatus();
     appState.leaderboardCache = {};
+    appState.mystatsCache = {};
     appState.currentVote = { leaderId: l1, opponentId: opp };
   }
 
   const action = LeagueCore.voteSubmitAction(appState.currentVote);
   callApi(action, { voteData: { leader1Id: l1, opponentId: opp } })
-    .then(() => { endFlight(); showVoteRecorded(); })
+    .then(() => { endFlight(); showVoteRecorded(); if (isRetry) fetchInitialAppData(); })
     .catch((err) => {
       endFlight();
       const msg = err.userMessage || err.message || '';

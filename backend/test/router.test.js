@@ -476,8 +476,11 @@ describe('router/index.js – fetch handler', () => {
 
   it('rate limit: exceeded returns 429', async () => {
     const testEnv = env();
-    for (let i = 0; i < 30; i++) {
-      await worker.fetch(post({ action: 'getAppData' }), testEnv);
+    for (let i = 0; i < 90; i++) {
+      await worker.fetch(
+        post({ action: 'getAppData' }),
+        testEnv
+      );
     }
     const resp = await worker.fetch(
       post({ action: 'getAppData' }),

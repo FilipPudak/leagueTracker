@@ -136,4 +136,22 @@ describe('handleGetStandingsData', () => {
       (err) => { assert.equal(err.status, 400); return true; }
     );
   });
+
+  it('garbage seasonId → 400 instead of silent empty result', async () => {
+    const db = createMockDb(makeTables());
+    await assert.rejects(
+      () => handleGetStandingsData({ seasonId: 'banana' }, { DB: db }),
+      (err) => {
+        assert.equal(err.status, 400);
+        assert.match(err.message, /Invalid seasonId/);
+        return true;
+      }
+    );
+  });
+
+  it('accepts prefixed seasonId "S6" form', async () => {
+    const db = createMockDb(makeTables());
+    const result = await handleGetStandingsData({ seasonId: 'S6' }, { DB: db });
+    assert.ok(Array.isArray(result.table));
+  });
 });

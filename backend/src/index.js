@@ -19,11 +19,13 @@ const TOKEN_OPTIONAL = ['getAppData'];
 
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_READS_MAX = 90;
+const RATE_LIMIT_WRITES_MAX = 10;
+const WRITE_ACTIONS = new Set(['submitVote', 'updateVote', 'linkAccount', 'unlinkAccount']);
 const RATE_LIMIT_SWEEP_INTERVAL_MS = 5 * 60_000;
 let lastSweep = 0;
 
-function checkRateLimit(ip) {
+function checkRateLimit(ip, action) {
   const now = Date.now();
   if (now - lastSweep > RATE_LIMIT_SWEEP_INTERVAL_MS) {
     lastSweep = now;
@@ -31,13 +33,16 @@ function checkRateLimit(ip) {
       if (now - entry.start > RATE_LIMIT_WINDOW_MS) rateLimitMap.delete(key);
     }
   }
-  const entry = rateLimitMap.get(ip);
+  const isWrite = WRITE_ACTIONS.has(action);
+  const max = isWrite ? RATE_LIMIT_WRITES_MAX : RATE_LIMIT_READS_MAX;
+  const key = isWrite ? `${ip}:w` : `${ip}:r`;
+  const entry = rateLimitMap.get(key);
   if (!entry || now - entry.start > RATE_LIMIT_WINDOW_MS) {
-    rateLimitMap.set(ip, { start: now, count: 1 });
+    rateLimitMap.set(key, { start: now, count: 1 });
     return true;
   }
   entry.count++;
-  return entry.count <= RATE_LIMIT_MAX;
+  return entry.count <= max;
 }
 
 export default {
@@ -73,7 +78,7 @@ export default {
     const { action, token } = body;
 
     const ip = request.headers.get('cf-connecting-ip') || 'unknown';
-    if (!checkRateLimit(ip)) {
+    if (!checkRateLimit(ip, action)) {
       return new Response(JSON.stringify({ success: false, error: 'Rate limit exceeded. Please try again later.' }), {
         status: 429,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

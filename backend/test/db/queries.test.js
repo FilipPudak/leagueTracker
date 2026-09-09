@@ -11,7 +11,6 @@ import {
   getAllActivePlayers,
   getAllActiveLeaders,
   getAllSeasons,
-  getSessionByToken,
   getAwardsForSeason,
   getMostPlayedLeaders,
   getMaxSeasonId,
@@ -111,20 +110,6 @@ describe('db/queries', () => {
     assert.equal(results.length, 2);
     assert.equal(results[0].id, 6);
     assert.equal(results[1].id, 5);
-  });
-
-  it('getSessionByToken returns session or undefined', async () => {
-    const session = await getSessionByToken(db, 'test-token-alice');
-    assert.equal(session.player_id, 'P001');
-    assert.equal(session.email, 'alice@test.com');
-
-    const missing = await getSessionByToken(db, 'nonexistent-token');
-    assert.ok(!missing);
-  });
-
-  it('getSessionByToken returns falsy for falsy token', async () => {
-    assert.ok(!(await getSessionByToken(db, null)));
-    assert.ok(!(await getSessionByToken(db, '')));
   });
 
   it('getAwardsForSeason returns awards for given season', async () => {

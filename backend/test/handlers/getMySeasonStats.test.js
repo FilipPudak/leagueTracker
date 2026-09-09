@@ -145,6 +145,17 @@ describe('handleGetMySeasonStats', () => {
     );
   });
 
+  it('garbage seasonId → 400 instead of silent fallback to active season', async () => {
+    await assert.rejects(
+      () => handleGetMySeasonStats({ seasonId: 'banana' }, env, aliceSession),
+      (err) => {
+        assert.equal(err.status, 400);
+        assert.match(err.message, /Invalid seasonId/);
+        return true;
+      }
+    );
+  });
+
   it('no active season → 400', async () => {
     const tables = basicTables();
     tables.settings = tables.settings.filter(s => s.key !== 'ACTIVE_SEASON_ID');

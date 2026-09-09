@@ -2,7 +2,7 @@ import { getSettings, getPlayerById, getAllActiveLeaders, getAllSeasons, parseSe
 import { getWeeklyParticipation } from '../lib/participation.js';
 import { getFacedOpponents } from '../lib/voteValidation.js';
 
-const APP_VERSION = '4.0.13';
+const APP_VERSION = '4.0.14';
 
 export async function handleGetAppData(body, env, session) {
   const { DB } = env;

@@ -1,16 +1,20 @@
 import { computeSeasonTable } from '../lib/seasonTable.js';
+import { parseSeasonId } from '../db/queries.js';
+import { badRequest } from '../lib/errors.js';
 
 const PHASE_DISPLAY_ORDER = { cut: 0, side: 1, regular: 2 };
 
 export async function handleGetStandingsData(body, env) {
   const { DB } = env;
-  const { seasonId, asOfRound } = body;
+  const { seasonId: rawSeasonId, asOfRound } = body;
 
-  if (!seasonId) {
+  if (!rawSeasonId) {
     const err = new Error('seasonId is required');
     err.status = 400;
     throw err;
   }
+  const seasonId = parseSeasonId(rawSeasonId);
+  if (seasonId == null) throw badRequest('Invalid seasonId.');
 
   const tournaments = await DB.prepare(
     'SELECT melee_id, round, name, date, phase FROM melee_tournaments WHERE season_id = ?'
