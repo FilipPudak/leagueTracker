@@ -44,6 +44,7 @@ export async function handleGetAppData(body, env, session) {
   let status = 'unlinked';
   let linkedPlayer = null;
   let alreadySubmitted = false;
+  let currentVote = null;
 
   if (session) {
     const player = await getPlayerById(DB, session.player_id);
@@ -54,6 +55,14 @@ export async function handleGetAppData(body, env, session) {
       // Check if already voted this week
       if (activeSeasonId && currentWeek) {
         alreadySubmitted = await hasPlayerVotedThisWeek(DB, activeSeasonId, currentWeek, player.id);
+        if (alreadySubmitted) {
+          const vote = await DB.prepare(
+            'SELECT leader_id, opponent_id FROM votes WHERE season_id = ? AND week = ? AND player_id = ?'
+          ).bind(activeSeasonId, currentWeek, player.id).first();
+          if (vote) {
+            currentVote = { leaderId: vote.leader_id, opponentId: vote.opponent_id };
+          }
+        }
       }
     } else {
       status = 'invalid-token';
@@ -99,6 +108,7 @@ export async function handleGetAppData(body, env, session) {
     seasonId: activeSeasonId,
     alreadySubmitted,
     alreadyVoted: alreadySubmitted,
+    currentVote,
     weeklyParticipation,
   };
 }

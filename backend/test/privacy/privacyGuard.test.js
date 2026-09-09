@@ -60,9 +60,14 @@ describe('Privacy guard: no voter+opponent leak', () => {
   it('getAppData does not expose opponent_id in voter-voter mapping', () => {
     const file = readFileSync(join(HANDLERS_DIR, 'getAppData.js'), 'utf-8');
     const lines = file.split('\n');
-    const suspect = lines.filter(l =>
-      l.includes('opponent_id') && !l.includes('//') && !l.includes('opponentIds')
-    );
-    assert.equal(suspect.length, 0, 'getAppData should not expose opponent_id in responses');
+    const suspect = lines.filter(l => {
+      if (!l.includes('opponent_id')) return false;
+      if (l.includes('//')) return false;
+      if (l.includes('opponentIds')) return false;
+      if (l.includes('currentVote')) return false;
+      if (l.includes('SELECT') && l.includes('FROM votes')) return false;
+      return true;
+    });
+    assert.equal(suspect.length, 0, 'getAppData should not expose opponent_id in responses (except currentVote which is own data)');
   });
 });

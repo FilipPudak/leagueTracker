@@ -190,6 +190,7 @@ function applyBoot(boot) {
   appState.votingOpen = Boolean(boot.votingOpen);
   appState.seasons = boot.seasons || [];
   appState.players = boot.players || [];
+  appState.currentVote = boot.currentVote || null;
   appState.seasonName = boot.seasonName;
   appState.week = boot.week;
   appState.seasonId = boot.seasonId;
@@ -496,6 +497,13 @@ function changeVote() {
   if (voteForm) voteForm.style.display = '';
   if (votedCard) votedCard.style.display = 'none';
   clearStatus();
+
+  if (appState.currentVote) {
+    const l1El = $('leader-1');
+    const oppEl = $('favorite-opponent');
+    if (l1El && appState.currentVote.leaderId) l1El.value = appState.currentVote.leaderId;
+    if (oppEl && appState.currentVote.opponentId) oppEl.value = appState.currentVote.opponentId;
+  }
 }
 
 let voteInFlight = false;
@@ -528,11 +536,15 @@ function submitVotes() {
     const vCard = $('already-voted-card');
     if (vForm) vForm.style.display = 'none';
     if (vCard) vCard.style.display = 'block';
+    const changeBtn = $('btn-change-vote');
+    if (changeBtn) changeBtn.style.display = appState.votingOpen ? 'inline-block' : 'none';
     clearStatus();
     appState.leaderboardCache = {};
+    appState.currentVote = { leaderId: l1, opponentId: opp };
   }
 
-  callApi('submitVote', { voteData: { leader1Id: l1, opponentId: opp } })
+  const action = appState.currentVote ? 'updateVote' : 'submitVote';
+  callApi(action, { voteData: { leader1Id: l1, opponentId: opp } })
     .then(() => { endFlight(); showVoteRecorded(); })
     .catch((err) => {
       endFlight();
@@ -817,21 +829,15 @@ function renderMySeasonStats(res) {
 
   if (gamSection && gamContainer) {
     let html = '';
-    if (raffle > 0) {
-      html += `<div><span style="color:#94a3b8;">Raffle tickets:</span> <strong style="color:#fbbf24;">${escapeHtml(raffle)}</strong> <span style="font-size:0.8rem; color:#64748b;">— every vote is a ticket for the season-end raffle</span></div>`;
-    }
+    html += `<div><span style="color:#94a3b8;">Raffle tickets:</span> <strong style="color:#fbbf24;">${escapeHtml(raffle)}</strong> <span style="font-size:0.8rem; color:#64748b;">— every vote is a ticket for the season-end raffle</span></div>`;
     if (compliance.weeksAttended > 0) {
-      html += `<div style="margin-top:6px;"><span style="color:#94a3b8;">Compliance:</span> <strong>${escapeHtml(compliance.weeksVoted)} of ${escapeHtml(compliance.weeksAttended)} weeks (${escapeHtml(compliance.compliancePct)}%)</strong></div>`;
+      html += `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);"><span style="color:#94a3b8; font-size:0.8rem;">Compliance:</span> <span style="font-size:0.85rem;">${escapeHtml(compliance.weeksVoted)} of ${escapeHtml(compliance.weeksAttended)} weeks (${escapeHtml(compliance.compliancePct)}%)</span></div>`;
     }
     if (streaks.currentStreak > 0 || streaks.bestStreak > 0) {
-      html += `<div><span style="color:#94a3b8;">Streak:</span> <strong>${escapeHtml(streaks.currentStreak)} current</strong> &bull; <strong>${escapeHtml(streaks.bestStreak)} best</strong></div>`;
+      html += `<div><span style="color:#94a3b8; font-size:0.8rem;">Streak:</span> <span style="font-size:0.85rem;">${escapeHtml(streaks.currentStreak)} current &bull; ${escapeHtml(streaks.bestStreak)} best</span></div>`;
     }
-    if (html) {
-      gamContainer.innerHTML = html;
-      gamSection.style.display = 'block';
-    } else {
-      gamSection.style.display = 'none';
-    }
+    gamContainer.innerHTML = html;
+    gamSection.style.display = 'block';
   }
 
   const awardsContainer = $('myseason-awards-container');
