@@ -20,9 +20,17 @@ const TOKEN_OPTIONAL = ['getAppData'];
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_SWEEP_INTERVAL_MS = 5 * 60_000;
+let lastSweep = 0;
 
 function checkRateLimit(ip) {
   const now = Date.now();
+  if (now - lastSweep > RATE_LIMIT_SWEEP_INTERVAL_MS) {
+    lastSweep = now;
+    for (const [key, entry] of rateLimitMap) {
+      if (now - entry.start > RATE_LIMIT_WINDOW_MS) rateLimitMap.delete(key);
+    }
+  }
   const entry = rateLimitMap.get(ip);
   if (!entry || now - entry.start > RATE_LIMIT_WINDOW_MS) {
     rateLimitMap.set(ip, { start: now, count: 1 });

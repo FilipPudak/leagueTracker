@@ -59,4 +59,18 @@ describe('rate limiter window behavior', () => {
     const other = await worker.fetch(requestIp('5.6.7.8'), testEnv);
     assert.equal(other.status, 200, 'different IP unaffected');
   });
+
+  it('after a long idle gap the sweep keeps accounting fresh (full window available again)', async () => {
+    const testEnv = env();
+    for (let i = 0; i < 29; i++) {
+      await worker.fetch(requestIp('9.9.9.9'), testEnv);
+    }
+    fakeNow += 6 * 60_000;
+    for (let i = 0; i < 30; i++) {
+      const resp = await worker.fetch(requestIp('9.9.9.9'), testEnv);
+      assert.equal(resp.status, 200, `post-sweep request ${i + 1} in new window`);
+    }
+    const blocked = await worker.fetch(requestIp('9.9.9.9'), testEnv);
+    assert.equal(blocked.status, 429, 'counter restarted from zero at sweep, not carried over');
+  });
 });
