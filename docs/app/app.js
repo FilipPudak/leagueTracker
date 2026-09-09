@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.0.2';
+const APP_VERSION = '4.0.3';
 
 // How long a loaded leaderboard/stats payload stays fresh before a re-entry
 // refetches it. Flicking between tabs is sub-second, so a tiny TTL is enough to
@@ -688,7 +688,7 @@ function renderRoundResults(rounds) {
     const isSide = round.phase === 'side';
     const phaseLabel = isCut ? 'Top Cut' : (isSide ? 'Side Event' : 'Regular');
     const dateStr = formatNightDate(round.date);
-    const title = 'R' + round.round + (dateStr ? ' — ' + dateStr : '');
+    const title = (isCut ? 'CUT' : isSide ? 'SIDE' : 'R' + round.round) + (dateStr ? ' — ' + dateStr : '');
     const playerRows = (round.players || [])
       .sort((a, b) => (a.rank || 999) - (b.rank || 999))
       .map(p => {

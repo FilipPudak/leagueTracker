@@ -1,7 +1,7 @@
 import { getSettings, getPlayerById, getAllActivePlayers, getAllActiveLeaders, getAllSeasons, parseSeasonId, parseWeek, isVotingOpen, hasPlayerVotedThisWeek } from '../db/queries.js';
 import { getWeeklyParticipation } from '../lib/participation.js';
 
-const APP_VERSION = '4.0.2';
+const APP_VERSION = '4.0.3';
 
 export async function handleGetAppData(body, env, session) {
   const { DB } = env;
