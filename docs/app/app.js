@@ -612,10 +612,8 @@ function renderStandings(res) {
 function updateRoundFilter(rounds, asOfRound) {
   const sel = $('standings-round-filter');
   if (!sel) return;
-  const currentValue = sel.value;
   sel.innerHTML = '<option value="">Latest Regular</option>';
-  const regularRounds = rounds.filter(r => r.phase === 'regular');
-  regularRounds.forEach(r => {
+  (rounds || []).forEach(r => {
     const opt = document.createElement('option');
     opt.value = r.round;
     opt.textContent = 'After Round ' + r.round;
@@ -830,11 +828,8 @@ function renderMySeasonStats(res) {
   if (gamSection && gamContainer) {
     let html = '';
     html += `<div><span style="color:#94a3b8;">Raffle tickets:</span> <strong style="color:#fbbf24;">${escapeHtml(raffle)}</strong> <span style="font-size:0.8rem; color:#64748b;">— every vote is a ticket for the season-end raffle</span></div>`;
-    if (compliance.weeksAttended > 0) {
-      html += `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);"><span style="color:#94a3b8; font-size:0.8rem;">Compliance:</span> <span style="font-size:0.85rem;">${escapeHtml(compliance.weeksVoted)} of ${escapeHtml(compliance.weeksAttended)} weeks (${escapeHtml(compliance.compliancePct)}%)</span></div>`;
-    }
     if (streaks.currentStreak > 0 || streaks.bestStreak > 0) {
-      html += `<div><span style="color:#94a3b8; font-size:0.8rem;">Streak:</span> <span style="font-size:0.85rem;">${escapeHtml(streaks.currentStreak)} current &bull; ${escapeHtml(streaks.bestStreak)} best</span></div>`;
+      html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Streak:</span> <span style="font-size:0.85rem;">${escapeHtml(streaks.currentStreak)} current &bull; ${escapeHtml(streaks.bestStreak)} best</span></div>`;
     }
     gamContainer.innerHTML = html;
     gamSection.style.display = 'block';
