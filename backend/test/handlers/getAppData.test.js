@@ -143,6 +143,9 @@ describe('handleGetAppData', () => {
       assert.ok(playerIds.includes('P003'), 'Charlie is opponent');
       assert.ok(!playerIds.includes('P004'), 'Diana excluded');
       assert.ok(!playerIds.includes('P005'), 'Eve excluded (inactive anyway)');
+      const rosterIds = result.roster.map(p => p.id);
+      assert.ok(rosterIds.includes('P004'), 'roster stays complete while the opponent filter is active');
+      assert.ok(rosterIds.includes('P005'), 'roster includes every DB player for name resolution');
     });
 
     it('falls back to all players when match data has no resolved player IDs', async () => {

@@ -27,18 +27,22 @@ export async function handleGetMySeasonStats(body, env, session) {
 
   const isCurrentSeason = sid === activeSeasonId;
 
-  // Get awards won (only if player has the highest score for that award)
-  const awards = await getAwardsForSeason(DB, sid);
-  const allAwards = awards.results || [];
-  const awardsWon = allAwards
-    .filter(a => {
-      if (a.player_id !== playerId) return false;
-      const maxScore = Math.max(...allAwards
-        .filter(x => x.award_name === a.award_name)
-        .map(x => x.score ?? 0));
-      return (a.score ?? 0) === maxScore;
-    })
-    .map(a => a.award_name);
+  // Awards are declared at season close: mid-season podium rows exist (sync
+  // refreshes them weekly) but must never be listed as won in the active season.
+  let awardsWon = [];
+  if (!isCurrentSeason) {
+    const awards = await getAwardsForSeason(DB, sid);
+    const allAwards = awards.results || [];
+    awardsWon = allAwards
+      .filter(a => {
+        if (a.player_id !== playerId) return false;
+        const maxScore = Math.max(...allAwards
+          .filter(x => x.award_name === a.award_name)
+          .map(x => x.score ?? 0));
+        return (a.score ?? 0) === maxScore;
+      })
+      .map(a => a.award_name);
+  }
 
   // Get leaders played (per-leader play counts from votes)
   const leadersRaw = await DB.prepare(`

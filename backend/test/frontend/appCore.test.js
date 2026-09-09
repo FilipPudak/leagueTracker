@@ -38,6 +38,22 @@ describe('frontend/app-core', () => {
     assert.equal(typeof core.computeSubtitle, 'function');
     assert.equal(typeof core.isFreshCache, 'function');
     assert.equal(typeof core.resolvePlayerChoices, 'function');
+    assert.equal(typeof core.leaderOptionLabel, 'function');
+  });
+
+  describe('leaderOptionLabel', () => {
+    it('joins name and set with a hyphen', () => {
+      assert.equal(core.leaderOptionLabel({ name: 'Admiral Ackbar', set: 'JTL' }), 'Admiral Ackbar - JTL');
+    });
+
+    it('plain name when set is missing', () => {
+      assert.equal(core.leaderOptionLabel({ name: 'Yoda', set: null }), 'Yoda');
+      assert.equal(core.leaderOptionLabel({ name: 'Yoda' }), 'Yoda');
+    });
+
+    it('empty for null leader', () => {
+      assert.equal(core.leaderOptionLabel(null), '');
+    });
   });
 
   describe('mapSettings (R7: backend sends UPPER_SNAKE keys)', () => {
@@ -176,6 +192,12 @@ describe('frontend wiring', () => {
     assert.ok(!/compliance/i.test(app), 'app.js must not reference compliance');
     assert.ok(!/compliance/i.test(html), 'index.html must not reference compliance');
     assert.match(app, /LeagueCore\.gamificationViewFor/);
+  });
+
+  it('standings name resolution uses the full roster, leader dropdown uses set labels', () => {
+    assert.match(app, /appState\.roster = boot\.roster \|\| boot\.players/);
+    assert.match(app, /LeagueCore\.leaderOptionLabel/);
+    assert.ok(!/new Option\(l\.name, l\.id\)/.test(app), 'no bare-name leader options left');
   });
 
   it('link view exposes the pick/email dual mode for multi-device relinking', () => {

@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.0.11';
+const APP_VERSION = '4.0.12';
 
 let appState = {
   status: 'unlinked',
@@ -184,6 +184,7 @@ function applyBoot(boot) {
   appState.votingOpen = Boolean(boot.votingOpen);
   appState.seasons = boot.seasons || [];
   appState.players = boot.players || [];
+  appState.roster = boot.roster || boot.players || [];
   appState.currentVote = boot.currentVote || null;
   appState.seasonName = boot.seasonName;
   appState.week = boot.week;
@@ -493,7 +494,7 @@ function populateVotingDropdowns(leaders, players, currentUserId) {
   if (!l1 || !opp) return;
   l1.innerHTML = '<option value="">-- Select Leader --</option>';
   opp.innerHTML = '<option value="">-- Select Favorite Opponent --</option>';
-  (leaders || []).forEach((l) => l1.appendChild(new Option(l.name, l.id)));
+  (leaders || []).forEach((l) => l1.appendChild(new Option(LeagueCore.leaderOptionLabel(l), l.id)));
   (players || []).forEach((p) => {
     if (String(p.id) !== String(currentUserId)) opp.appendChild(new Option(p.name, p.id));
   });
@@ -644,7 +645,7 @@ function renderStandingsTable(table) {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#94a3b8; padding:16px;">No standings data.</td></tr>';
     return;
   }
-  const players = appState.players || [];
+  const players = appState.roster || [];
   const nameMap = {};
   players.forEach(p => { nameMap[p.id] = p.name; });
 
@@ -689,7 +690,7 @@ function renderRoundResults(rounds) {
     return;
   }
 
-  const players = appState.players || [];
+  const players = appState.roster || [];
   const nameMap = {};
   players.forEach(p => { nameMap[p.id] = p.name; });
 

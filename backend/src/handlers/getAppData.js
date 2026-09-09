@@ -2,7 +2,7 @@ import { getSettings, getPlayerById, getAllActiveLeaders, getAllSeasons, parseSe
 import { getWeeklyParticipation } from '../lib/participation.js';
 import { getFacedOpponents } from '../lib/voteValidation.js';
 
-const APP_VERSION = '4.0.11';
+const APP_VERSION = '4.0.12';
 
 export async function handleGetAppData(body, env, session) {
   const { DB } = env;
@@ -91,6 +91,7 @@ export async function handleGetAppData(body, env, session) {
     settings: safeSettings,
     seasons: seasons.results || [],
     players: players.map(p => ({ id: p.id, name: p.name })),
+    roster: allPlayers.map(p => ({ id: p.id, name: p.name })),
     unlinkedPlayers,
     leaders: (leaders.results || []).map(l => ({ id: l.id, name: l.name, set: l.set })),
     activeSeasonId,

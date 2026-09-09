@@ -34,6 +34,11 @@ const LeagueCore = (() => {
     return hasVoteData ? 'summary' : 'hidden';
   }
 
+  function leaderOptionLabel(leader) {
+    if (!leader) return '';
+    return leader.set ? `${leader.name} - ${leader.set}` : leader.name;
+  }
+
   function voteSubmitAction(currentVote) {
     return currentVote ? 'updateVote' : 'submitVote';
   }
@@ -42,7 +47,7 @@ const LeagueCore = (() => {
     return !isRetry && typeof message === 'string' && message.includes('No vote to update');
   }
 
-  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, gamificationViewFor, voteSubmitAction, shouldRetryAsNewVote, CACHE_TTL_MS };
+  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, gamificationViewFor, leaderOptionLabel, voteSubmitAction, shouldRetryAsNewVote, CACHE_TTL_MS };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.LeagueCore = LeagueCore;

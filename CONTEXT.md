@@ -159,6 +159,11 @@ own row; a podium may exceed three entries (tie-aware); standard competition ran
 | S6 | **Manual seed, sacred.** Its awards predate live voting; never overwrite. (Cross-check only: its Ruler scores match the derived S6 season table.) |
 | S7+ | Native: computed by the close sequence from votes + Melee data. |
 
+**Mid-season refresh:** from S7 the weekly sync also refreshes the computed podiums in the
+`awards` table every run (so the leaderboard can show live races, subject to the reveal
+gating above); `awardsWon` in My Stats lists awards only after the season has closed — a
+mid-season leader is "in the lead", never a "winner".
+
 ## 10. Gamification (private motivation layer)
 
 | Term | Definition |

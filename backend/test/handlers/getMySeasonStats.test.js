@@ -53,15 +53,32 @@ describe('handleGetMySeasonStats', () => {
     assert.equal(totalPlays, 2);
   });
 
-  it('awards won lists only awards for this player', async () => {
+  it('closed season lists awards won for this player', async () => {
+    const tables = basicTables();
+    tables.settings = tables.settings.map(s =>
+      s.key === 'ACTIVE_SEASON_ID' ? { ...s, value: '5' } : s
+    );
+    const db = createMockDb(tables);
+    const result = await handleGetMySeasonStats(
+      { seasonId: 6 },
+      { DB: db },
+      aliceSession
+    );
+    assert.equal(result.isCurrentSeason, false);
+    assert.ok(result.awardsWon.includes('Galactic Schemer'));
+    assert.ok(result.awardsWon.includes('Galactic Ambassador'));
+    assert.ok(result.awardsWon.includes('Galactic Ruler'));
+    assert.ok(!result.awardsWon.includes('A New Hope'), 'P001 is not top scorer of A New Hope');
+  });
+
+  it('active season lists NO awards mid-season (winners declared at close)', async () => {
     const result = await handleGetMySeasonStats(
       { seasonId: 6 },
       env,
       aliceSession
     );
-    assert.ok(result.awardsWon.includes('Galactic Schemer'));
-    assert.ok(result.awardsWon.includes('Galactic Ambassador'));
-    assert.ok(result.awardsWon.includes('Galactic Ruler'));
+    assert.equal(result.isCurrentSeason, true);
+    assert.deepEqual(result.awardsWon, [], 'stored mid-season podium rows must not surface as won');
   });
 
   it('current season includes milestone progress toward target', async () => {
