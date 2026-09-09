@@ -94,7 +94,7 @@ A league-season's Melee tournaments are classified by `phase`:
 | Phase | Name pattern | Examples | Feeds |
 |---|---|---|---|
 | **regular** | date `D/M` or `DD/MM` in the name | "SWU Wednesday league season 6 15/7 (week 8)" | season table, attendance, voting/opponent filter, Ruler, New Hope, Bounty Hunter |
-| **cut** | Top 8 / Top 4 / Playoff / Championship | "SWU Wednesday league season 6 TOP 4" | **Galactic Champion** only |
+| **cut** | Top 8 / Top 4 / Playoff / Championship | "SWU Wednesday league season 6 TOP 4" | **Galactic Champion** only; displayed as "Top Cut" |
 | **side** | Best of the Rest / finale | "SWU Wednesday league season 6 Best of the Rest" | nothing official; stored, labeled, browsable |
 
 - Excluded entirely: `prerelease`, `draft`, `clone`, `budget draft`, non-league names.

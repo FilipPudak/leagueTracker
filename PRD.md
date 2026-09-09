@@ -191,22 +191,22 @@ Actions (all `ADMIN_SECRET`-gated via the same pattern as `handleBackfillFromMel
 0/1), `removeLeaders` (delete only if never referenced by `votes`, else refuse with a named
 list), `materializePastAwards` (M6). Router registration + `wrangler` invocation snippets in docs.
 
-### M9 — Frontend (`docs/app/`, version 4.0.0)
+### M9 — Frontend (`docs/app/`, version 4.0.3)
 
-- **4 tabs** per approved structure: Vote | **Standings** (new) | Awards (today's leaderboard
-  panels, + Galactic Champion podium) | My Stats.
-- **Standings view:** season picker + as-of round picker (default latest regular); cumulative
-  table (rank, name, Played/W/D/L, Points, medal styling for podium range); "Round results"
-  section showing per-night standings; cut rounds labeled "Championship Cut", side rounds
-  labeled "Side Event".
+- **4 tabs** per approved structure: Vote (✓) | **Standings** (✓) | Awards (✓) | Me (✓).
+- **Standings view:** season picker + as-of round picker (R11 style, descending); cumulative
+  table (rank, name, Played/W/D/L, Points, medal styling for podium range, Show More at 12 rows);
+  "Round results" section showing per-night standings; cut events labeled "Top Cut" with CUT
+  prefix, side events labeled "Side Event" with SIDE prefix, regular rounds use "RN — D/M" format.
 - **Search picker** on link (filter on keystroke over the full roster — all players shown).
 - **Vote flow:** both selects mandatory client-side; "Change vote" button on the already-voted
   card while `votingOpen` → prefilled form → `updateVote`.
-- **My Stats:** milestone progress bar (votes/4, full state + copy "4 votes earns you a prize —
-  ask the organizer") **separate from** "Raffle tickets: N — every vote is a ticket for the
-  season-end raffle draw".
+- **Me tab:** milestone progress bar (votes/4, full state + copy "4 votes earns you a prize —
+  ask the organizer") + "Raffle tickets: N — every vote is a ticket for the season-end raffle draw".
 - **Deadline copy** rendered from settings ("Voting closes Wed 17:45 before games").
 - Fix "Season Ended → Week 1" subtitle bug.
+- Galactic Champion displayed at top of Awards tab.
+- Most Played Leaders at bottom of Awards tab.
 
 ### M10 — Tests (runs alongside every M, not after)
 
@@ -255,7 +255,7 @@ list), `materializePastAwards` (M6). Router registration + `wrangler` invocation
 8. `startNewSeason` S7 `{length:11, topResults:7}` (or M0 guard + interim start if this happens
    before the cutover). Verify the coming Wednesday's dual-cron fires: data synced on first
    usable fire, `LAST_ADVANCED` written exactly once.
-9. Frontend deploy (GitHub Pages) + hard-refresh check, APP_VERSION 4.0.0.
+9. Frontend deploy (GitHub Pages) + hard-refresh check, APP_VERSION 4.0.3.
 
 **Rollback:** D1 re-import from step-1 export; `wrangler deployments rollback` to tagged version.
 
