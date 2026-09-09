@@ -1,42 +1,56 @@
-# Security model
+# Security Model
 
-The backend is a Cloudflare Worker with no shared secret and no Google sign-in. The static
-client (GitHub Pages) calls it directly with `fetch`. Identity for voting is established by a
-**per-device session token** minted at link time.
+Cloudflare Worker backend with static frontend (GitHub Pages). No shared secret, no Google sign-in. Identity established by **per-device session tokens**.
 
-- **Per-device session tokens** — when a user links on a device, the backend mints a UUID
-  token stored in the D1 `sessions` table (one row per device, many rows per player) and returns
-  it to the client, which persists it in `localStorage`. Every subsequent request sends the
-  token; the backend resolves it to the linked player and lazily deletes stale sessions.
-- **Link is keyed on an email + player name** — the user types an email and picks a player
-  from the (public) active roster. The backend enforces ownership: an email cannot be claimed
-  by two players, a player cannot be claimed by two emails, and a player re-picking their own
-  already-claimed identity on a new device re-links cleanly.
-- **One vote per player per week** — enforced by a `UNIQUE(season_id, week, player_id)`
-  constraint on the `leader_votes` table, so concurrent requests cannot both succeed.
-- **Session TTL** — sessions expire after 90 days of inactivity. The `last_active`
-  timestamp is refreshed on each successful vote and link, so active weekly voters
-  never expire. An expired session is lazily deleted on next use.
-- **Admin lifecycle** — week advancement (`advanceWeek`), and player sync (`syncPlayers`)
-  run as Cloudflare Worker cron triggers (scheduled handlers) or manual invocation via
-  `curl`/`wrangler`. They are not exposed through the public API.
-- **Admin unclaim (revocation)** — clearing a player's email in D1 unclaims the player and
-  invalidates their sessions; stale tokens are lazily GC'd on their next request.
+## Session Tokens
 
-## Accepted limitation: email is not Google-verified
+- User links on a device → backend mints UUID token → stored in D1 `sessions` table → client persists in `localStorage`
+- Every request sends token → backend resolves to linked player
+- Stale sessions lazily deleted on next use
+- **90-day rolling TTL** from `last_active` timestamp
 
-The backend is stateless at the identity layer — it trusts the email asserted by the linking
-user (typed into the form). For a casual-league hobby project this is accepted. Exploits would
-require either guessing another player's email `+` organization name (both effectively public
-to league members) and claiming their identity **before** the legitimate owner does, or being
-handed a valid session token. Mitigations already in place:
+## Linking
 
-- Mandatory one-time link step before any vote is accepted.
-- One vote per player per week under a UNIQUE constraint.
-- Full audit logging on every `getAppData`, `linkAccount`, `submitVote`, and `unlinkAccount`
-  call (Cloudflare Worker logs) so anomalies can be detected and corrected.
-- Unlink/revoke story: user can unlink a device ("Not you?"); admin can unclaim a player.
+- Email + player name from public roster
+- **One email ↔ one player** — enforced at link time
+- **One player ↔ one email** — changing requires admin
+- Re-linking same email on new device creates new session, reuses player
 
-**Deferred upgrade:** if competitive integrity or public security review ever matters, replace
-the asserted email with Google-verified identity (e.g. the static client sends an OAuth token and the
-backend resolves it against `https://www.googleapis.com/oauth2/v3/userinfo`).
+## Voting
+
+- **One vote per player per week** — `UNIQUE(season_id, week, player_id)` on `votes` table
+- **Both fields mandatory** — leader and opponent, server-side validated
+- **Self-vote prohibited** — opponent_id ≠ player_id
+- **Editable while open** — `updateVote` replaces both fields, re-checks constraints
+- **Privacy invariant** — no endpoint exposes voter→opponent mapping; only aggregate tallies
+
+## Privacy Guard
+
+Lint-style test (`test/privacy/privacyGuard.test.js`) asserts:
+- No handler returns `opponent_id` alongside voter identity in the same response
+- `getAppData` does not expose `opponent_id` except in `currentVote` (own data)
+
+## Admin Actions
+
+- Require `adminToken` in request body matching `ADMIN_SECRET` env var
+- **Constant-time comparison** — prevents timing side-channel
+- Actions: `startNewSeason`, `syncNow`, `pauseCurrentSeason`, `resumeCurrentSeason`, `materializePastAwards`, leader management
+
+## Rate Limiting
+
+- Best-effort per Worker isolate (30 requests/minute per IP)
+- Documented, not a security guarantee
+
+## Accepted Limitation: Email Not Verified
+
+Backend trusts asserted email. For casual league use, accepted. Mitigations:
+- Mandatory one-time link before voting
+- One vote per player per week (UNIQUE constraint)
+- Full audit logging (Cloudflare Worker logs)
+- Unlink/revoke: user can unlink device; admin can unclaim player
+
+## Admin Secret
+
+- `ADMIN_SECRET` encrypted in Cloudflare dashboard (not in `wrangler.toml`)
+- Never logged, never returned in responses
+- Used only for constant-time comparison in admin actions
