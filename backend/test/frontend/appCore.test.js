@@ -148,6 +148,21 @@ describe('frontend/app-core', () => {
       assert.equal(core.gamificationViewFor(false, false), 'hidden');
     });
   });
+
+  describe('vote action selection across week boundaries', () => {
+    it('picks updateVote only when a current vote is held', () => {
+      assert.equal(core.voteSubmitAction(null), 'submitVote');
+      assert.equal(core.voteSubmitAction(undefined), 'submitVote');
+      assert.equal(core.voteSubmitAction({ leaderId: '1', opponentId: 'P002' }), 'updateVote');
+    });
+
+    it('retries once as new vote when the stale tab gets 404 after week advance', () => {
+      assert.equal(core.shouldRetryAsNewVote('No vote to update. Use submitVote instead.', false), true);
+      assert.equal(core.shouldRetryAsNewVote('No vote to update. Use submitVote instead.', true), false, 'single retry only');
+      assert.equal(core.shouldRetryAsNewVote('Voting is currently closed for this week.', false), false);
+      assert.equal(core.shouldRetryAsNewVote(null, false), false);
+    });
+  });
 });
 
 describe('frontend wiring', () => {

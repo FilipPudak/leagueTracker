@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.0.9';
+const APP_VERSION = '4.0.10';
 
 let appState = {
   status: 'unlinked',
@@ -517,7 +517,7 @@ function changeVote() {
 let voteInFlight = false;
 let unlinkInFlight = false;
 
-function submitVotes() {
+function submitVotes(isRetry) {
   if (!appState.votingOpen) {
     showStatus('Voting is currently closed for this week.', false);
     return;
@@ -551,13 +551,16 @@ function submitVotes() {
     appState.currentVote = { leaderId: l1, opponentId: opp };
   }
 
-  const action = appState.currentVote ? 'updateVote' : 'submitVote';
+  const action = LeagueCore.voteSubmitAction(appState.currentVote);
   callApi(action, { voteData: { leader1Id: l1, opponentId: opp } })
     .then(() => { endFlight(); showVoteRecorded(); })
     .catch((err) => {
       endFlight();
       const msg = err.userMessage || err.message || '';
-      if (msg.includes('already submitted votes for this week')) {
+      if (LeagueCore.shouldRetryAsNewVote(msg, isRetry)) {
+        appState.currentVote = null;
+        submitVotes(true);
+      } else if (msg.includes('already submitted votes for this week')) {
         showVoteRecorded();
       } else {
         showStatus(msg || 'Vote submission failed.', false);

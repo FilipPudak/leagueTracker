@@ -70,7 +70,7 @@ export async function computeAmbassador(db, seasonId) {
 
 // Write a podium block for an award (supports tie-aware results > 3 entries)
 export async function writePodiumBlock(db, seasonId, awardName, entries) {
-  const topN = entries.slice(0, 5);
+  const topN = entries;
 
   if (topN.length === 0) {
     const existing = await db.prepare(

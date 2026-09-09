@@ -221,13 +221,15 @@ describe('writePodiumBlock', () => {
     assert.equal(awardRows.length, 0);
   });
 
-  it('truncates entries to top 5', async () => {
+  it('writes all tie-boundary members beyond five entries (podium may exceed 3)', async () => {
     const db = createMockDb(basicTables());
     const entries = [
-      { playerId: 'P001', score: 10 },
-      { playerId: 'P002', score: 8 },
-      { playerId: 'P003', score: 6 },
-      { playerId: 'P004', score: 4 },
+      { playerId: 'P001', score: 4 },
+      { playerId: 'P002', score: 3 },
+      { playerId: 'P003', score: 3 },
+      { playerId: 'P004', score: 3 },
+      { playerId: 'P005', score: 3 },
+      { playerId: 'P006', score: 3 },
     ];
     await writePodiumBlock(db, 6, 'Galactic Schemer', entries);
 
@@ -235,8 +237,8 @@ describe('writePodiumBlock', () => {
     const awardRows = store.awards.filter(
       r => r.award_name === 'Galactic Schemer' && r.season_id === 6
     );
-    assert.equal(awardRows.length, 4);
-    assert.equal(awardRows[2].player_id, 'P003');
+    assert.equal(awardRows.length, 6, 'no silent cap — tied players are not arbitrarily dropped');
+    assert.equal(awardRows[0].player_id, 'P001');
   });
 
   it('issues DELETE and INSERT calls to DB', async () => {

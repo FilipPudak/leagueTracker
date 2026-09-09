@@ -40,7 +40,15 @@ const LeagueCore = (() => {
     return hasVoteData ? 'summary' : 'hidden';
   }
 
-  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, linkModeFor, gamificationViewFor, CACHE_TTL_MS };
+  function voteSubmitAction(currentVote) {
+    return currentVote ? 'updateVote' : 'submitVote';
+  }
+
+  function shouldRetryAsNewVote(message, isRetry) {
+    return !isRetry && typeof message === 'string' && message.includes('No vote to update');
+  }
+
+  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, linkModeFor, gamificationViewFor, voteSubmitAction, shouldRetryAsNewVote, CACHE_TTL_MS };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.LeagueCore = LeagueCore;
