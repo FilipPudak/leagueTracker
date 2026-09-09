@@ -125,6 +125,6 @@ export async function getMostPlayedLeaders(db, seasonId) {
     WHERE v.season_id = ?
     GROUP BY l.id, l.name, l."set"
     ORDER BY play_count DESC
-    LIMIT 10
+    LIMIT 50
   `).bind(seasonId).all();
 }

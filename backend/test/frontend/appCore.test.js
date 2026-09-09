@@ -56,6 +56,24 @@ describe('frontend/app-core', () => {
     });
   });
 
+  describe('list expansion helpers (most-played leaders)', () => {
+    const seven = Array.from({ length: 7 }, (_, i) => ({ id: String(i + 1) }));
+
+    it('collapses to the limit, expands to all', () => {
+      assert.equal(core.visibleListSlice(seven, 5, false).length, 5);
+      assert.equal(core.visibleListSlice(seven, 5, true).length, 7);
+    });
+
+    it('non-array input yields empty slice', () => {
+      assert.deepEqual(core.visibleListSlice(null, 5, false), []);
+    });
+
+    it('toggle labels mirror the standings pattern', () => {
+      assert.equal(core.listToggleLabel(7, 5, false), 'Show all 7 leaders');
+      assert.equal(core.listToggleLabel(7, 5, true), 'Show less');
+    });
+  });
+
   describe('mapSettings (R7: backend sends UPPER_SNAKE keys)', () => {
     it('maps WEEKLY_DEADLINE_DAY/TIME and TIMEZONE to camelCase', () => {
       const mapped = core.mapSettings({
@@ -198,6 +216,15 @@ describe('frontend wiring', () => {
     assert.match(app, /appState\.roster = boot\.roster \|\| boot\.players/);
     assert.match(app, /LeagueCore\.leaderOptionLabel/);
     assert.ok(!/new Option\(l\.name, l\.id\)/.test(app), 'no bare-name leader options left');
+  });
+
+  it('vote dropdowns are populated whenever voting is open, even with a vote already cast', () => {
+    assert.match(app, /if \(appState\.votingOpen\) \{\s*\n\s*populateVotingDropdowns/);
+  });
+
+  it('every leader list carries the set label and most-played is expandable at 5', () => {
+    assert.ok((app.match(/LeagueCore\.leaderOptionLabel/g) || []).length >= 3, 'dropdown + most-played + my-stats');
+    assert.match(app, /limit: 5,\s*\n\s*expandable: true/);
   });
 
   it('link view exposes the pick/email dual mode for multi-device relinking', () => {

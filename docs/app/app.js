@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.0.12';
+const APP_VERSION = '4.0.13';
 
 let appState = {
   status: 'unlinked',
@@ -252,6 +252,9 @@ function applyBoot(boot) {
     showTabs(true);
     setActiveView('vote-view', 0);
 
+    if (appState.votingOpen) {
+      populateVotingDropdowns(boot.leaders, boot.players, appState.linkedPlayer.id);
+    }
     if (boot.alreadySubmitted || boot.alreadyVoted) {
       if (voteForm) voteForm.style.display = 'none';
       if (votedCard) votedCard.style.display = 'block';
@@ -262,8 +265,6 @@ function applyBoot(boot) {
       if (voteForm) voteForm.style.display = 'none';
       clearStatus();
       showStatus('Voting is currently closed for this week.', false);
-    } else {
-      populateVotingDropdowns(boot.leaders, boot.players, appState.linkedPlayer.id);
     }
   } else {
     showLinkedPresence(null);
@@ -764,6 +765,7 @@ function loadLeaderboardData() {
 }
 
 function renderLeaderboard(res) {
+  mostPlayedExpanded = false;
   const lpCard = $('leaderboard-participation-card');
   const lpText = $('leaderboard-participation-text');
   if (lpCard && lpText) {
@@ -777,9 +779,11 @@ function renderLeaderboard(res) {
   }
 
   renderStatsList('most-played-container', res.leaderLeaderboard || [], {
-    getTitle: (item) => item.name,
+    getTitle: (item) => LeagueCore.leaderOptionLabel(item),
     getScore: (item) => item.score,
-    getSubtitle: (item) => item.subtitle
+    getSubtitle: (item) => item.subtitle,
+    limit: 5,
+    expandable: true
   });
   renderLeaderboardSection('schemer-section', 'schemer-container', res, 'schemer');
   renderLeaderboardSection('ambassador-section', 'ambassador-container', res, 'ambassador');
@@ -901,7 +905,7 @@ function renderMySeasonStats(res) {
   }
 
   renderStatsList('myseason-leaders-container', res.leaders || [], {
-    getTitle: (item) => item.name,
+    getTitle: (item) => LeagueCore.leaderOptionLabel(item),
     getScore: (item) => `${item.plays} Plays`,
     limit: Infinity
   });
@@ -933,6 +937,8 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+let mostPlayedExpanded = false;
+
 function renderStatsList(containerId, items, config) {
   const container = $(containerId);
   if (!container) return;
@@ -941,7 +947,8 @@ function renderStatsList(containerId, items, config) {
     return;
   }
   const limit = config.limit !== undefined ? config.limit : 3;
-  const shown = items.slice(0, limit);
+  const expanded = config.expandable && mostPlayedExpanded;
+  const shown = LeagueCore.visibleListSlice(items, limit, expanded);
   let html = '<div class="stats-list">';
   shown.forEach((item, i) => {
     const rankNumber = item.displayRank !== undefined ? item.displayRank : (i + 1);
@@ -963,6 +970,17 @@ function renderStatsList(containerId, items, config) {
   });
   html += '</div>';
   container.innerHTML = html;
+  if (config.expandable && items.length > limit) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'show-more-btn';
+    btn.textContent = LeagueCore.listToggleLabel(items.length, limit, expanded);
+    btn.onclick = () => {
+      mostPlayedExpanded = !mostPlayedExpanded;
+      renderStatsList(containerId, items, config);
+    };
+    container.appendChild(btn);
+  }
 }
 
 /* ------------------------------------------------------------- boot / init -- */
