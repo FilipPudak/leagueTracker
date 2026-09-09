@@ -35,7 +35,7 @@ describe('handleGetStandingsData', () => {
     assert.equal(result.table[0].points, 18);
   });
 
-  it('returns per-round night results', async () => {
+  it('returns per-round night results in descending order', async () => {
     const tables = makeTables({
       melee_tournaments: [
         { melee_id: 100, season_id: 6, round: 1, name: 'SWU Wednesday league season 6 15/7 (week 1)', date: '2026-06-15', phase: 'regular' },
@@ -50,13 +50,18 @@ describe('handleGetStandingsData', () => {
 
     const result = await handleGetStandingsData({ seasonId: 6 }, { DB: db });
 
-    assert.ok(result.rounds.length > 0);
-    assert.equal(result.rounds[0].round, 1);
+    assert.equal(result.rounds.length, 2);
+    assert.equal(result.rounds[0].round, 2);
     assert.equal(result.rounds[0].phase, 'regular');
+    assert.equal(result.rounds[1].round, 1);
   });
 
-  it('filters by asOfRound when provided', async () => {
+  it('filters table by asOfRound when provided', async () => {
     const tables = makeTables({
+      melee_tournaments: [
+        { melee_id: 100, season_id: 6, round: 1, name: 'SWU Wednesday league season 6 15/7 (week 1)', date: '2026-06-15', phase: 'regular' },
+        { melee_id: 101, season_id: 6, round: 2, name: 'SWU Wednesday league season 6 22/7 (week 2)', date: '2026-06-22', phase: 'regular' },
+      ],
       season_standings: [
         { season_id: 6, round: 1, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
         { season_id: 6, round: 2, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
@@ -68,6 +73,7 @@ describe('handleGetStandingsData', () => {
 
     assert.equal(result.table[0].rounds.length, 1);
     assert.equal(result.table[0].rounds[0].round, 1);
+    assert.equal(result.asOfRound, 1);
   });
 
   it('labels cut and side phases', async () => {

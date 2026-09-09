@@ -1,5 +1,7 @@
 import { computeSeasonTable } from '../lib/seasonTable.js';
 
+const PHASE_DISPLAY_ORDER = { cut: 0, side: 1, regular: 2 };
+
 export async function handleGetStandingsData(body, env) {
   const { DB } = env;
   const { seasonId, asOfRound } = body;
@@ -11,7 +13,7 @@ export async function handleGetStandingsData(body, env) {
   }
 
   const tournaments = await DB.prepare(
-    'SELECT melee_id, round, name, date, phase FROM melee_tournaments WHERE season_id = ? ORDER BY round, melee_id'
+    'SELECT melee_id, round, name, date, phase FROM melee_tournaments WHERE season_id = ?'
   ).bind(seasonId).all();
   const tournamentList = tournaments.results || [];
 
@@ -23,15 +25,21 @@ export async function handleGetStandingsData(body, env) {
   }
   const effectiveAsOf = asOfRound || latestRegularRound;
 
-  const standings = await DB.prepare(
-    'SELECT round, player_id, wins, losses, draws, match_points, rank FROM season_standings WHERE season_id = ? AND round <= ?'
-  ).bind(seasonId, effectiveAsOf).all();
-  const standingsList = standings.results || [];
+  const allStandings = await DB.prepare(
+    'SELECT round, player_id, wins, losses, draws, match_points, rank FROM season_standings WHERE season_id = ?'
+  ).bind(seasonId).all();
+  const allStandingsList = allStandings.results || [];
 
   const season = await DB.prepare('SELECT length, top_results FROM seasons WHERE id = ?').bind(seasonId).first();
   const topResults = season?.top_results || 7;
 
-  const nights = standingsList.map(s => ({
+  const tableStandings = allStandingsList
+    .filter(s => {
+      const t = tournamentList.find(t => t.round === s.round);
+      return t && t.phase === 'regular' && s.round <= effectiveAsOf;
+    });
+
+  const nights = tableStandings.map(s => ({
     playerId: s.player_id,
     round: s.round,
     wins: s.wins || 0,
@@ -44,7 +52,6 @@ export async function handleGetStandingsData(body, env) {
 
   const roundMap = new Map();
   for (const t of tournamentList) {
-    if (t.round > effectiveAsOf) continue;
     if (!roundMap.has(t.round)) {
       roundMap.set(t.round, {
         round: t.round,
@@ -57,7 +64,7 @@ export async function handleGetStandingsData(body, env) {
     }
   }
 
-  for (const s of standingsList) {
+  for (const s of allStandingsList) {
     const roundInfo = roundMap.get(s.round);
     if (roundInfo) {
       roundInfo.players.push({
@@ -71,11 +78,17 @@ export async function handleGetStandingsData(body, env) {
     }
   }
 
-  const rounds = [...roundMap.values()].sort((a, b) => a.round - b.round);
+  const rounds = [...roundMap.values()].sort((a, b) => {
+    const pa = PHASE_DISPLAY_ORDER[a.phase] ?? 2;
+    const pb = PHASE_DISPLAY_ORDER[b.phase] ?? 2;
+    if (pa !== pb) return pa - pb;
+    return b.round - a.round;
+  });
 
   const allRegularRounds = tournamentList
     .filter(t => t.phase === 'regular')
-    .map(t => ({ round: t.round, name: t.name }));
+    .map(t => ({ round: t.round, name: t.name }))
+    .sort((a, b) => b.round - a.round);
 
   return {
     table,

@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.0.0';
+const APP_VERSION = '4.0.1';
 
 // How long a loaded leaderboard/stats payload stays fresh before a re-entry
 // refetches it. Flicking between tabs is sub-second, so a tiny TTL is enough to
@@ -612,11 +612,11 @@ function renderStandings(res) {
 function updateRoundFilter(rounds, asOfRound) {
   const sel = $('standings-round-filter');
   if (!sel) return;
-  sel.innerHTML = '<option value="">Latest Regular</option>';
+  sel.innerHTML = '';
   (rounds || []).forEach(r => {
     const opt = document.createElement('option');
     opt.value = r.round;
-    opt.textContent = 'After Round ' + r.round;
+    opt.textContent = 'Round ' + r.round;
     if (String(r.round) === String(asOfRound)) opt.selected = true;
     sel.appendChild(opt);
   });
@@ -662,7 +662,12 @@ function renderRoundResults(rounds) {
 
   container.innerHTML = rounds.map(round => {
     const phaseClass = 'round-phase-' + round.phase;
-    const phaseLabel = round.phase === 'cut' ? 'Championship Cut' : (round.phase === 'side' ? 'Side Event' : 'Regular');
+    const isCut = round.phase === 'cut';
+    const isSide = round.phase === 'side';
+    const phaseLabel = isCut ? 'Championship Cut' : (isSide ? 'Side Event' : 'Regular');
+    const title = (isCut || isSide)
+      ? `${escapeHtml(phaseLabel)} — ${escapeHtml(round.name || '')}`
+      : `Round ${escapeHtml(round.round)}${round.name ? ' — ' + escapeHtml(round.name) : ''}`;
     const playerRows = (round.players || [])
       .sort((a, b) => (a.rank || 999) - (b.rank || 999))
       .map(p => {
@@ -679,7 +684,7 @@ function renderRoundResults(rounds) {
 
     return `<div class="round-card">
       <div class="round-header" onclick="this.nextElementSibling.classList.toggle('open')">
-        <span class="round-title">Round ${escapeHtml(round.round)}${round.name ? ' — ' + escapeHtml(round.name) : ''}</span>
+        <span class="round-title">${title}</span>
         <span class="round-phase ${phaseClass}">${escapeHtml(phaseLabel)}</span>
       </div>
       <div class="round-body">${playerRows || '<div style="color:#94a3b8; padding:8px 0;">No standings recorded.</div>'}</div>
