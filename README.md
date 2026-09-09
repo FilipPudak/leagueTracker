@@ -11,7 +11,7 @@ front end on GitHub Pages backed by a Cloudflare Worker + D1 database backend.
 - A Cloudflare Worker backend tracks votes, compiles leaderboards, advances weeks, and
   calculates end-of-season awards. Data is stored in a D1 (SQLite) database.
 - Player data is synced from the Melee.gg API on a weekly cron trigger (dual-cron for DST handling).
-- Gamification features: raffle tickets (1 per vote), compliance tracking, streak tracking, and voting milestones.
+- Gamification features: raffle tickets (1 per vote), streak tracking, and voting milestones.
 - 4 tabs: Vote | Standings | Awards | My Stats
 
 ## Architecture

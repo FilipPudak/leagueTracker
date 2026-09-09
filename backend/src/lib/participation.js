@@ -1,25 +1,4 @@
-// Voting compliance, streaks, and raffle tickets
-
-// Get player's voting compliance for a season
-export async function getCompliance(db, seasonId, playerId) {
-  const row = await db.prepare(`
-    SELECT
-      COUNT(DISTINCT v.week) as weeks_voted,
-      COUNT(DISTINCT a.week) as weeks_attended
-    FROM attendance a
-    LEFT JOIN votes v
-      ON v.season_id = a.season_id
-      AND v.week = a.week
-      AND v.player_id = a.player_id
-    WHERE a.season_id = ? AND a.player_id = ?
-  `).bind(seasonId, playerId).first();
-
-  const voted = row?.weeks_voted || 0;
-  const attended = row?.weeks_attended || 0;
-  const pct = attended > 0 ? Math.round((voted / attended) * 1000) / 10 : 0;
-
-  return { weeksVoted: voted, weeksAttended: attended, compliancePct: pct };
-}
+// Voting streaks and raffle tickets
 
 // Get player's current and best voting streak for a season
 export async function getStreaks(db, seasonId, playerId) {

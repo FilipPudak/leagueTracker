@@ -35,7 +35,12 @@ const LeagueCore = (() => {
     return 'pick';
   }
 
-  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, linkModeFor, CACHE_TTL_MS };
+  function gamificationViewFor(isCurrentSeason, hasVoteData) {
+    if (isCurrentSeason) return 'full';
+    return hasVoteData ? 'summary' : 'hidden';
+  }
+
+  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, linkModeFor, gamificationViewFor, CACHE_TTL_MS };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.LeagueCore = LeagueCore;

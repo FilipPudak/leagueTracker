@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables, emptyTables } from '../helpers/fixtures.js';
 import {
-  getCompliance,
   getStreaks,
   getRaffleTickets,
   getWeeklyParticipation,
@@ -54,35 +53,6 @@ function makeStreakTables() {
     ],
   };
 }
-
-describe('getCompliance', () => {
-  it('returns compliance data structure for a player with attendance', async () => {
-    const db = createMockDb(makeStreakTables());
-    const result = await getCompliance(db, 7, 'P100');
-    assert.ok('weeksVoted' in result);
-    assert.ok('weeksAttended' in result);
-    assert.ok('compliancePct' in result);
-    assert.equal(typeof result.weeksVoted, 'number');
-    assert.equal(typeof result.weeksAttended, 'number');
-    assert.equal(typeof result.compliancePct, 'number');
-  });
-
-  it('returns 0s when player has no attendance', async () => {
-    const db = createMockDb(makeStreakTables());
-    const result = await getCompliance(db, 7, 'P999');
-    assert.equal(result.weeksVoted, 0);
-    assert.equal(result.weeksAttended, 0);
-    assert.equal(result.compliancePct, 0);
-  });
-
-  it('returns 0s with empty tables', async () => {
-    const db = createMockDb(emptyTables());
-    const result = await getCompliance(db, 6, 'P001');
-    assert.equal(result.weeksVoted, 0);
-    assert.equal(result.weeksAttended, 0);
-    assert.equal(result.compliancePct, 0);
-  });
-});
 
 describe('getStreaks', () => {
   it('returns full streak when player voted every attended week', async () => {

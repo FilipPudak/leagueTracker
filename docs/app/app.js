@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.0.8';
+const APP_VERSION = '4.0.9';
 
 let appState = {
   status: 'unlinked',
@@ -842,31 +842,40 @@ function loadMySeasonStats() {
 function renderMySeasonStats(res) {
   const gamSection = $('myseason-gamification-section');
   const gamContainer = $('myseason-gamification-container');
-  const compliance = res.compliance || {};
   const streaks = res.streaks || {};
   const raffle = res.raffleTickets || 0;
-  const milestone = res.milestone || {};
+  const view = LeagueCore.gamificationViewFor(res.isCurrentSeason !== false, res.hasVoteData !== false);
 
   const milestoneContainer = $('myseason-milestone-container');
   const milestoneBar = $('milestone-bar');
   const milestoneText = $('milestone-text');
-  if (milestoneContainer && milestoneBar && milestoneText) {
-    const votes = milestone.votes || 0;
-    const target = milestone.target || 4;
-    const pct = Math.min(100, Math.round((votes / target) * 100));
-    milestoneBar.style.width = pct + '%';
-    milestoneText.textContent = votes + ' of ' + target + ' votes' + (milestone.complete ? ' — Prize earned!' : '');
-    milestoneContainer.style.display = 'block';
+  if (milestoneContainer) {
+    if (view === 'full' && res.milestone && milestoneBar && milestoneText) {
+      const votes = res.milestone.votes || 0;
+      const target = res.milestone.target || 4;
+      const pct = Math.min(100, Math.round((votes / target) * 100));
+      milestoneBar.style.width = pct + '%';
+      milestoneText.textContent = votes + ' of ' + target + ' votes' + (res.milestone.complete ? ' — Prize earned!' : '');
+      milestoneContainer.style.display = 'block';
+    } else {
+      milestoneContainer.style.display = 'none';
+    }
   }
 
   if (gamSection && gamContainer) {
-    let html = '';
-    html += `<div><span style="color:#94a3b8;">Raffle tickets:</span> <strong style="color:#fbbf24;">${escapeHtml(raffle)}</strong> <span style="font-size:0.8rem; color:#64748b;">— every vote is a ticket for the season-end raffle</span></div>`;
-    if (streaks.currentStreak > 0 || streaks.bestStreak > 0) {
-      html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Streak:</span> <span style="font-size:0.85rem;">${escapeHtml(streaks.currentStreak)} current &bull; ${escapeHtml(streaks.bestStreak)} best</span></div>`;
+    if (view === 'hidden') {
+      gamSection.style.display = 'none';
+    } else {
+      let html = '';
+      html += `<div><span style="color:#94a3b8;">Raffle tickets:</span> <strong style="color:#fbbf24;">${escapeHtml(raffle)}</strong> <span style="font-size:0.8rem; color:#64748b;">— every vote is a ticket for the season-end raffle</span></div>`;
+      if (view === 'full' && (streaks.currentStreak > 0 || streaks.bestStreak > 0)) {
+        html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Streak:</span> <span style="font-size:0.85rem;">${escapeHtml(streaks.currentStreak)} current &bull; ${escapeHtml(streaks.bestStreak)} best</span></div>`;
+      } else if (view === 'summary' && streaks.bestStreak > 0) {
+        html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Streak:</span> <span style="font-size:0.85rem;">${escapeHtml(streaks.bestStreak)} best (season record)</span></div>`;
+      }
+      gamContainer.innerHTML = html;
+      gamSection.style.display = 'block';
     }
-    gamContainer.innerHTML = html;
-    gamSection.style.display = 'block';
   }
 
   const awardsContainer = $('myseason-awards-container');

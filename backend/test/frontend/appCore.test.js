@@ -133,6 +133,21 @@ describe('frontend/app-core', () => {
       assert.equal(core.linkModeFor('', 'invalid-token'), 'email');
     });
   });
+
+  describe('gamificationViewFor (historical vs live season display)', () => {
+    it('active season always gets the full view, even before any votes', () => {
+      assert.equal(core.gamificationViewFor(true, false), 'full');
+      assert.equal(core.gamificationViewFor(true, true), 'full');
+    });
+
+    it('closed season with vote data gets summary', () => {
+      assert.equal(core.gamificationViewFor(false, true), 'summary');
+    });
+
+    it('closed pre-voting era season is hidden, not zeroed', () => {
+      assert.equal(core.gamificationViewFor(false, false), 'hidden');
+    });
+  });
 });
 
 describe('frontend wiring', () => {
@@ -159,6 +174,12 @@ describe('frontend wiring', () => {
   it('deadline banner reads camelCase settings that mapSettings produces (R7)', () => {
     assert.match(app, /appState\.settings\.weeklyDeadlineDay/);
     assert.match(app, /LeagueCore\.mapSettings/);
+  });
+
+  it('compliance is fully retired from the client and view mode is wired', () => {
+    assert.ok(!/compliance/i.test(app), 'app.js must not reference compliance');
+    assert.ok(!/compliance/i.test(html), 'index.html must not reference compliance');
+    assert.match(app, /LeagueCore\.gamificationViewFor/);
   });
 
   it('link view exposes the pick/email dual mode for multi-device relinking', () => {

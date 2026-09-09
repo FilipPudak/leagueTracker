@@ -18,7 +18,7 @@ describe('handleGetMySeasonStats', () => {
     env = { DB };
   });
 
-  it('returns awards won, leaders, compliance, streaks, raffleTickets', async () => {
+  it('returns awards won, leaders, streaks, raffleTickets, milestone', async () => {
     const result = await handleGetMySeasonStats(
       { seasonId: 6 },
       env,
@@ -26,9 +26,9 @@ describe('handleGetMySeasonStats', () => {
     );
     assert.ok(Array.isArray(result.awardsWon));
     assert.ok(Array.isArray(result.leaders));
-    assert.ok(result.compliance);
     assert.ok(result.streaks);
     assert.equal(typeof result.raffleTickets, 'number');
+    assert.equal(result.isCurrentSeason, true);
   });
 
   it('no seasonId falls back to active season', async () => {
@@ -64,15 +64,27 @@ describe('handleGetMySeasonStats', () => {
     assert.ok(result.awardsWon.includes('Galactic Ruler'));
   });
 
-  it('compliance has correct structure', async () => {
+  it('current season includes milestone progress toward target', async () => {
     const result = await handleGetMySeasonStats(
       { seasonId: 6 },
       env,
       aliceSession
     );
-    assert.equal(typeof result.compliance.weeksVoted, 'number');
-    assert.equal(typeof result.compliance.weeksAttended, 'number');
-    assert.equal(typeof result.compliance.compliancePct, 'number');
+    assert.deepEqual(result.milestone, { votes: 2, target: 4, complete: false });
+    assert.equal(result.hasVoteData, true);
+    assert.equal(typeof result.streaks.currentStreak, 'number', 'current streak exposed for active season');
+  });
+
+  it('historical season: milestone null, streaks best-only, no-vote era hidden', async () => {
+    const result = await handleGetMySeasonStats(
+      { seasonId: 5 },
+      env,
+      aliceSession
+    );
+    assert.equal(result.isCurrentSeason, false);
+    assert.equal(result.milestone, null);
+    assert.equal(result.hasVoteData, false);
+    assert.deepEqual(Object.keys(result.streaks), ['bestStreak']);
   });
 
   it('streaks has currentStreak and bestStreak', async () => {
@@ -103,7 +115,7 @@ describe('handleGetMySeasonStats', () => {
     );
     assert.ok(result.awardsWon);
     assert.ok(result.leaders);
-    assert.ok(result.compliance);
+    assert.equal(result.isCurrentSeason, true, 'fallback resolves to active season');
   });
 
   it('null session (bypassing router) → 401', async () => {

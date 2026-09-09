@@ -132,7 +132,7 @@ ignored).
   tallies exist. (A previous "de-identified at rest" design was abandoned: it was already
   breakable via synchronized insert timestamps, and it made vote editing impossible.)
 - Voting without attending is allowed (rain-outs, arriving late to vote after the game): it earns
-  raffle tickets but does not move compliance.
+  raffle tickets.
 
 ## 9. Awards (six)
 
@@ -163,12 +163,15 @@ own row; a podium may exceed three entries (tie-aware); standard competition ran
 
 | Term | Definition |
 |---|---|
-| **Voting Milestone** | A personal **progress bar 0 → 4 votes** for the current season (resets each season). Filling it earns a small offline reward chosen by the organizer. It is a completion bar, **not** a points system, and **not** the raffle. |
+| **Voting Milestone** | A personal **progress bar 0 → 4 votes** for the current season (resets each season; shown only while the season is active). Filling it earns a small offline reward chosen by the organizer. It is a completion bar, **not** a points system, and **not** the raffle. |
 | **Raffle Tickets** | A separate, plainly displayed count: **1 ticket per vote submitted**, accumulating within the season, **no bonuses, no gates**. The end-of-season raffle is drawn **manually, off-system**, using these stored per-player counts. The UI states next to the count that tickets are used in the season-end raffle. |
-| **Compliance** | Weeks voted ÷ weeks attended, this season. Private (own My Stats only). |
-| **Streak** | Consecutive **attended** weeks that were also voted; a missed *attendance* does not break the streak (only attended weeks form the sequence). |
+| **Streak** | Consecutive **attended** weeks that were also voted; a missed *attendance* does not break the streak (only attended weeks form the sequence). A *current* streak is meaningful only in the active season; closed seasons show the best streak as a season record. |
 
-**Hard rule (public vs private):** individual participation metrics — tickets, compliance,
+**Historical view (My Stats):** the active season shows the full gamification block. A closed
+season with vote data shows a summary (tickets, best streak — no current streak, no milestone).
+Pre-voting seasons (S1–S6: voting did not exist) show no gamification at all — zeros there
+would misrepresent absence of the feature as absence of effort.
+**Hard rule (public vs private):** individual participation metrics — tickets,
 streaks, badges — appear **only in that player's own My Stats**. Public surfaces (Vote tab,
 Leaderboard/Awards) show **aggregates only** ("X of Y voters attended last night have voted"),
 never per-player rankings.

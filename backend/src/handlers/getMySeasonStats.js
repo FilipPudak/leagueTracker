@@ -1,5 +1,5 @@
 import { getSetting, getAwardsForSeason, parseSeasonId } from '../db/queries.js';
-import { getCompliance, getStreaks, getRaffleTickets } from '../lib/participation.js';
+import { getStreaks, getRaffleTickets } from '../lib/participation.js';
 
 export async function handleGetMySeasonStats(body, env, session) {
   const { DB } = env;
@@ -12,11 +12,11 @@ export async function handleGetMySeasonStats(body, env, session) {
   }
 
   const playerId = session.player_id;
+  const activeSeasonId = parseSeasonId(await getSetting(DB, 'ACTIVE_SEASON_ID'));
   let sid = seasonId ? parseSeasonId(seasonId) : null;
 
   if (!sid) {
-    const activeSeasonId = await getSetting(DB, 'ACTIVE_SEASON_ID');
-    sid = parseSeasonId(activeSeasonId);
+    sid = activeSeasonId;
   }
 
   if (!sid) {
@@ -24,6 +24,8 @@ export async function handleGetMySeasonStats(body, env, session) {
     err.status = 400;
     throw err;
   }
+
+  const isCurrentSeason = sid === activeSeasonId;
 
   // Get awards won (only if player has the highest score for that award)
   const awards = await getAwardsForSeason(DB, sid);
@@ -55,26 +57,29 @@ export async function handleGetMySeasonStats(body, env, session) {
     plays: r.play_count,
   }));
 
-  // Gamification: compliance, streaks, raffle tickets
-  const compliance = await getCompliance(DB, sid, playerId);
-  const streaks = await getStreaks(DB, sid, playerId);
   const raffleTickets = await getRaffleTickets(DB, sid, playerId);
+  const hasVoteData = raffleTickets > 0;
 
-  // Voting milestone: progress toward 4 votes this season
-  const milestoneTarget = 4;
-  const milestoneVotes = raffleTickets; // 1 ticket per vote
-  const milestone = {
-    votes: milestoneVotes,
-    target: milestoneTarget,
-    complete: milestoneVotes >= milestoneTarget,
-  };
+  let streaks = await getStreaks(DB, sid, playerId);
+  let milestone = null;
+  if (isCurrentSeason) {
+    const milestoneTarget = 4;
+    milestone = {
+      votes: raffleTickets,
+      target: milestoneTarget,
+      complete: raffleTickets >= milestoneTarget,
+    };
+  } else {
+    streaks = { bestStreak: streaks.bestStreak };
+  }
 
   return {
     awardsWon,
     leaders,
-    compliance,
     streaks,
     raffleTickets,
     milestone,
+    isCurrentSeason,
+    hasVoteData,
   };
 }
