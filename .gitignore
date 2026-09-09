@@ -15,3 +15,7 @@ node_modules/
 
 # Temporary data files
 tmp/
+
+# DB dumps / data snapshots — never commit (contains PII and session tokens)
+backend/backup-*.sql
+backend/src/db/data.sql
