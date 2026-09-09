@@ -73,9 +73,14 @@ export async function handleGetStandingsData(body, env) {
 
   const rounds = [...roundMap.values()].sort((a, b) => a.round - b.round);
 
+  const allRegularRounds = tournamentList
+    .filter(t => t.phase === 'regular')
+    .map(t => ({ round: t.round, name: t.name }));
+
   return {
     table,
     rounds,
+    allRegularRounds,
     asOfRound: effectiveAsOf,
   };
 }

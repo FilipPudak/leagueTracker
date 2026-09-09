@@ -159,10 +159,10 @@ export async function handleGetLeaderboardData(body, env) {
 
   // Galactic Champion: stored or live from cut tournament
   let champion = awardsMap['Galactic Champion'] || null;
-  if ((!champion || champion.length === 0) && isActiveSeason) {
+  if (!champion || champion.length === 0) {
     const live = await computeChampion(DB, seasonId);
     champion = live.length > 0 ? assignStandardRanks(live) : null;
-  } else if (champion) {
+  } else {
     champion = assignStandardRanks(champion);
   }
 

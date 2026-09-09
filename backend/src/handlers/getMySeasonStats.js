@@ -60,11 +60,21 @@ export async function handleGetMySeasonStats(body, env, session) {
   const streaks = await getStreaks(DB, sid, playerId);
   const raffleTickets = await getRaffleTickets(DB, sid, playerId);
 
+  // Voting milestone: progress toward 4 votes this season
+  const milestoneTarget = 4;
+  const milestoneVotes = raffleTickets; // 1 ticket per vote
+  const milestone = {
+    votes: milestoneVotes,
+    target: milestoneTarget,
+    complete: milestoneVotes >= milestoneTarget,
+  };
+
   return {
     awardsWon,
     leaders,
     compliance,
     streaks,
     raffleTickets,
+    milestone,
   };
 }

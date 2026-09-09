@@ -590,7 +590,7 @@ function loadStandingsData() {
 }
 
 function renderStandings(res) {
-  updateRoundFilter(res.rounds, res.asOfRound);
+  updateRoundFilter(res.allRegularRounds || res.rounds, res.asOfRound);
   renderStandingsTable(res.table);
   renderRoundResults(res.rounds);
   const content = $('standings-content');
@@ -807,29 +807,26 @@ function renderMySeasonStats(res) {
   const milestoneBar = $('milestone-bar');
   const milestoneText = $('milestone-text');
   if (milestoneContainer && milestoneBar && milestoneText) {
-    if (milestone.votes !== undefined && milestone.target) {
-      const pct = Math.min(100, Math.round((milestone.votes / milestone.target) * 100));
-      milestoneBar.style.width = pct + '%';
-      milestoneText.textContent = milestone.votes + ' of ' + milestone.target + ' votes' + (milestone.complete ? ' — Prize earned!' : '');
-      milestoneContainer.style.display = 'block';
-    } else {
-      milestoneContainer.style.display = 'none';
-    }
+    const votes = milestone.votes || 0;
+    const target = milestone.target || 4;
+    const pct = Math.min(100, Math.round((votes / target) * 100));
+    milestoneBar.style.width = pct + '%';
+    milestoneText.textContent = votes + ' of ' + target + ' votes' + (milestone.complete ? ' — Prize earned!' : '');
+    milestoneContainer.style.display = 'block';
   }
 
   if (gamSection && gamContainer) {
-    if (compliance.weeksAttended > 0 || raffle > 0) {
-      let html = '';
-      if (compliance.weeksAttended > 0) {
-        html += `<div><span style="color:#94a3b8;">Compliance:</span> <strong>${escapeHtml(compliance.weeksVoted)} of ${escapeHtml(compliance.weeksAttended)} weeks (${escapeHtml(compliance.compliancePct)}%)</strong></div>`;
-      }
-      // FIX: Corrected mismatched tag from </span> to </strong>
-      if (streaks.currentStreak > 0 || streaks.bestStreak > 0) {
-        html += `<div><span style="color:#94a3b8;">Streak:</span> <strong>${escapeHtml(streaks.currentStreak)} current</strong> &bull; <strong>${escapeHtml(streaks.bestStreak)} best</strong></div>`;
-      }
-      if (raffle > 0) {
-        html += `<div><span style="color:#94a3b8;">Raffle tickets:</span> <strong style="color:#fbbf24;">${escapeHtml(raffle)}</strong></div>`;
-      }
+    let html = '';
+    if (raffle > 0) {
+      html += `<div><span style="color:#94a3b8;">Raffle tickets:</span> <strong style="color:#fbbf24;">${escapeHtml(raffle)}</strong> <span style="font-size:0.8rem; color:#64748b;">— every vote is a ticket for the season-end raffle</span></div>`;
+    }
+    if (compliance.weeksAttended > 0) {
+      html += `<div style="margin-top:6px;"><span style="color:#94a3b8;">Compliance:</span> <strong>${escapeHtml(compliance.weeksVoted)} of ${escapeHtml(compliance.weeksAttended)} weeks (${escapeHtml(compliance.compliancePct)}%)</strong></div>`;
+    }
+    if (streaks.currentStreak > 0 || streaks.bestStreak > 0) {
+      html += `<div><span style="color:#94a3b8;">Streak:</span> <strong>${escapeHtml(streaks.currentStreak)} current</strong> &bull; <strong>${escapeHtml(streaks.bestStreak)} best</strong></div>`;
+    }
+    if (html) {
       gamContainer.innerHTML = html;
       gamSection.style.display = 'block';
     } else {
