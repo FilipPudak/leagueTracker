@@ -16,7 +16,13 @@ export async function backfillFromMelee(env, deps = {}) {
 
   const finder = createPlayerFinder(DB);
 
-  const allTournaments = await fetchLeagueTournaments(client, { targetSeason: targetSeasonId });
+  let allTournaments;
+  try {
+    allTournaments = await fetchLeagueTournaments(client, { targetSeason: targetSeasonId });
+  } catch (err) {
+    console.error(`[Backfill] Tournament list fetch failed; aborting: ${err.message}`);
+    return { seasonId: targetSeasonId, fetchFailed: true, tournaments: 0, standings: 0, matches: 0, error: err.message };
+  }
 
   const seasonGroups = new Map();
   for (const t of allTournaments) {

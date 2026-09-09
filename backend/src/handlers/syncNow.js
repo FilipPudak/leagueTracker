@@ -11,7 +11,8 @@ export async function handleSyncNow(body, env) {
     throw err;
   }
 
-  await syncFromMelee({ DB });
+  const runSync = env.syncFromMelee || syncFromMelee;
+  const result = await runSync({ DB });
 
-  return { synced: true };
+  return { synced: true, result: result || { status: 'ok' } };
 }

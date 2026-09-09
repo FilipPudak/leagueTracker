@@ -43,13 +43,9 @@ export async function fetchLeagueTournaments(client, { targetSeason } = {}) {
   const all = [];
 
   while (hasMore) {
-    let response;
-    try {
-      response = await client.listTournaments(null, page, pageSize);
-    } catch (err) {
-      console.error(`[meleeLeague] Failed to list tournaments: ${err.message}`);
-      break;
-    }
+    // Callers rely on a hard failure here: partial or empty results must never
+    // look like "the league simply has no tournaments".
+    const response = await client.listTournaments(null, page, pageSize);
 
     const content = response.Content || [];
     for (const t of content) {

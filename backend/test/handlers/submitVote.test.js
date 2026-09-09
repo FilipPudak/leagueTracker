@@ -299,4 +299,118 @@ describe('handleSubmitVote', () => {
     assert.ok(result);
     assert.equal(typeof result.raffleTickets, 'number');
   });
+
+  describe('server-side validation', () => {
+    function tablesForWeek3(extra = {}) {
+      const t = submitVoteTables();
+      if (extra.attendance) t.attendance = [...t.attendance, ...extra.attendance];
+      if (extra.match_results) t.match_results = extra.match_results;
+      return t;
+    }
+
+    it('season paused → 403 even with voting open', async () => {
+      const t = submitVoteTables();
+      t.settings = [...t.settings, { key: 'SEASON_PAUSED', value: 'TRUE' }];
+      const db = createMockDb(t);
+      await assert.rejects(
+        () => handleSubmitVote({ voteData: { leader1Id: '1', opponentId: 'P002' } }, { DB: db }, aliceSession),
+        (err) => { assert.equal(err.status, 403); assert.match(err.message, /paused/i); return true; }
+      );
+    });
+
+    it('nonexistent leader → 400', async () => {
+      await assert.rejects(
+        () => handleSubmitVote({ voteData: { leader1Id: '999', opponentId: 'P002' } }, env, aliceSession),
+        (err) => { assert.equal(err.status, 400); assert.match(err.message, /Leader/); return true; }
+      );
+    });
+
+    it('inactive leader → 400', async () => {
+      await assert.rejects(
+        () => handleSubmitVote({ voteData: { leader1Id: '4', opponentId: 'P002' } }, env, aliceSession),
+        (err) => { assert.equal(err.status, 400); assert.match(err.message, /Leader/); return true; }
+      );
+    });
+
+    it('nonexistent opponent → 400', async () => {
+      await assert.rejects(
+        () => handleSubmitVote({ voteData: { leader1Id: '1', opponentId: 'P999' } }, env, aliceSession),
+        (err) => { assert.equal(err.status, 400); assert.match(err.message, /opponent/); return true; }
+      );
+    });
+
+    it('inactive opponent → 400', async () => {
+      await assert.rejects(
+        () => handleSubmitVote({ voteData: { leader1Id: '1', opponentId: 'P005' } }, env, aliceSession),
+        (err) => { assert.equal(err.status, 400); assert.match(err.message, /opponent/); return true; }
+      );
+    });
+
+    it('voter did not attend but week has attendance data → 400', async () => {
+      const db = createMockDb(tablesForWeek3({
+        attendance: [{ season_id: 6, week: 3, player_id: 'P002' }],
+      }));
+      await assert.rejects(
+        () => handleSubmitVote({ voteData: { leader1Id: '1', opponentId: 'P002' } }, { DB: db }, aliceSession),
+        (err) => { assert.equal(err.status, 400); assert.match(err.message, /attended/); return true; }
+      );
+    });
+
+    it('voter attended, opponent faced is unrestricted without match data', async () => {
+      const db = createMockDb(tablesForWeek3({
+        attendance: [
+          { season_id: 6, week: 3, player_id: 'P001' },
+          { season_id: 6, week: 3, player_id: 'P003' },
+        ],
+      }));
+      const result = await handleSubmitVote({ voteData: { leader1Id: '1', opponentId: 'P003' } }, { DB: db }, aliceSession);
+      assert.equal(typeof result.raffleTickets, 'number');
+    });
+
+    it('opponent not faced this week → 400', async () => {
+      const db = createMockDb(tablesForWeek3({
+        attendance: [
+          { season_id: 6, week: 3, player_id: 'P001' },
+          { season_id: 6, week: 3, player_id: 'P002' },
+          { season_id: 6, week: 3, player_id: 'P003' },
+        ],
+        match_results: [
+          { season_id: 6, round: 3, melee_match_id: 'm1', player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: '2-1', is_bye: 0 },
+        ],
+      }));
+      await assert.rejects(
+        () => handleSubmitVote({ voteData: { leader1Id: '1', opponentId: 'P003' } }, { DB: db }, aliceSession),
+        (err) => { assert.equal(err.status, 400); assert.match(err.message, /faced/); return true; }
+      );
+    });
+
+    it('opponent faced this week → accepted', async () => {
+      const db = createMockDb(tablesForWeek3({
+        attendance: [
+          { season_id: 6, week: 3, player_id: 'P001' },
+          { season_id: 6, week: 3, player_id: 'P002' },
+        ],
+        match_results: [
+          { season_id: 6, round: 3, melee_match_id: 'm1', player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: '2-1', is_bye: 0 },
+          { season_id: 6, round: 3, melee_match_id: 'm2', player1_id: 'P003', player2_id: 'P002', winner_id: 'P003', result: '2-0', is_bye: 0 },
+        ],
+      }));
+      const result = await handleSubmitVote({ voteData: { leader1Id: '1', opponentId: 'P002' } }, { DB: db }, aliceSession);
+      assert.equal(typeof result.raffleTickets, 'number');
+    });
+
+    it('bye rows do not create faced restrictions', async () => {
+      const db = createMockDb(tablesForWeek3({
+        attendance: [
+          { season_id: 6, week: 3, player_id: 'P001' },
+          { season_id: 6, week: 3, player_id: 'P003' },
+        ],
+        match_results: [
+          { season_id: 6, round: 3, melee_match_id: 'm1', player1_id: 'P001', player2_id: 'P003', winner_id: null, result: null, is_bye: 1 },
+        ],
+      }));
+      const result = await handleSubmitVote({ voteData: { leader1Id: '1', opponentId: 'P003' } }, { DB: db }, aliceSession);
+      assert.equal(typeof result.raffleTickets, 'number');
+    });
+  });
 });

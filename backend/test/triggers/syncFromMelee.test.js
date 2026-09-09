@@ -304,18 +304,27 @@ describe('triggers/syncFromMelee', () => {
     assert.equal(players.find(p => p.id === 'P005').active, 0, 'Eve stays inactive (did not attend)');
   });
 
-  it('listTournaments failure → loop breaks, no crash', async () => {
-    db = createMockDb(withSeasonStarted(makeTables()));
+  it('listTournaments failure → aborts before advance, no crash, no writes', async () => {
+    const tables = withSeasonStarted(makeTables());
+    tables.settings = tables.settings.map(s =>
+      s.key === 'CURRENT_WEEK' ? { ...s, value: 'Week 2' } : s
+    );
+    db = createMockDb(tables);
     const failingClient = class {
       async listTournaments() { throw new Error('API down'); }
       async getStandings() { return { Content: [] }; }
       async getMatches() { return { Content: [] }; }
     };
 
-    await syncFromMelee({ DB: db }, { MeleeClient: failingClient });
+    const lateTime = '2026-07-01T20:15:00Z';
+    const result = await syncFromMelee({ DB: db }, { MeleeClient: failingClient, now: lateTime });
 
+    assert.equal(result.status, 'fetch-failed');
     const store = db.getStore();
     assert.equal(store.melee_tournaments.length, 0, 'No tournaments stored');
+    const settings = await getSettings(db);
+    assert.equal(settings.CURRENT_WEEK, 'Week 2', 'Week NOT advanced on list-fetch failure');
+    assert.ok(!settings.LAST_ADVANCED, 'LAST_ADVANCED not stamped → backup cron can retry');
   });
 
   it('getStandings failure → skips tournament, continues', async () => {

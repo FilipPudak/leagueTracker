@@ -19,6 +19,7 @@ import {
   parseSeasonId,
   parseWeek,
   isSeasonStarted,
+  isSeasonPaused,
   findPlayerByMelee,
   hasPlayerVotedThisWeek,
 } from '../../src/db/queries.js';
@@ -196,6 +197,17 @@ describe('db/queries', () => {
     it('rejects null', () => assert.equal(isSeasonStarted(null), false));
     it('rejects undefined', () => assert.equal(isSeasonStarted(undefined), false));
     it('rejects missing key (undefined from getSetting)', () => assert.equal(isSeasonStarted(undefined), false));
+  });
+
+  describe('isSeasonPaused', () => {
+    it('accepts TRUE', () => assert.equal(isSeasonPaused('TRUE'), true));
+    it('accepts YES', () => assert.equal(isSeasonPaused('YES'), true));
+    it('accepts 1', () => assert.equal(isSeasonPaused('1'), true));
+    it('accepts case-insensitive true', () => assert.equal(isSeasonPaused('true'), true));
+    it('rejects FALSE', () => assert.equal(isSeasonPaused('FALSE'), false));
+    it('rejects empty string', () => assert.equal(isSeasonPaused(''), false));
+    it('rejects null', () => assert.equal(isSeasonPaused(null), false));
+    it('rejects undefined', () => assert.equal(isSeasonPaused(undefined), false));
   });
 
   describe('findPlayerByMelee', () => {

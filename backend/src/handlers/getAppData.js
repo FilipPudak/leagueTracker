@@ -1,5 +1,6 @@
-import { getSettings, getPlayerById, getAllActivePlayers, getAllActiveLeaders, getAllSeasons, parseSeasonId, parseWeek, isVotingOpen, hasPlayerVotedThisWeek } from '../db/queries.js';
+import { getSettings, getPlayerById, getAllActiveLeaders, getAllSeasons, parseSeasonId, parseWeek, isVotingOpen, isSeasonPaused, hasPlayerVotedThisWeek } from '../db/queries.js';
 import { getWeeklyParticipation } from '../lib/participation.js';
+import { getFacedOpponents } from '../lib/voteValidation.js';
 
 const APP_VERSION = '4.0.3';
 
@@ -11,7 +12,7 @@ export async function handleGetAppData(body, env, session) {
   const rawSeasonId = settings.ACTIVE_SEASON_ID || '';
   const activeSeasonId = rawSeasonId ? parseSeasonId(rawSeasonId) : null;
   const currentWeek = parseWeek(settings.CURRENT_WEEK);
-  const votingOpen = isVotingOpen(settings.VOTING_OPEN);
+  const votingOpen = isVotingOpen(settings.VOTING_OPEN) && !isSeasonPaused(settings.SEASON_PAUSED);
 
   const seasons = await getAllSeasons(DB);
   const allPlayersResult = await DB.prepare('SELECT * FROM players').all();
@@ -21,22 +22,9 @@ export async function handleGetAppData(body, env, session) {
   let players = allPlayers;
 
   if (votingOpen && session && activeSeasonId && currentWeek) {
-    const matchRow = await DB.prepare(
-      'SELECT 1 FROM match_results WHERE season_id = ? AND round = ? AND (player1_id = ? OR player2_id = ?) AND is_bye = 0 LIMIT 1'
-    ).bind(activeSeasonId, currentWeek, session.player_id, session.player_id).first();
-
-    if (matchRow) {
-      const matches = await DB.prepare(
-        'SELECT player1_id, player2_id FROM match_results WHERE season_id = ? AND round = ? AND (player1_id = ? OR player2_id = ?) AND is_bye = 0'
-      ).bind(activeSeasonId, currentWeek, session.player_id, session.player_id).all();
-
-      const opponentIds = new Set();
-      for (const m of (matches.results || [])) {
-        if (m.player1_id === session.player_id && m.player2_id) opponentIds.add(m.player2_id);
-        if (m.player2_id === session.player_id && m.player1_id) opponentIds.add(m.player1_id);
-      }
-
-      const filtered = allPlayers.filter(p => opponentIds.has(p.id));
+    const faced = await getFacedOpponents(DB, activeSeasonId, currentWeek, session.player_id);
+    if (faced && faced.size > 0) {
+      const filtered = allPlayers.filter(p => faced.has(String(p.id)));
       if (filtered.length > 0) {
         players = filtered;
       }

@@ -1,5 +1,5 @@
 import { MeleeClient } from '../lib/melee.js';
-import { getSettings, updateSetting, parseSeasonId, parseWeek, isSeasonStarted, isVotingOpen, findPlayerByMelee, getAllActivePlayers } from '../db/queries.js';
+import { getSettings, updateSetting, parseSeasonId, parseWeek, isSeasonStarted, isSeasonPaused, isVotingOpen, findPlayerByMelee, getAllActivePlayers } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, computeChampion, computeBountyHunter, writePodiumBlock } from '../lib/awards.js';
 import { fetchLeagueTournaments, buildWeekMap } from '../lib/meleeLeague.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';
@@ -31,18 +31,18 @@ export async function syncFromMelee(env, deps = {}) {
 
   if (!seasonStarted) {
     console.log('[SyncFromMelee] Season not started; skipping.');
-    return;
+    return { status: 'skipped', reason: 'season-not-started' };
   }
 
   const activeSeasonId = parseSeasonId(settings.ACTIVE_SEASON_ID);
   const currentWeek = parseWeek(settings.CURRENT_WEEK);
   const votingOpen = isVotingOpen(settings.VOTING_OPEN);
-  const isPaused = settings.SEASON_PAUSED === 'TRUE';
+  const isPaused = isSeasonPaused(settings.SEASON_PAUSED);
   const lastAdvanced = settings.LAST_ADVANCED || '';
 
   if (!activeSeasonId) {
     console.log('[SyncFromMelee] No active season; skipping.');
-    return;
+    return { status: 'skipped', reason: 'no-active-season' };
   }
 
   const clientId = env.MELEE_CLIENT_ID || '';
@@ -57,7 +57,13 @@ export async function syncFromMelee(env, deps = {}) {
   ).bind(activeSeasonId).all();
   const existingRoundMap = new Map((storedTournaments.results || []).map(t => [t.melee_id, t.round]));
 
-  const matchedTournaments = await fetchLeagueTournaments(client, { targetSeason: activeSeasonId });
+  let matchedTournaments;
+  try {
+    matchedTournaments = await fetchLeagueTournaments(client, { targetSeason: activeSeasonId });
+  } catch (err) {
+    console.error(`[SyncFromMelee] Tournament list fetch failed; aborting before any changes: ${err.message}`);
+    return { status: 'fetch-failed', error: err.message };
+  }
 
   const season = await DB.prepare('SELECT length, top_results FROM seasons WHERE id = ?').bind(activeSeasonId).first();
   const seasonLength = season?.length || 11;
@@ -212,7 +218,7 @@ export async function syncFromMelee(env, deps = {}) {
   if (isPaused) {
     console.log('[SyncFromMelee] Season paused; data synced, skipping advance/open/close.');
     console.log('[SyncFromMelee] Sync complete.');
-    return;
+    return { status: 'paused', syncedTournaments: weekMap.size };
   }
 
   const schemer = await computeSchemer(DB, activeSeasonId);
@@ -309,6 +315,7 @@ export async function syncFromMelee(env, deps = {}) {
     await updateSetting(DB, 'VOTING_OPEN', 'TRUE');
     await updateSetting(DB, 'LAST_ADVANCED', today);
     console.log('[SyncFromMelee] First run — voting opened.');
+    return { status: 'voting-opened' };
   } else if (canAdvance) {
     const nextWeek = (currentWeek || 0) + 1;
     if (nextWeek > seasonLength) {
@@ -320,16 +327,17 @@ export async function syncFromMelee(env, deps = {}) {
       await updateSetting(DB, 'VOTING_OPEN', 'FALSE');
       await updateSetting(DB, 'SEASON_STARTED', 'FALSE');
       console.log('[SyncFromMelee] Season ended.');
+      return { status: 'season-ended' };
     } else {
       await updateSetting(DB, 'CURRENT_WEEK', `Week ${nextWeek}`);
       await updateSetting(DB, 'LAST_ADVANCED', today);
       console.log(`[SyncFromMelee] Advanced to Week ${nextWeek}.`);
+      return { status: 'advanced', week: nextWeek };
     }
   } else {
     console.log('[SyncFromMelee] Gate not met; data synced, no advance.');
+    return { status: 'synced-no-advance' };
   }
-
-  console.log('[SyncFromMelee] Sync complete.');
 }
 
 function findPlayerIdByMelee(players, meleeUsername) {

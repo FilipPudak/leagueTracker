@@ -19,10 +19,15 @@ export async function updateSetting(db, key, value) {
   ).bind(key, String(value)).run();
 }
 
-export function isVotingOpen(settingValue) {
-  if (!settingValue) return false;
+function isTruthySetting(settingValue) {
+  if (settingValue == null) return false;
   const v = String(settingValue).trim().toUpperCase();
   return v === 'TRUE' || v === 'YES' || v === '1';
+}
+
+export function isVotingOpen(settingValue) {
+  if (!settingValue) return false;
+  return isTruthySetting(settingValue);
 }
 
 export function parseSeasonId(value) {
@@ -39,8 +44,12 @@ export function parseWeek(value) {
 
 export function isSeasonStarted(settingValue) {
   if (settingValue == null) return false;
-  const v = String(settingValue).trim().toUpperCase();
-  return v === 'TRUE' || v === 'YES' || v === '1';
+  return isTruthySetting(settingValue);
+}
+
+export function isSeasonPaused(settingValue) {
+  if (settingValue == null) return false;
+  return isTruthySetting(settingValue);
 }
 
 // Player helpers

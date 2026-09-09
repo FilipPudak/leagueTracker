@@ -33,7 +33,7 @@ function checkRateLimit(ip) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const allowedOrigin = env.ALLOWED_ORIGIN || 'https://filippudak.github.io';
     const corsHeaders = {
       'Access-Control-Allow-Origin': allowedOrigin,
@@ -107,7 +107,8 @@ export default {
         if (token) {
           session = await findSessionByToken(env.DB, token);
           if (session) {
-            touchSessionTimestamp(env.DB, token).catch(() => {});
+            const touch = touchSessionTimestamp(env.DB, token).catch(() => {});
+            if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(touch);
           }
         }
         if (TOKEN_REQUIRED.includes(action) && !session) {
@@ -131,10 +132,11 @@ export default {
   },
 
   // Cron trigger handlers
-  async scheduled(event, env) {
+  async scheduled(event, env, ctx) {
     try {
       const { syncFromMelee } = await import('./triggers/syncFromMelee.js');
-      await syncFromMelee(env);
+      const result = await syncFromMelee(env);
+      console.log('[Cron] sync result:', JSON.stringify(result ?? 'ok'));
     } catch (err) {
       console.error('[Cron] syncFromMelee failed:', err);
     }

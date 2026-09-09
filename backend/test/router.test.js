@@ -364,16 +364,28 @@ describe('router/index.js – fetch handler', () => {
   });
 
   it('backfillFromMelee routes to handler with valid admin token', async () => {
-    const resp = await worker.fetch(
-      post({ action: 'backfillFromMelee', adminToken: 'test-secret-123' }),
-      env(basicTables(), { ADMIN_SECRET: 'test-secret-123' })
-    );
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: async () => JSON.stringify({ Content: [], TotalCount: 0 }),
+    });
+    try {
+      const resp = await worker.fetch(
+        post({ action: 'backfillFromMelee', adminToken: 'test-secret-123' }),
+        env(basicTables(), { ADMIN_SECRET: 'test-secret-123' })
+      );
 
-    assert.equal(resp.status, 200);
-    const json = await resp.json();
-    assert.equal(json.success, true);
-    assert.ok(json.data);
-    assert.equal(typeof json.data.tournaments, 'number');
+      assert.equal(resp.status, 200);
+      const json = await resp.json();
+      assert.equal(json.success, true);
+      assert.ok(json.data);
+      assert.equal(json.data.tournaments, 0);
+      assert.ok(!json.data.fetchFailed, 'empty (but valid) tournament list is not a fetch failure');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   it('backfillFromMelee missing adminToken → 403', async () => {
@@ -401,6 +413,42 @@ describe('router/index.js – fetch handler', () => {
 
   it('scheduled handler exists and is a function', () => {
     assert.equal(typeof worker.scheduled, 'function');
+  });
+
+  it('scheduled() runs weekly sync and surfaces fetch-failed via cron without throwing', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: false, status: 400, headers: { get: () => null }, text: async () => 'boom' });
+    const tables = basicTables();
+    tables.settings.push({ key: 'SEASON_STARTED', value: 'TRUE' });
+    const testEnv = env(tables, { MELEE_CLIENT_ID: 'x', MELEE_CLIENT_SECRET: 'y' });
+    try {
+      await worker.scheduled({ cron: '15 20 * * 3' }, testEnv, { waitUntil() {} });
+    } catch (err) {
+      assert.fail(`scheduled() must swallow errors (cron reliability): ${err.message}`);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+    const settings = testEnv.DB.getStore().settings;
+    const week = settings.find(s => s.key === 'CURRENT_WEEK');
+    assert.equal(week.value, 'Week 3', 'week untouched on fetch failure via cron');
+  });
+
+  it('session timestamp touch is registered via ctx.waitUntil', async () => {
+    installCryptoMock();
+    const testEnv = env();
+    const waited = [];
+    const ctx = { waitUntil: (p) => waited.push(p) };
+    const resp = await worker.fetch(
+      post({ action: 'getAppData', token: 'test-token-alice' }),
+      testEnv,
+      ctx
+    );
+    assert.equal(resp.status, 200);
+    assert.equal(waited.length, 1, 'one waitUntil registered for session touch');
+    await Promise.all(waited);
+    const store = testEnv.DB.getStore();
+    const session = store.sessions.find(s => s.token === 'test-token-alice');
+    assert.ok(Date.now() - new Date(session.last_active).getTime() < 5000, 'last_active refreshed');
   });
 
   it('rate limit: requests within limit succeed', async () => {

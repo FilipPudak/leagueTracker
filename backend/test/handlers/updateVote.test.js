@@ -26,20 +26,20 @@ describe('handleUpdateVote', () => {
         { key: 'VOTING_OPEN', value: 'TRUE' },
       ],
       votes: [
-        { id: 1, timestamp: '2026-01-01T00:00:00Z', season_id: 6, week: 2, player_id: 'P001', leader_id: 'L001', opponent_id: 'P002' },
+        { id: 1, timestamp: '2026-01-01T00:00:00Z', season_id: 6, week: 2, player_id: 'P001', leader_id: '1', opponent_id: 'P002' },
       ],
     });
     db = createMockDb(tables);
 
     const result = await handleUpdateVote(
-      { voteData: { leader1Id: 'L002', opponentId: 'P003' } },
+      { voteData: { leader1Id: '2', opponentId: 'P003' } },
       { DB: db },
       makeSession()
     );
 
     const store = db.getStore();
     const vote = store.votes.find(v => v.player_id === 'P001' && v.week === 2);
-    assert.equal(vote.leader_id, 'L002');
+    assert.equal(vote.leader_id, '2');
     assert.equal(vote.opponent_id, 'P003');
     assert.ok(vote.updated_at, 'updated_at is set');
   });
@@ -140,6 +140,68 @@ describe('handleUpdateVote', () => {
 
     await assert.rejects(
       () => handleUpdateVote({ voteData: { leader1Id: 'L001', opponentId: 'P001' } }, { DB: db }, makeSession()),
+      (err) => { assert.equal(err.status, 400); return true; }
+    );
+  });
+
+  it('returns 403 when season is paused even with voting open', async () => {
+    const tables = makeTables({
+      settings: [
+        { key: 'ACTIVE_SEASON_ID', value: '6' },
+        { key: 'CURRENT_WEEK', value: 'Week 2' },
+        { key: 'VOTING_OPEN', value: 'TRUE' },
+        { key: 'SEASON_PAUSED', value: 'TRUE' },
+      ],
+      votes: [
+        { id: 1, timestamp: '2026-01-01T00:00:00Z', season_id: 6, week: 2, player_id: 'P001', leader_id: '1', opponent_id: 'P002' },
+      ],
+    });
+    db = createMockDb(tables);
+
+    await assert.rejects(
+      () => handleUpdateVote({ voteData: { leader1Id: '2', opponentId: 'P003' } }, { DB: db }, makeSession()),
+      (err) => { assert.equal(err.status, 403); return true; }
+    );
+  });
+
+  it('rejects update to inactive leader → 400', async () => {
+    const tables = makeTables({
+      settings: [
+        { key: 'ACTIVE_SEASON_ID', value: '6' },
+        { key: 'CURRENT_WEEK', value: 'Week 2' },
+        { key: 'VOTING_OPEN', value: 'TRUE' },
+      ],
+      votes: [
+        { id: 1, timestamp: '2026-01-01T00:00:00Z', season_id: 6, week: 2, player_id: 'P001', leader_id: '1', opponent_id: 'P002' },
+      ],
+    });
+    db = createMockDb(tables);
+
+    await assert.rejects(
+      () => handleUpdateVote({ voteData: { leader1Id: '4', opponentId: 'P002' } }, { DB: db }, makeSession()),
+      (err) => {
+        assert.equal(err.status, 400);
+        assert.match(err.message, /Leader/);
+        return true;
+      }
+    );
+  });
+
+  it('rejects update to inactive opponent → 400', async () => {
+    const tables = makeTables({
+      settings: [
+        { key: 'ACTIVE_SEASON_ID', value: '6' },
+        { key: 'CURRENT_WEEK', value: 'Week 2' },
+        { key: 'VOTING_OPEN', value: 'TRUE' },
+      ],
+      votes: [
+        { id: 1, timestamp: '2026-01-01T00:00:00Z', season_id: 6, week: 2, player_id: 'P001', leader_id: '1', opponent_id: 'P002' },
+      ],
+    });
+    db = createMockDb(tables);
+
+    await assert.rejects(
+      () => handleUpdateVote({ voteData: { leader1Id: '1', opponentId: 'P005' } }, { DB: db }, makeSession()),
       (err) => { assert.equal(err.status, 400); return true; }
     );
   });
