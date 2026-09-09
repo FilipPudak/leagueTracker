@@ -114,11 +114,14 @@
 
     .nav-tabs { display: flex; gap: 8px; margin-bottom: 20px; background-color: #090d16; padding: 4px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05); }
     .tab-btn { 
-      flex: 1; padding: 10px 0; border: none; background: transparent; color: #64748b; 
-      font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 0.8rem; letter-spacing: 1px; 
-      border-radius: 6px; cursor: pointer; transition: all 0.25s ease; 
+      flex: 1; padding: 8px 0; border: none; background: transparent; color: #64748b; 
+      font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 0.65rem; letter-spacing: 0.5px; 
+      border-radius: 6px; cursor: pointer; transition: all 0.25s ease;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
     }
+    .tab-btn svg { transition: color 0.25s ease; }
     .tab-btn.active { background: #38bdf8; color: #050811; box-shadow: 0 0 12px rgba(56, 189, 248, 0.5); }
+    .tab-btn.active svg { stroke: #050811; }
 
     .view-panel { display: none; }
     .view-panel.active { display: block; }
@@ -268,10 +271,22 @@
     </div>
 
     <div class="nav-tabs" style="display:none;">
-      <button type="button" class="tab-btn active" onclick="switchTab('vote-view')">Vote</button>
-      <button type="button" class="tab-btn" onclick="switchTab('standings-view')">Table</button>
-      <button type="button" class="tab-btn" onclick="switchTab('leaderboard-view')">Awards</button>
-      <button type="button" class="tab-btn" onclick="switchTab('myseason-view')">Stats</button>
+      <button type="button" class="tab-btn active" onclick="switchTab('vote-view')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        <span>Vote</span>
+      </button>
+      <button type="button" class="tab-btn" onclick="switchTab('standings-view')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        <span>Standings</span>
+      </button>
+      <button type="button" class="tab-btn" onclick="switchTab('leaderboard-view')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+        <span>Awards</span>
+      </button>
+      <button type="button" class="tab-btn" onclick="switchTab('myseason-view')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>Me</span>
+      </button>
     </div>
 
     <div id="status-box" class="status-msg"></div>
