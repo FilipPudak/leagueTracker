@@ -57,14 +57,22 @@ export function buildCareerRecord(standingsRows, matches, playerId) {
   const nightKeys = new Set(standingsRows.map(s => `${s.season_id}-${s.round}`));
   const seasonSeen = new Set(standingsRows.map(s => s.season_id));
 
-  let wins = 0, losses = 0, draws = 0, byes = 0;
-  let gamesWon = 0, gamesLost = 0, parsed = 0, sweeps = 0, deciders = 0;
+  let wins = 0, losses = 0, draws = 0;
+  let gamesWon = 0, gamesLost = 0, parsed = 0, sweeps = 0;
+  let undefeated = 0, totalNightPoints = 0;
+
+  const myStandings = standingsRows.filter(s => s.player_id === playerId);
+  for (const s of myStandings) {
+    const nightPoints = (s.wins || 0) * 3 + (s.draws || 0);
+    totalNightPoints += nightPoints;
+    if ((s.losses || 0) === 0) undefeated++;
+  }
 
   for (const m of matches) {
     const involvesMe = m.player1_id === playerId || m.player2_id === playerId;
     if (!involvesMe) continue;
     seasonSeen.add(m.season_id);
-    if (m.is_bye) { byes++; continue; }
+    if (m.is_bye) continue;
     const winner = m.winner_id;
     if (!winner) draws++;
     else if (winner === playerId) wins++;
@@ -78,19 +86,21 @@ export function buildCareerRecord(standingsRows, matches, playerId) {
       gamesWon += myGames;
       gamesLost += oppGames;
       if (winner === playerId && oppGames === 0 && myGames >= 2) sweeps++;
-      if (myGames + oppGames >= 3) deciders++;
     }
   }
 
   const played = wins + losses + draws;
+  const nightCount = nightKeys.size;
   return {
     sinceSeason: seasonSeen.size ? Math.min(...seasonSeen) : null,
-    nights: nightKeys.size,
-    matches: { played, wins, losses, draws, byes },
+    nights: nightCount,
+    matches: { played, wins, losses, draws },
     winPct: pct(wins, played),
     games: { won: gamesWon, lost: gamesLost, winPct: pct(gamesWon, gamesWon + gamesLost), parsed },
     sweeps: { count: sweeps, pctOfWins: pct(sweeps, wins) },
-    deciders: { count: deciders, pctOfParsed: pct(deciders, parsed) },
+    undefeated,
+    gameDiff: gamesWon - gamesLost,
+    avgPtsPerNight: nightCount > 0 ? Math.round((totalNightPoints / nightCount) * 10) / 10 : 0,
   };
 }
 

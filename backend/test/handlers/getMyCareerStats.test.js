@@ -52,7 +52,7 @@ describe('handleGetMyCareerStats', () => {
     assert.equal(result.hasCareerData, true);
     assert.equal(result.record.nights, 3, 'regular nights only — cut round 3 excluded');
     assert.equal(result.record.sinceSeason, 5);
-    assert.equal(result.record.matches.byes, 1);
+    assert.equal(result.record.matches.byes, undefined);
 
     assert.equal(result.rivalry.headToHead.length, 2);
     assert.equal(result.rivalry.headToHead[0].name, 'Bob', 'most-played opponent first');

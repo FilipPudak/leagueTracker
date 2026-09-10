@@ -58,7 +58,7 @@ export async function handleGetMyCareerStats(body, env, session) {
     currentSeason.asOfRound = roundsWithData.length ? Math.max(...roundsWithData) : null;
   }
 
-  const hasCareerData = record.nights > 0 || record.matches.played > 0 || record.matches.byes > 0;
+  const hasCareerData = record.nights > 0 || record.matches.played > 0;
 
   return { hasCareerData, rivalry, record, progression, peak, activeSeasonId };
 }

@@ -109,13 +109,16 @@ describe('lib/careerStats buildCareerRecord', () => {
     assert.equal(rec.matches.wins, 1);
     assert.equal(rec.matches.losses, 2);
     assert.equal(rec.matches.draws, 1);
-    assert.equal(rec.matches.byes, 1);
+    assert.equal(rec.matches.byes, undefined);
     assert.equal(rec.games.won, 4);
     assert.equal(rec.games.lost, 5);
     assert.equal(rec.games.parsed, 4);
     assert.equal(rec.sweeps.count, 1);
-    assert.equal(rec.deciders.count, 1);
+    assert.equal(rec.deciders, undefined);
     assert.equal(rec.winPct, 25);
+    assert.equal(rec.undefeated, 1);
+    assert.equal(rec.gameDiff, -1);
+    assert.equal(rec.avgPtsPerNight, 7.5);
   });
 
   it('unparsable results still count the match outcome, not games', () => {
@@ -132,6 +135,9 @@ describe('lib/careerStats buildCareerRecord', () => {
     assert.equal(rec.nights, 0);
     assert.equal(rec.matches.played, 0);
     assert.equal(rec.winPct, null);
+    assert.equal(rec.undefeated, 0);
+    assert.equal(rec.gameDiff, 0);
+    assert.equal(rec.avgPtsPerNight, 0);
   });
 });
 

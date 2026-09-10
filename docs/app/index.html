@@ -244,6 +244,14 @@
     .round-phase-side { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
     .round-body { padding: 0 14px 12px; display: none; }
     .round-body.open { display: block; }
+    details.section-block { margin-bottom: 14px; }
+    details.section-block > summary {
+      font-size: 0.95rem; color: #38bdf8; font-weight: 600; cursor: pointer;
+      padding: 8px 0; list-style: none; user-select: none;
+    }
+    details.section-block > summary::-webkit-details-marker { display: none; }
+    details.section-block > summary::before { content: '▸ '; }
+    details[open].section-block > summary::before { content: '▾ '; }
     .footer-version { opacity: 0.8; }
     .footer-discord {
       display: inline-flex; align-items: center; gap: 6px;
@@ -445,45 +453,48 @@
 
     <!-- MY STATS PANEL -->
     <div id="myseason-view" class="view-panel">
-      <div id="career-section" style="display:none; margin-bottom: 18px;">
-        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Career</h3>
+      <details id="career-details" class="section-block">
+        <summary>Career</summary>
         <div id="career-empty" style="text-align:center; color:#94a3b8; padding:12px; font-size:0.85rem; display:none;">No career history yet — your stats appear after your first synced league night.</div>
         <div id="career-record-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
         <div id="career-rivalry-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
         <div id="career-progression-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
-      </div>
+      </details>
 
-      <div class="form-group">
-        <label for="myseason-season-filter">Select Season</label>
-        <select id="myseason-season-filter" onchange="loadMySeasonStats()"></select>
-      </div>
+      <details id="season-details" class="section-block" open>
+        <summary id="season-summary">Season</summary>
+        <div class="form-group">
+          <label for="myseason-season-filter">Select Season</label>
+          <select id="myseason-season-filter" onchange="loadMySeasonStats()"></select>
+        </div>
 
-      <div id="myseason-content" style="display: none;">
-        <div id="myseason-gamification-section" style="margin-top: 0; display: none;">
-          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Voting Milestone</h3>
-          <div id="myseason-milestone-container" class="card" style="padding: 14px; margin-bottom: 12px;">
-            <div style="background: #1e293b; border-radius: 6px; height: 12px; overflow: hidden; margin-bottom: 10px;">
-              <div id="milestone-bar" style="background: linear-gradient(90deg, #38bdf8, #22d3ee); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 6px;"></div>
+        <div id="myseason-content" style="display: none;">
+          <div id="myseason-gamification-section" style="margin-top: 0; display: none;">
+            <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Voting Milestone</h3>
+            <div id="myseason-milestone-container" class="card" style="padding: 14px; margin-bottom: 12px;">
+              <div style="background: #1e293b; border-radius: 6px; height: 12px; overflow: hidden; margin-bottom: 10px;">
+                <div id="milestone-bar" style="background: linear-gradient(90deg, #38bdf8, #22d3ee); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 6px;"></div>
+              </div>
+              <div id="milestone-text" style="font-size: 0.9rem; color: #f8fafc; font-weight: 600;"></div>
+              <div id="milestone-reward" style="font-size: 0.8rem; color: #94a3b8; margin-top: 6px;">4 votes earns you a prize — ask the organizer</div>
             </div>
-            <div id="milestone-text" style="font-size: 0.9rem; color: #f8fafc; font-weight: 600;"></div>
-            <div id="milestone-reward" style="font-size: 0.8rem; color: #94a3b8; margin-top: 6px;">4 votes earns you a prize — ask the organizer</div>
+
+            <div style="margin-top: 12px;">
+              <div id="myseason-gamification-container" class="card" style="padding: 12px; line-height: 1.7;"></div>
+            </div>
           </div>
 
-          <div style="margin-top: 12px;">
-            <div id="myseason-gamification-container" class="card" style="padding: 12px; line-height: 1.7;"></div>
+          <div id="myseason-awards-section" style="margin-top: 16px; display: none;">
+            <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Awards Won</h3>
+            <div id="myseason-awards-container"></div>
+          </div>
+
+          <div style="margin-top: 16px;">
+            <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Leaders Played</h3>
+            <div id="myseason-leaders-container"></div>
           </div>
         </div>
-
-        <div id="myseason-awards-section" style="margin-top: 16px; display: none;">
-          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Awards Won</h3>
-          <div id="myseason-awards-container"></div>
-        </div>
-
-        <div style="margin-top: 16px;">
-          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Leaders Played</h3>
-          <div id="myseason-leaders-container"></div>
-        </div>
-      </div>
+      </details>
     </div>
 
     <footer class="site-footer">

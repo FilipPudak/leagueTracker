@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.1.1';
+const APP_VERSION = '4.1.2';
 
 let appState = {
   status: 'unlinked',
@@ -220,6 +220,9 @@ function applyBoot(boot) {
       sel.appendChild(opt);
     });
   });
+
+  appState.activeSeasonId = boot.seasonId || appState.settings.activeSeasonId;
+  updateSeasonSummaryText();
 
   const wpCard = $('weekly-participation-card');
   const wpText = $('weekly-participation-text');
@@ -645,7 +648,7 @@ function updateRoundFilter(rounds, asOfRound) {
   (rounds || []).forEach(r => {
     const opt = document.createElement('option');
     opt.value = r.round;
-    opt.textContent = 'R' + r.round;
+    opt.textContent = 'Round ' + r.round;
     if (String(r.round) === String(asOfRound)) opt.selected = true;
     sel.appendChild(opt);
   });
@@ -716,7 +719,7 @@ function renderRoundResults(rounds) {
     const isSide = round.phase === 'side';
     const phaseLabel = isCut ? 'Top Cut' : (isSide ? 'Side Event' : 'Regular');
     const dateStr = formatNightDate(round.date);
-    const title = (isCut ? 'CUT' : isSide ? 'SIDE' : 'R' + round.round) + (dateStr ? ' — ' + dateStr : '');
+    const title = (isCut ? 'Top Cut' : isSide ? 'Side Event' : 'Round ' + round.round) + (dateStr ? ' — ' + dateStr : '');
     const playerRows = (round.players || [])
       .sort((a, b) => (a.rank || 999) - (b.rank || 999))
       .map(p => {
@@ -950,7 +953,7 @@ function loadCareerStats() {
 }
 
 function renderCareerStats(res) {
-  const section = $('career-section');
+  const section = $('career-details');
   const empty = $('career-empty');
   const recordCard = $('career-record-card');
   const rivalryCard = $('career-rivalry-card');
@@ -980,10 +983,10 @@ function renderCareerStats(res) {
       <div><span style="color:#94a3b8;">W-D-L</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.wins)}-${escapeHtml(rec.draws)}-${escapeHtml(rec.losses)}</strong></div>
       <div><span style="color:#94a3b8;">Win %</span><br><strong style="color:#f8fafc;">${pct(r.winPct)}</strong></div>
       <div><span style="color:#94a3b8;">Game win %</span><br><strong style="color:#f8fafc;">${pct(r.games.winPct)}</strong></div>
-      <div><span style="color:#94a3b8;">Sweeps</span><br><strong style="color:#f8fafc;">${escapeHtml(r.sweeps.count)}${r.sweeps.pctOfWins != null ? ' (' + r.sweeps.pctOfWins + '%)' : ''}</strong></div>
-      <div><span style="color:#94a3b8;">Deciders</span><br><strong style="color:#f8fafc;">${escapeHtml(r.deciders.count)}</strong></div>
-      <div><span style="color:#94a3b8;">Draws</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.draws)}</strong></div>
-      <div><span style="color:#94a3b8;">Byes</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.byes)}</strong></div>
+      <div><span style="color:#94a3b8;">Sweeps (2-0s)</span><br><strong style="color:#f8fafc;">${escapeHtml(r.sweeps.count)}${r.sweeps.pctOfWins != null ? ' (' + r.sweeps.pctOfWins + '%)' : ''}</strong></div>
+      <div><span style="color:#94a3b8;">Undefeated</span><br><strong style="color:#f8fafc;">${escapeHtml(r.undefeated)}${r.nights > 0 ? ' (' + Math.round(r.undefeated / r.nights * 100) + '%)' : ''}</strong></div>
+      <div><span style="color:#94a3b8;">Game diff</span><br><strong style="color:#f8fafc;">${r.gameDiff > 0 ? '+' : ''}${escapeHtml(r.gameDiff)}</strong></div>
+      <div><span style="color:#94a3b8;">Avg pts/night</span><br><strong style="color:#f8fafc;">${escapeHtml(r.avgPtsPerNight)}</strong></div>
     </div>`;
   recordCard.innerHTML = recordHtml;
   recordCard.style.display = 'block';
@@ -1025,14 +1028,14 @@ function renderCareerStats(res) {
   }
   if (prog.length > 0) {
     progHtml += prog.map(p => {
+      if (p.rank == null && !p.isCurrent) return null;
       const rank = p.rank != null ? '#' + p.rank : '—';
       const pts = p.points != null ? p.points + ' pts' : '';
       const currentMark = p.isCurrent ? ' ★' : '';
-      const asOf = p.asOfRound != null ? ` (as of R${p.asOfRound})` : '';
-      const nights = p.nightsPlayed != null ? `${p.nightsPlayed}N` : '';
-      const detail = [nights, pts].filter(Boolean).join(', ');
+      const asOf = p.asOfRound != null ? ' (as of Round ' + p.asOfRound + ')' : '';
+      const detail = [pts].filter(Boolean).join(', ');
       return `<span style="color:${p.isCurrent ? '#38bdf8' : '#94a3b8'}; font-size:0.85rem;">S${escapeHtml(p.seasonId)} ${escapeHtml(rank)}${detail ? ' · ' + escapeHtml(detail) : ''}${asOf}${currentMark}</span>`;
-    }).join('<span style="color:#475569; margin:0 6px;">→</span>');
+    }).filter(Boolean).join('<span style="color:#475569; margin:0 6px;">→</span>');
   }
   progressionCard.innerHTML = progHtml;
   progressionCard.style.display = 'block';
@@ -1136,4 +1139,33 @@ async function fetchInitialAppData() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => { applyVersion(); fetchInitialAppData(); });
+document.addEventListener('DOMContentLoaded', () => {
+  applyVersion();
+  fetchInitialAppData();
+  initCollapsibles();
+});
+
+function initCollapsibles() {
+  const careerDetails = $('career-details');
+  const seasonDetails = $('season-details');
+  if (careerDetails) {
+    careerDetails.open = localStorage.getItem('career-details-open') !== 'false';
+    careerDetails.addEventListener('toggle', () => {
+      localStorage.setItem('career-details-open', careerDetails.open);
+    });
+  }
+  if (seasonDetails) {
+    seasonDetails.open = localStorage.getItem('season-details-open') !== 'false';
+    seasonDetails.addEventListener('toggle', () => {
+      localStorage.setItem('season-details-open', seasonDetails.open);
+      updateSeasonSummaryText();
+    });
+  }
+}
+
+function updateSeasonSummaryText() {
+  const summary = $('season-summary');
+  if (!summary) return;
+  const seasonId = appState.activeSeasonId;
+  summary.textContent = seasonId ? 'Season ' + seasonId : 'Season';
+}
