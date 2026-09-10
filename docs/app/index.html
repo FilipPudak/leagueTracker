@@ -444,6 +444,14 @@
 
     <!-- MY STATS PANEL -->
     <div id="myseason-view" class="view-panel">
+      <div id="career-section" style="display:none; margin-bottom: 18px;">
+        <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Career</h3>
+        <div id="career-empty" style="text-align:center; color:#94a3b8; padding:12px; font-size:0.85rem; display:none;">No career history yet — your stats appear after your first synced league night.</div>
+        <div id="career-record-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
+        <div id="career-rivalry-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
+        <div id="career-progression-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
+      </div>
+
       <div class="form-group">
         <label for="myseason-season-filter">Select Season</label>
         <select id="myseason-season-filter" onchange="loadMySeasonStats()"></select>

@@ -33,6 +33,8 @@ let appState = {
   leaderboardInFlightSeason: null,
   mystatsInFlight: false,
   mystatsInFlightSeason: null,
+  careerCache: {},
+  careerInFlight: false,
   standingsInFlight: false,
   standingsInFlightSeason: null,
   lastView: 'vote-view'
@@ -430,6 +432,8 @@ function confirmUnlink() {
       clearSession();
       appState.linkedPlayer = null;
       appState.status = 'unlinked';
+      appState.careerCache = {};
+      appState.careerInFlight = false;
       return fetchInitialAppData();
     })
     .catch((err) => {
@@ -482,6 +486,7 @@ function switchTab(tabId) {
       setActiveView('myseason-view', 3);
       appState.lastView = 'myseason-view';
       loadMySeasonStats();
+      loadCareerStats();
     } else {
       setActiveView('link-view', 3);
     }
@@ -924,6 +929,113 @@ function renderMySeasonStats(res) {
 
   const content = $('myseason-content');
   if (content) content.style.display = 'block';
+}
+
+function loadCareerStats() {
+  if (!appState.linkedPlayer) return;
+  const cacheKey = 'career';
+  if (isFreshCache(appState.careerCache, cacheKey)) {
+    renderCareerStats(appState.careerCache[cacheKey].data);
+    return;
+  }
+  if (appState.careerInFlight) return;
+  appState.careerInFlight = true;
+  callApi('getMyCareerStats', {})
+    .then((res) => {
+      appState.careerInFlight = false;
+      appState.careerCache = { [cacheKey]: { data: res, ts: Date.now() } };
+      renderCareerStats(res);
+    })
+    .catch(() => { appState.careerInFlight = false; });
+}
+
+function renderCareerStats(res) {
+  const section = $('career-section');
+  const empty = $('career-empty');
+  const recordCard = $('career-record-card');
+  const rivalryCard = $('career-rivalry-card');
+  const progressionCard = $('career-progression-card');
+  if (!section) return;
+
+  if (!res || !res.hasCareerData) {
+    section.style.display = 'block';
+    empty.style.display = 'block';
+    recordCard.style.display = 'none';
+    rivalryCard.style.display = 'none';
+    progressionCard.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+  empty.style.display = 'none';
+
+  const r = res.record;
+  const rec = r.matches;
+  const pct = (v) => v == null ? '—' : v + '%';
+  const recordHtml = `
+    <div style="font-weight:700; color:#f8fafc; margin-bottom:8px;">Career record${r.sinceSeason ? ' — since S' + escapeHtml(r.sinceSeason) : ''}</div>
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; font-size:0.85rem;">
+      <div><span style="color:#94a3b8;">Nights</span><br><strong style="color:#f8fafc;">${escapeHtml(r.nights)}</strong></div>
+      <div><span style="color:#94a3b8;">Matches</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.played)}</strong></div>
+      <div><span style="color:#94a3b8;">W-D-L</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.wins)}-${escapeHtml(rec.draws)}-${escapeHtml(rec.losses)}</strong></div>
+      <div><span style="color:#94a3b8;">Win %</span><br><strong style="color:#f8fafc;">${pct(rec.winPct)}</strong></div>
+      <div><span style="color:#94a3b8;">Game win %</span><br><strong style="color:#f8fafc;">${pct(rec.gameWinPct)}</strong></div>
+      <div><span style="color:#94a3b8;">Sweeps</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.sweeps)}${rec.played > 0 ? ' (' + Math.round(rec.sweeps / rec.played * 100) + '%)' : ''}</strong></div>
+      <div><span style="color:#94a3b8;">Deciders</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.deciders)}</strong></div>
+      <div><span style="color:#94a3b8;">Draws</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.draws)}</strong></div>
+      <div><span style="color:#94a3b8;">Byes</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.byes)}</strong></div>
+    </div>`;
+  recordCard.innerHTML = recordHtml;
+  recordCard.style.display = 'block';
+
+  const nem = res.rivalry.nemesis;
+  const vic = res.rivalry.victim;
+  let rivalryHtml = '';
+  if (nem.length === 0 && vic.length === 0 && res.rivalry.headToHead.length === 0) {
+    rivalryHtml = '<div style="color:#94a3b8; font-size:0.85rem;">No rivalries yet — they appear after you face someone at least twice.</div>';
+  } else {
+    if (nem.length > 0) {
+      const names = nem.map(n => escapeHtml(n.name)).join(' & ');
+      rivalryHtml += `<div style="margin-bottom:6px;"><span style="color:#ef4444; font-weight:700;">Nemesis:</span> <span style="color:#f8fafc;">${names}</span> <span style="color:#94a3b8; font-size:0.85rem;">— beat you ${escapeHtml(nem[0].count)}×</span></div>`;
+    }
+    if (vic.length > 0) {
+      const names = vic.map(v => escapeHtml(v.name)).join(' & ');
+      rivalryHtml += `<div style="margin-bottom:6px;"><span style="color:#22c55e; font-weight:700;">Victim:</span> <span style="color:#f8fafc;">${names}</span> <span style="color:#94a3b8; font-size:0.85rem;">— you beat them ${escapeHtml(vic[0].count)}×</span></div>`;
+    }
+    rivalryHtml += '<div id="career-h2h-container" style="margin-top:8px;"></div>';
+  }
+  rivalryCard.innerHTML = rivalryHtml;
+  rivalryCard.style.display = 'block';
+
+  if (res.rivalry.headToHead.length > 0) {
+    renderStatsList('career-h2h-container', res.rivalry.headToHead, {
+      getTitle: (item) => `${item.name} — ${item.wins}W ${item.losses}L${item.draws ? ' ' + item.draws + 'D' : ''}`,
+      getScore: (item) => `${item.played}×`,
+      limit: 3,
+      expandable: true,
+      noun: 'matchup'
+    });
+  }
+
+  const prog = res.progression;
+  const peak = res.peak;
+  let progHtml = '<div style="font-weight:700; color:#f8fafc; margin-bottom:8px;">Season progression</div>';
+  if (peak) {
+    progHtml += `<div style="margin-bottom:8px;"><span style="color:#fbbf24;">Peak:</span> <span style="color:#f8fafc;">#${escapeHtml(peak.rank)} (S${escapeHtml(peak.seasonId)})</span></div>`;
+  }
+  if (prog.length > 0) {
+    progHtml += prog.map(p => {
+      const rank = p.rank != null ? '#' + p.rank : '—';
+      const pts = p.points != null ? p.points + ' pts' : '';
+      const currentMark = p.isCurrent ? ' ★' : '';
+      const asOf = p.asOfRound != null ? ` (as of R${p.asOfRound})` : '';
+      const nights = p.nightsPlayed != null ? `${p.nightsPlayed}N` : '';
+      const detail = [nights, pts].filter(Boolean).join(', ');
+      return `<span style="color:${p.isCurrent ? '#38bdf8' : '#94a3b8'}; font-size:0.85rem;">S${escapeHtml(p.seasonId)} ${escapeHtml(rank)}${detail ? ' · ' + escapeHtml(detail) : ''}${asOf}${currentMark}</span>`;
+    }).join('<span style="color:#475569; margin:0 6px;">→</span>');
+  }
+  progressionCard.innerHTML = progHtml;
+  progressionCard.style.display = 'block';
 }
 
 /* -------------------------------------------------------------- utilities -- */
