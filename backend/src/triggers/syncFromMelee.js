@@ -1,7 +1,7 @@
 import { MeleeClient } from '../lib/melee.js';
 import { getSettings, updateSetting, parseSeasonId, parseWeek, isSeasonStarted, isSeasonPaused, isVotingOpen } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, computeChampion, computeBountyHunter, writePodiumBlock } from '../lib/awards.js';
-import { fetchLeagueTournaments, buildWeekMap } from '../lib/meleeLeague.js';
+import { fetchLeagueTournaments, buildWeekMap, createPlayerFinder } from '../lib/meleeLeague.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';
 
 export function shouldAdvance(isoNow, marker) {
@@ -92,9 +92,9 @@ export async function syncFromMelee(env, deps = {}) {
   ).bind(activeSeasonId).all();
   const syncedMatchesRounds = new Set((matchesInSeason.results || []).map(r => r.round));
 
-  const playerMap = new Map(allPlayers.map(p => [p.melee_name?.toLowerCase(), p]));
+  const createdPlayers = new Map();
+  const finder = createPlayerFinder(DB, { onCreated: p => createdPlayers.set(p.id, p) });
   const roundAttendance = new Map();
-  const unknownUsernames = new Set();
 
   for (const [meleeId, info] of weekMap) {
     if (syncedStandingsRounds.has(info.round) && syncedMatchesRounds.has(info.round)) continue;
@@ -110,15 +110,11 @@ export async function syncFromMelee(env, deps = {}) {
     const attendedThisRound = new Set();
     const standings = standingsResp.Content || [];
     for (const s of standings) {
-      const username = s.Team?.Players?.[0]?.Username;
+      const meleePlayer = s.Team?.Players?.[0];
+      const username = meleePlayer?.Username;
       if (!username) continue;
-      const player = playerMap.get(username.toLowerCase());
-      const playerId = player ? player.id : null;
-
-      if (!playerId) {
-        unknownUsernames.add(username);
-        continue;
-      }
+      const displayName = meleePlayer.DisplayName || meleePlayer.Name || username;
+      const playerId = await finder.find(username, displayName);
 
       try {
         await DB.prepare(
@@ -158,17 +154,14 @@ export async function syncFromMelee(env, deps = {}) {
       const comps = m.Competitors || [];
       if (comps.length < 2) continue;
 
-      const p1Username = comps[0].Team?.Players?.[0]?.Username;
-      const p2Username = comps[1].Team?.Players?.[0]?.Username;
+      const p1Player = comps[0].Team?.Players?.[0];
+      const p2Player = comps[1].Team?.Players?.[0];
+      const p1Username = p1Player?.Username;
+      const p2Username = p2Player?.Username;
       if (!p1Username || !p2Username) continue;
 
-      const p1Id = findPlayerIdByMelee(allPlayers, p1Username);
-      const p2Id = findPlayerIdByMelee(allPlayers, p2Username);
-      if (!p1Id || !p2Id) {
-        if (!p1Id) unknownUsernames.add(p1Username);
-        if (!p2Id) unknownUsernames.add(p2Username);
-        continue;
-      }
+      const p1Id = await finder.find(p1Username, p1Player.DisplayName || p1Player.Name || p1Username);
+      const p2Id = await finder.find(p2Username, p2Player.DisplayName || p2Player.Name || p2Username);
 
       const p1Wins = comps[0].GameWins || 0;
       const p2Wins = comps[1].GameWins || 0;
@@ -201,8 +194,8 @@ export async function syncFromMelee(env, deps = {}) {
     }
   }
 
-  if (unknownUsernames.size > 0) {
-    console.warn(`[SyncFromMelee] ${unknownUsernames.size} melee username(s) not in roster (standings skipped, run backfill to adopt): ${[...unknownUsernames].join(', ')}`);
+  if (createdPlayers.size > 0) {
+    console.log(`[SyncFromMelee] Auto-created ${createdPlayers.size} player(s) from Melee data: ${[...createdPlayers.values()].map(p => `${p.id} (${p.melee_name})`).join(', ')}`);
   }
 
   for (const [round, players] of roundAttendance) {
@@ -358,9 +351,4 @@ export async function syncFromMelee(env, deps = {}) {
     console.log('[SyncFromMelee] Gate not met; data synced, no advance.');
     return { status: 'synced-no-advance' };
   }
-}
-
-function findPlayerIdByMelee(players, meleeUsername) {
-  const found = players.find(p => p.melee_name && p.melee_name.toLowerCase() === meleeUsername.toLowerCase());
-  return found ? found.id : null;
 }

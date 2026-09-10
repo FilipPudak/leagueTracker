@@ -536,15 +536,15 @@ describe('triggers/syncFromMelee', () => {
     });
   });
 
-  it('unknown melee usernames are skipped cleanly, no null-player inserts', async () => {
+  it('auto-creates unknown melee players from standings and matches (invariant 4)', async () => {
     db = createMockDb(withSeasonStarted(makeTables()));
     const ghostStandings = [
       { Rank: 1, Points: 9, MatchWins: 3, MatchDraws: 0, MatchLosses: 0, Team: { Players: [{ Username: 'alice42' }] } },
-      { Rank: 2, Points: 6, MatchWins: 2, MatchDraws: 0, MatchLosses: 1, Team: { Players: [{ Username: 'ghost_player' }] } },
+      { Rank: 2, Points: 6, MatchWins: 2, MatchDraws: 0, MatchLosses: 1, Team: { Players: [{ Username: 'ghost_player', DisplayName: 'Ghost Display' }] } },
     ];
     const ghostMatches = [
       { ID: 900, Competitors: [
-        { Team: { Players: [{ Username: 'ghost_player' }] }, GameWins: 2 },
+        { Team: { Players: [{ Username: 'ghost_player', DisplayName: 'Ghost Display' }] }, GameWins: 2 },
         { Team: { Players: [{ Username: 'nobody_here' }] }, GameWins: 0 },
       ], ByeReason: null },
     ];
@@ -555,10 +555,20 @@ describe('triggers/syncFromMelee', () => {
 
     assert.equal(result.status, 'synced-no-advance', 'gate not met at pinned afternoon time');
     const store = db.getStore();
+    const ghost = store.players.find(p => p.melee_name === 'ghost_player');
+    const nobody = store.players.find(p => p.melee_name === 'nobody_here');
+    assert.ok(ghost, 'ghost_player auto-created');
+    assert.equal(ghost.name, 'Ghost Display', 'display name preferred over username');
+    assert.equal(ghost.active, 1);
+    assert.ok(nobody, 'nobody_here auto-created from match');
+    assert.equal(nobody.name, 'nobody_here', 'username fallback when no display name');
     assert.ok(store.season_standings.every(r => r.player_id), 'no null-player standings rows');
-    assert.equal(store.season_standings.length, 1, 'only the roster-matched standing stored');
-    assert.equal(store.season_standings[0].player_id, 'P001');
-    assert.equal(store.match_results.length, 0, 'matches between unknowns skipped');
+    assert.equal(store.season_standings.length, 2, 'roster-matched and auto-created standings stored');
+    assert.equal(store.season_standings.find(s => s.rank === 2).player_id, ghost.id);
+    assert.equal(store.match_results.length, 1, 'match between auto-created players stored');
+    assert.equal(store.match_results[0].winner_id, ghost.id);
+    const week1 = store.attendance.filter(a => a.season_id === 6 && a.week === 1);
+    assert.ok(week1.some(a => a.player_id === ghost.id), 'auto-created player gets attendance');
   });
 
   it('re-activates a returning player who attends', async () => {

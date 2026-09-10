@@ -108,7 +108,7 @@ export function buildWeekMap(tournaments, existingRoundMap = new Map()) {
   return weekMap;
 }
 
-export function createPlayerFinder(DB) {
+export function createPlayerFinder(DB, { onCreated } = {}) {
   const playerMap = new Map();
   let nextPlayerNum = 1;
   let initialized = false;
@@ -151,6 +151,7 @@ export function createPlayerFinder(DB) {
       .bind(id, name, username).run();
     const player = { id, name, melee_name: username, active: 1 };
     playerMap.set(key, player);
+    if (onCreated) onCreated({ ...player });
     return id;
   }
 
