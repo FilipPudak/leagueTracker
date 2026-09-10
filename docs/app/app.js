@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.0.16';
+const APP_VERSION = '4.1.0';
 
 let appState = {
   status: 'unlinked',
@@ -570,7 +570,7 @@ function submitVotes(isRetry) {
 
   const action = LeagueCore.voteSubmitAction(appState.currentVote);
   callApi(action, { voteData: { leader1Id: l1, opponentId: opp } })
-    .then(() => { endFlight(); showVoteRecorded(); fetchInitialAppData(); })
+    .then(() => { endFlight(); showVoteRecorded(); })
     .catch((err) => {
       endFlight();
       const msg = err.userMessage || err.message || '';
@@ -946,7 +946,7 @@ function loadCareerStats() {
       appState.careerCache = { [cacheKey]: { data: res, ts: Date.now() } };
       renderCareerStats(res);
     })
-    .catch(() => { appState.careerInFlight = false; });
+    .catch((err) => { appState.careerInFlight = false; console.warn('Career stats load failed:', err); });
 }
 
 function renderCareerStats(res) {
