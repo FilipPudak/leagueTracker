@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.1.0';
+const APP_VERSION = '4.1.1';
 
 let appState = {
   status: 'unlinked',
@@ -978,10 +978,10 @@ function renderCareerStats(res) {
       <div><span style="color:#94a3b8;">Nights</span><br><strong style="color:#f8fafc;">${escapeHtml(r.nights)}</strong></div>
       <div><span style="color:#94a3b8;">Matches</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.played)}</strong></div>
       <div><span style="color:#94a3b8;">W-D-L</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.wins)}-${escapeHtml(rec.draws)}-${escapeHtml(rec.losses)}</strong></div>
-      <div><span style="color:#94a3b8;">Win %</span><br><strong style="color:#f8fafc;">${pct(rec.winPct)}</strong></div>
-      <div><span style="color:#94a3b8;">Game win %</span><br><strong style="color:#f8fafc;">${pct(rec.gameWinPct)}</strong></div>
-      <div><span style="color:#94a3b8;">Sweeps</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.sweeps)}${rec.played > 0 ? ' (' + Math.round(rec.sweeps / rec.played * 100) + '%)' : ''}</strong></div>
-      <div><span style="color:#94a3b8;">Deciders</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.deciders)}</strong></div>
+      <div><span style="color:#94a3b8;">Win %</span><br><strong style="color:#f8fafc;">${pct(r.winPct)}</strong></div>
+      <div><span style="color:#94a3b8;">Game win %</span><br><strong style="color:#f8fafc;">${pct(r.games.winPct)}</strong></div>
+      <div><span style="color:#94a3b8;">Sweeps</span><br><strong style="color:#f8fafc;">${escapeHtml(r.sweeps.count)}${r.sweeps.pctOfWins != null ? ' (' + r.sweeps.pctOfWins + '%)' : ''}</strong></div>
+      <div><span style="color:#94a3b8;">Deciders</span><br><strong style="color:#f8fafc;">${escapeHtml(r.deciders.count)}</strong></div>
       <div><span style="color:#94a3b8;">Draws</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.draws)}</strong></div>
       <div><span style="color:#94a3b8;">Byes</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.byes)}</strong></div>
     </div>`;
