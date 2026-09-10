@@ -536,6 +536,137 @@ describe('triggers/syncFromMelee', () => {
     });
   });
 
+  describe('retry fire and drift self-heal', () => {
+    function emptyClient() {
+      return class {
+        async listTournaments() { return { Content: [], TotalCount: 0 }; }
+        async getStandings() { return { Content: [] }; }
+        async getMatches() { return { Content: [] }; }
+      };
+    }
+
+    function withVoting(tables, open) {
+      tables.settings = tables.settings.map(s =>
+        s.key === 'VOTING_OPEN' ? { ...s, value: open ? 'TRUE' : 'FALSE' } : s
+      );
+      return tables;
+    }
+
+    function withWeek(tables, week) {
+      tables.settings = tables.settings.map(s =>
+        s.key === 'CURRENT_WEEK' ? { ...s, value: week } : s
+      );
+      return tables;
+    }
+
+    function regularTournaments(rounds) {
+      return rounds.map(r => ({
+        melee_id: 300 + r, season_id: 6, round: r,
+        name: `SWU Wednesday league season 6 0${r}/07`, date: `2026-07-${String(r).padStart(2, '0')}`, phase: 'regular',
+      }));
+    }
+
+    function attendanceFor(weeks) {
+      return weeks.flatMap(w => ['P001', 'P002'].map(pid => ({ season_id: 6, week: w, player_id: pid })));
+    }
+
+    it('Thursday retry fire opens voting once week data exists, without advancing', async () => {
+      const tables = withVoting(withWeek(makeTables(), 'Week 3'), false);
+      tables.melee_tournaments = regularTournaments([1, 2, 3]);
+      tables.attendance = attendanceFor([1, 2, 3]);
+      db = createMockDb(withSeasonStarted(tables));
+
+      const result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-07-02T07:00:00Z' });
+
+      assert.equal(result.status, 'voting-opened');
+      const settings = await getSettings(db);
+      assert.equal(settings.VOTING_OPEN, 'TRUE');
+      assert.equal(settings.CURRENT_WEEK, 'Week 3', 'retry fire must not advance the week');
+    });
+
+    it('Thursday retry fire without week data leaves voting closed', async () => {
+      const tables = withVoting(withWeek(makeTables(), 'Week 3'), false);
+      tables.melee_tournaments = regularTournaments([1, 2]);
+      tables.attendance = attendanceFor([1, 2]);
+      db = createMockDb(withSeasonStarted(tables));
+
+      const result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-07-02T07:00:00Z' });
+
+      assert.equal(result.status, 'synced-no-advance');
+      const settings = await getSettings(db);
+      assert.equal(settings.VOTING_OPEN, 'FALSE', 'no data + off-gate time → voting stays closed');
+      assert.equal(settings.CURRENT_WEEK, 'Week 3');
+    });
+
+    it('Wednesday first-run fallback still opens voting with no data for the week', async () => {
+      const tables = withVoting(withWeek(makeTables(), 'Week 3'), false);
+      tables.melee_tournaments = regularTournaments([1, 2]);
+      tables.attendance = attendanceFor([1, 2]);
+      db = createMockDb(withSeasonStarted(tables));
+
+      const result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-07-01T20:15:00Z' });
+
+      assert.equal(result.status, 'voting-opened', 'Wednesday ≥22:10 opens even without data (late-results fallback)');
+    });
+
+    it('retry fire never advances an already-open window', async () => {
+      const tables = withVoting(withWeek(makeTables(), 'Week 2'), true);
+      tables.melee_tournaments = regularTournaments([1, 2, 3]);
+      tables.attendance = attendanceFor([1, 2, 3]);
+      db = createMockDb(withSeasonStarted(tables));
+
+      const result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-07-02T07:00:00Z' });
+
+      assert.equal(result.status, 'synced-no-advance');
+      const settings = await getSettings(db);
+      assert.equal(settings.CURRENT_WEEK, 'Week 2', 'Thursday must not advance');
+    });
+
+    it('drift self-heal jumps to the latest attended regular round', async () => {
+      const tables = withVoting(withWeek(makeTables(), 'Week 1'), true);
+      tables.melee_tournaments = regularTournaments([1, 2, 3]);
+      tables.attendance = attendanceFor([1, 2, 3]);
+      db = createMockDb(withSeasonStarted(tables));
+
+      const result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-07-01T20:15:00Z' });
+
+      assert.equal(result.status, 'advanced');
+      assert.equal(result.week, 3, 'behind by two nights → realigns in one advance');
+      const settings = await getSettings(db);
+      assert.equal(settings.CURRENT_WEEK, 'Week 3');
+    });
+
+    it('self-heal ignores cut/side attendance — no premature season end', async () => {
+      const tables = withVoting(withWeek(makeTables(), 'Week 10'), true);
+      tables.melee_tournaments = [
+        ...regularTournaments([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]),
+        { melee_id: 999, season_id: 6, round: 12, name: 'SWU Wednesday league season 6 TOP 4', date: '2026-09-02', phase: 'cut' },
+      ];
+      tables.attendance = [...attendanceFor([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])];
+      db = createMockDb(withSeasonStarted(tables));
+
+      const result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-07-01T20:15:00Z' });
+
+      assert.equal(result.status, 'advanced');
+      assert.equal(result.week, 11, 'advance capped at latest REGULAR attended round');
+      const settings = await getSettings(db);
+      assert.equal(settings.CURRENT_WEEK, 'Week 11');
+      assert.equal(settings.VOTING_OPEN, 'TRUE', 'season not ended by cut attendance at round 12');
+    });
+
+    it('self-heal does not jump to created-but-unplayed rounds', async () => {
+      const tables = withVoting(withWeek(makeTables(), 'Week 1'), true);
+      tables.melee_tournaments = regularTournaments([1, 2, 3]);
+      tables.attendance = attendanceFor([1, 2]);
+      db = createMockDb(withSeasonStarted(tables));
+
+      const result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-07-01T20:15:00Z' });
+
+      assert.equal(result.status, 'advanced');
+      assert.equal(result.week, 2, 'round 3 exists but has no attendance → normal +1 advance only');
+    });
+  });
+
   it('auto-creates unknown melee players from standings and matches (invariant 4)', async () => {
     db = createMockDb(withSeasonStarted(makeTables()));
     const ghostStandings = [

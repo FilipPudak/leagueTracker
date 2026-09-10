@@ -324,13 +324,30 @@ export async function syncFromMelee(env, deps = {}) {
   const today = now.split('T')[0];
   const canAdvance = shouldAdvance(now, lastAdvanced);
 
-  if (!votingOpen && canAdvance) {
+  const attendedRounds = await DB.prepare(
+    'SELECT DISTINCT week FROM attendance WHERE season_id = ?'
+  ).bind(activeSeasonId).all();
+  const latestRegularAttended = (attendedRounds.results || [])
+    .filter(r => regularRoundSet.has(r.week))
+    .reduce((m, r) => Math.max(m, r.week), 0);
+
+  let weekDataPresent = false;
+  if (currentWeek) {
+    const weekRow = await DB.prepare(
+      'SELECT 1 FROM attendance WHERE season_id = ? AND week = ? LIMIT 1'
+    ).bind(activeSeasonId, currentWeek).first();
+    weekDataPresent = !!weekRow;
+  }
+
+  if (!votingOpen && (canAdvance || weekDataPresent)) {
     await updateSetting(DB, 'VOTING_OPEN', 'TRUE');
     await updateSetting(DB, 'LAST_ADVANCED', today);
-    console.log('[SyncFromMelee] First run — voting opened.');
+    console.log(canAdvance
+      ? '[SyncFromMelee] First run — voting opened.'
+      : '[SyncFromMelee] Week data present — voting opened by retry fire.');
     return { status: 'voting-opened' };
   } else if (canAdvance) {
-    const nextWeek = (currentWeek || 0) + 1;
+    const nextWeek = Math.max((currentWeek || 0) + 1, latestRegularAttended);
     if (nextWeek > seasonLength) {
       const champion = await computeChampion(DB, activeSeasonId);
       if (champion.length > 0) {
