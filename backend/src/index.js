@@ -139,7 +139,8 @@ export default {
       });
     } catch (err) {
       const status = err.status || 500;
-      return new Response(JSON.stringify({ success: false, error: err.message || 'Server error' }), {
+      const message = status === 500 ? 'Internal server error' : (err.message || 'Server error');
+      return new Response(JSON.stringify({ success: false, error: message }), {
         status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

@@ -16,6 +16,11 @@ export async function handleGetStandingsData(body, env) {
   const seasonId = parseSeasonId(rawSeasonId);
   if (seasonId == null) throw badRequest('Invalid seasonId.');
 
+  const parsedAsOf = asOfRound != null ? parseInt(String(asOfRound), 10) : null;
+  if (parsedAsOf !== null && (Number.isNaN(parsedAsOf) || parsedAsOf < 1)) {
+    throw badRequest('Invalid asOfRound.');
+  }
+
   const tournaments = await DB.prepare(
     'SELECT melee_id, round, name, date, phase FROM melee_tournaments WHERE season_id = ?'
   ).bind(seasonId).all();
@@ -27,7 +32,7 @@ export async function handleGetStandingsData(body, env) {
       latestRegularRound = t.round;
     }
   }
-  const effectiveAsOf = asOfRound || latestRegularRound;
+  const effectiveAsOf = parsedAsOf || latestRegularRound;
 
   const allStandings = await DB.prepare(
     'SELECT round, player_id, wins, losses, draws, match_points, rank FROM season_standings WHERE season_id = ?'

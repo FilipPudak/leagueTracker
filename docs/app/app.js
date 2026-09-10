@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.1.4';
+const APP_VERSION = '4.1.5';
 
 let appState = {
   status: 'unlinked',
@@ -949,7 +949,14 @@ function loadCareerStats() {
       appState.careerCache = { [cacheKey]: { data: res, ts: Date.now() } };
       renderCareerStats(res);
     })
-    .catch((err) => { appState.careerInFlight = false; console.warn('Career stats load failed:', err); });
+    .catch((err) => {
+      appState.careerInFlight = false;
+      console.warn('Career stats load failed:', err);
+      const section = $('career-details');
+      const empty = $('career-empty');
+      if (section) section.style.display = 'block';
+      if (empty) { empty.textContent = 'Failed to load career stats.'; empty.style.display = 'block'; }
+    });
 }
 
 function renderCareerStats(res) {
@@ -971,6 +978,15 @@ function renderCareerStats(res) {
 
   section.style.display = 'block';
   empty.style.display = 'none';
+
+  if (!res.record || !res.rivalry || res.progression == null) {
+    empty.textContent = 'Career data incomplete.';
+    empty.style.display = 'block';
+    recordCard.style.display = 'none';
+    rivalryCard.style.display = 'none';
+    progressionCard.style.display = 'none';
+    return;
+  }
 
   const r = res.record;
   const rec = r.matches;
@@ -1168,5 +1184,6 @@ function updateSeasonSummaryText() {
   const summary = $('season-summary');
   if (!summary) return;
   const seasonId = appState.activeSeasonId;
-  summary.textContent = 'Season';
+  const season = (appState.seasons || []).find(s => String(s.id) === String(seasonId));
+  summary.textContent = season ? season.name : 'Season';
 }

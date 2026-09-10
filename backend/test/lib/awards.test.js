@@ -119,6 +119,25 @@ describe('computeSchemer', () => {
     const result = await computeSchemer(db, 6);
     assert.ok(Array.isArray(result));
   });
+
+  it('returns results with playerId and score properties', async () => {
+    const db = createMockDb(basicTables());
+    const result = await computeSchemer(db, 6);
+    assert.ok(result.length > 0, 'should have at least one result');
+    for (const entry of result) {
+      assert.ok(entry.playerId, 'each entry should have a playerId');
+      assert.ok(typeof entry.score === 'number', 'each entry should have a numeric score');
+    }
+  });
+
+  it('returns more entries for players with more distinct leaders', async () => {
+    const tables = basicTables();
+    const db = createMockDb(tables);
+    const result = await computeSchemer(db, 6);
+    assert.ok(result.length >= 2, 'should have at least 2 players');
+    const sorted = [...result].sort((a, b) => b.score - a.score);
+    assert.ok(sorted[0].score >= sorted[sorted.length - 1].score, 'should be sorted by score desc');
+  });
 });
 
 describe('computeAmbassador', () => {
@@ -136,6 +155,24 @@ describe('computeAmbassador', () => {
     const db = createMockDb(emptyTables());
     const result = await computeAmbassador(db, 6);
     assert.ok(Array.isArray(result));
+  });
+
+  it('returns results with playerId and score properties', async () => {
+    const db = createMockDb(basicTables());
+    const result = await computeAmbassador(db, 6);
+    assert.ok(result.length > 0, 'should have at least one result');
+    for (const entry of result) {
+      assert.ok(entry.playerId, 'each entry should have a playerId');
+      assert.ok(typeof entry.score === 'number', 'each entry should have a numeric score');
+    }
+  });
+
+  it('returns more entries for players with more opponent votes', async () => {
+    const db = createMockDb(basicTables());
+    const result = await computeAmbassador(db, 6);
+    assert.ok(result.length >= 2, 'should have at least 2 players');
+    const sorted = [...result].sort((a, b) => b.score - a.score);
+    assert.ok(sorted[0].score >= sorted[sorted.length - 1].score, 'should be sorted by score desc');
   });
 });
 

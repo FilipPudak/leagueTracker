@@ -154,4 +154,32 @@ describe('handleGetStandingsData', () => {
     const result = await handleGetStandingsData({ seasonId: 'S6' }, { DB: db });
     assert.ok(Array.isArray(result.table));
   });
+
+  it('rejects non-numeric asOfRound with 400', async () => {
+    const db = createMockDb(makeTables());
+    await assert.rejects(
+      () => handleGetStandingsData({ seasonId: 6, asOfRound: 'abc' }, { DB: db }),
+      (err) => {
+        assert.equal(err.status, 400);
+        assert.match(err.message, /Invalid asOfRound/);
+        return true;
+      }
+    );
+  });
+
+  it('rejects negative asOfRound with 400', async () => {
+    const db = createMockDb(makeTables());
+    await assert.rejects(
+      () => handleGetStandingsData({ seasonId: 6, asOfRound: -1 }, { DB: db }),
+      (err) => { assert.equal(err.status, 400); return true; }
+    );
+  });
+
+  it('rejects zero asOfRound with 400', async () => {
+    const db = createMockDb(makeTables());
+    await assert.rejects(
+      () => handleGetStandingsData({ seasonId: 6, asOfRound: 0 }, { DB: db }),
+      (err) => { assert.equal(err.status, 400); return true; }
+    );
+  });
 });

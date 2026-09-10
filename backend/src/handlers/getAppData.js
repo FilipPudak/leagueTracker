@@ -2,8 +2,6 @@ import { getSettings, getPlayerById, getAllActiveLeaders, getAllSeasons, parseSe
 import { getWeeklyParticipation } from '../lib/participation.js';
 import { getFacedOpponents } from '../lib/voteValidation.js';
 
-const APP_VERSION = '4.0.16';
-
 export async function handleGetAppData(body, env, session) {
   const { DB } = env;
   const token = body.token;
@@ -83,7 +81,6 @@ export async function handleGetAppData(body, env, session) {
   };
 
   return {
-    appVersion: APP_VERSION,
     status,
     linkedPlayer,
     currentPlayer: linkedPlayer,

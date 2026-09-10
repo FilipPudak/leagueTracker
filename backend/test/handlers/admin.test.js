@@ -125,6 +125,33 @@ describe('handleAddLeaders', () => {
     assert.equal(result.added.length, 0);
     assert.equal(result.skipped.length, 1);
   });
+
+  it('rejects non-array leaders with 400', async () => {
+    const db = createMockDb(adminTables());
+    await assert.rejects(
+      () => handleAddLeaders({ adminToken: ADMIN_SECRET, leaders: 'hello' }, { DB: db, ADMIN_SECRET }),
+      (err) => { assert.equal(err.status, 400); assert.match(err.message, /array/); return true; }
+    );
+  });
+
+  it('rejects null leaders with 400', async () => {
+    const db = createMockDb(adminTables());
+    await assert.rejects(
+      () => handleAddLeaders({ adminToken: ADMIN_SECRET, leaders: null }, { DB: db, ADMIN_SECRET }),
+      (err) => { assert.equal(err.status, 400); return true; }
+    );
+  });
+
+  it('skips leaders with missing name', async () => {
+    const db = createMockDb(adminTables());
+    const result = await handleAddLeaders(
+      { adminToken: ADMIN_SECRET, leaders: [{ set: 'JTL' }] },
+      { DB: db, ADMIN_SECRET }
+    );
+    assert.equal(result.added.length, 0);
+    assert.equal(result.skipped.length, 1);
+    assert.equal(result.skipped[0].reason, 'missing name');
+  });
 });
 
 describe('handleSetLeadersActive', () => {
@@ -145,6 +172,22 @@ describe('handleSetLeadersActive', () => {
     const store = db.getStore();
     assert.equal(store.leaders.find(l => l.id === '1').active, 0);
     assert.equal(store.leaders.find(l => l.id === '2').active, 0);
+  });
+
+  it('rejects non-array leaderIds with 400', async () => {
+    const db = createMockDb(adminTables());
+    await assert.rejects(
+      () => handleSetLeadersActive({ adminToken: ADMIN_SECRET, leaderIds: 'hello', active: 0 }, { DB: db, ADMIN_SECRET }),
+      (err) => { assert.equal(err.status, 400); return true; }
+    );
+  });
+
+  it('rejects undefined leaderIds with 400', async () => {
+    const db = createMockDb(adminTables());
+    await assert.rejects(
+      () => handleSetLeadersActive({ adminToken: ADMIN_SECRET, active: 0 }, { DB: db, ADMIN_SECRET }),
+      (err) => { assert.equal(err.status, 400); return true; }
+    );
   });
 });
 
@@ -176,6 +219,14 @@ describe('handleRemoveLeaders', () => {
     );
     assert.equal(result.removed.length, 0);
     assert.ok(result.refused.length > 0);
+  });
+
+  it('rejects non-array leaderIds with 400', async () => {
+    const db = createMockDb(adminTables());
+    await assert.rejects(
+      () => handleRemoveLeaders({ adminToken: ADMIN_SECRET, leaderIds: 'hello' }, { DB: db, ADMIN_SECRET }),
+      (err) => { assert.equal(err.status, 400); return true; }
+    );
   });
 });
 

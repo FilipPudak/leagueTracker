@@ -79,21 +79,17 @@ export async function writePodiumBlock(db, seasonId, awardName, entries) {
     if (existing) return;
   }
 
-  await db.prepare(
+  const deleteStmt = db.prepare(
     'DELETE FROM awards WHERE season_id = ? AND award_name = ?'
-  ).bind(seasonId, awardName).run();
+  ).bind(seasonId, awardName);
 
-  for (let i = 0; i < topN.length; i++) {
-    const entry = topN[i];
-    await db.prepare(
+  const insertStmts = topN.map(entry =>
+    db.prepare(
       'INSERT INTO awards (season_id, award_name, player_id, score) VALUES (?, ?, ?, ?)'
-    ).bind(
-      seasonId,
-      awardName,
-      entry.playerId,
-      entry.score
-    ).run();
-  }
+    ).bind(seasonId, awardName, entry.playerId, entry.score)
+  );
+
+  await db.batch([deleteStmt, ...insertStmts]);
 }
 
 export async function computeChampion(db, seasonId) {

@@ -1,4 +1,5 @@
 import { constantTimeEqual } from '../lib/auth.js';
+import { badRequest } from '../lib/errors.js';
 
 export async function handleAddLeaders(body, env) {
   const { DB, ADMIN_SECRET } = env;
@@ -10,21 +11,25 @@ export async function handleAddLeaders(body, env) {
     throw err;
   }
 
+  if (!Array.isArray(leaders)) throw badRequest('leaders must be an array.');
+
   const existing = await DB.prepare('SELECT name FROM leaders').all();
   const existingNames = new Set((existing.results || []).map(l => l.name.toLowerCase()));
 
   const added = [];
   const skipped = [];
 
-  for (const leader of (leaders || [])) {
+  for (const leader of leaders) {
+    if (!leader || !leader.name) {
+      skipped.push({ name: leader?.name || '(unnamed)', reason: 'missing name' });
+      continue;
+    }
     if (existingNames.has(leader.name.toLowerCase())) {
       skipped.push({ name: leader.name, reason: 'duplicate' });
       continue;
     }
 
-    const maxId = await DB.prepare('SELECT MAX(CAST(id AS INTEGER)) as max_id FROM leaders').first();
-    const nextNum = (maxId?.max_id || 0) + 1;
-    const id = String(nextNum);
+    const id = crypto.randomUUID();
 
     await DB.prepare(
       'INSERT INTO leaders (id, name, "set", active) VALUES (?, ?, ?, 1)'
@@ -47,7 +52,9 @@ export async function handleSetLeadersActive(body, env) {
     throw err;
   }
 
-  for (const id of (leaderIds || [])) {
+  if (!Array.isArray(leaderIds)) throw badRequest('leaderIds must be an array.');
+
+  for (const id of leaderIds) {
     await DB.prepare('UPDATE leaders SET active = ? WHERE id = ?').bind(active ? 1 : 0, id).run();
   }
 
@@ -64,10 +71,12 @@ export async function handleRemoveLeaders(body, env) {
     throw err;
   }
 
+  if (!Array.isArray(leaderIds)) throw badRequest('leaderIds must be an array.');
+
   const removed = [];
   const refused = [];
 
-  for (const id of (leaderIds || [])) {
+  for (const id of leaderIds) {
     const referenced = await DB.prepare(
       'SELECT 1 FROM votes WHERE leader_id = ? LIMIT 1'
     ).bind(id).first();
