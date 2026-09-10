@@ -44,9 +44,9 @@ const LeagueCore = (() => {
     return expanded ? items : items.slice(0, limit);
   }
 
-  function listToggleLabel(total, limit, expanded) {
+  function listToggleLabel(total, limit, expanded, noun) {
     if (expanded) return 'Show less';
-    return `Show all ${total} leaders`;
+    return `Show all ${total} ${noun || 'leaders'}`;
   }
 
   function voteSubmitAction(currentVote) {

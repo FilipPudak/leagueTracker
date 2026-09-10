@@ -72,6 +72,11 @@ describe('frontend/app-core', () => {
       assert.equal(core.listToggleLabel(7, 5, false), 'Show all 7 leaders');
       assert.equal(core.listToggleLabel(7, 5, true), 'Show less');
     });
+
+    it('toggle labels carry a custom noun for podium lists', () => {
+      assert.equal(core.listToggleLabel(8, 3, false, 'players'), 'Show all 8 players');
+      assert.equal(core.listToggleLabel(8, 3, true, 'players'), 'Show less');
+    });
   });
 
   describe('mapSettings (R7: backend sends UPPER_SNAKE keys)', () => {
@@ -231,6 +236,14 @@ describe('frontend wiring', () => {
   it('every leader list carries the set label and most-played is expandable at 5', () => {
     assert.ok((app.match(/LeagueCore\.leaderOptionLabel/g) || []).length >= 3, 'dropdown + most-played + my-stats');
     assert.match(app, /limit: 5,\s*\n\s*expandable: true/);
+  });
+
+  it('award podiums expand per-container with a players label', () => {
+    assert.ok(!/mostPlayedExpanded/.test(app), 'no shared expansion flag left');
+    assert.match(app, /let listExpanded = \{\};/);
+    assert.match(app, /listExpanded\[containerId\] = !expanded;/);
+    const sectionBody = app.slice(app.indexOf('function renderLeaderboardSection'));
+    assert.match(sectionBody.slice(0, 700), /expandable: true,\s*\n\s*noun: 'players'/);
   });
 
   it('link view exposes the pick/email dual mode for multi-device relinking', () => {

@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.0.14';
+const APP_VERSION = '4.0.15';
 
 let appState = {
   status: 'unlinked',
@@ -775,7 +775,7 @@ function loadLeaderboardData() {
 }
 
 function renderLeaderboard(res) {
-  mostPlayedExpanded = false;
+  listExpanded = {};
   const lpCard = $('leaderboard-participation-card');
   const lpText = $('leaderboard-participation-text');
   if (lpCard && lpText) {
@@ -814,7 +814,9 @@ function renderLeaderboardSection(sectionId, containerId, res, field) {
   renderStatsList(containerId, items, {
     getTitle: (item) => item.name,
     getScore: (item) => item.score,
-    getSubtitle: (item) => item.subtitle
+    getSubtitle: (item) => item.subtitle,
+    expandable: true,
+    noun: 'players'
   });
 }
 
@@ -947,7 +949,7 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-let mostPlayedExpanded = false;
+let listExpanded = {};
 
 function renderStatsList(containerId, items, config) {
   const container = $(containerId);
@@ -957,7 +959,7 @@ function renderStatsList(containerId, items, config) {
     return;
   }
   const limit = config.limit !== undefined ? config.limit : 3;
-  const expanded = config.expandable && mostPlayedExpanded;
+  const expanded = config.expandable && !!listExpanded[containerId];
   const shown = LeagueCore.visibleListSlice(items, limit, expanded);
   let html = '<div class="stats-list">';
   shown.forEach((item, i) => {
@@ -984,9 +986,9 @@ function renderStatsList(containerId, items, config) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'show-more-btn';
-    btn.textContent = LeagueCore.listToggleLabel(items.length, limit, expanded);
+    btn.textContent = LeagueCore.listToggleLabel(items.length, limit, expanded, config.noun);
     btn.onclick = () => {
-      mostPlayedExpanded = !mostPlayedExpanded;
+      listExpanded[containerId] = !expanded;
       renderStatsList(containerId, items, config);
     };
     container.appendChild(btn);
