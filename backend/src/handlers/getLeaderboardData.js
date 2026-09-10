@@ -155,7 +155,8 @@ export async function handleGetLeaderboardData(body, env) {
   }
 
   // Bounty Hunter: stored only, hidden while voting is live
-  const bountyHunter = isLive ? null : (awardsMap['Bounty Hunter'] || null);
+  let bountyHunter = isLive ? null : (awardsMap['Bounty Hunter'] || null);
+  if (bountyHunter) bountyHunter = assignStandardRanks(bountyHunter);
 
   // Galactic Champion: stored or live from cut tournament
   let champion = awardsMap['Galactic Champion'] || null;

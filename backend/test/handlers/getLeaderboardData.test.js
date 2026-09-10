@@ -185,6 +185,26 @@ describe('handleGetLeaderboardData', () => {
     assert.ok(result.bountyHunter, 'bountyHunter present when voting closed');
     assert.ok(result.bountyHunter.length > 0, 'bountyHunter has entries');
     assert.ok(result.bountyHunter[0].name);
+    assert.ok(result.bountyHunter.every(e => typeof e.displayRank === 'number'), 'rank pills populated (expandable podium needs competition ranks)');
+    assert.equal(result.bountyHunter[0].displayRank, 1);
+  });
+
+  it('bounty Hunter tie members share competition rank', async () => {
+    const tables = closedVotingTables();
+    tables.settings = tables.settings.map(s =>
+      s.key === 'ACTIVE_SEASON_ID' ? { ...s, value: '6' } : s
+    );
+    tables.awards = tables.awards.filter(a => !(a.award_name === 'Bounty Hunter' && a.season_id === 6));
+    tables.awards.push(
+      { season_id: 6, award_name: 'Bounty Hunter', player_id: 'P001', score: 4 },
+      { season_id: 6, award_name: 'Bounty Hunter', player_id: 'P002', score: 8 },
+      { season_id: 6, award_name: 'Bounty Hunter', player_id: 'P003', score: 4 },
+      { season_id: 6, award_name: 'Bounty Hunter', player_id: 'P004', score: 4 }
+    );
+    const db = createMockDb(tables);
+    const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
+    const ranks = result.bountyHunter.map(e => e.displayRank);
+    assert.deepEqual(ranks, [1, 2, 2, 2], 'standard competition ranking 1,2,2,2 for a score tie');
   });
 
   it('Ambassador callsign masking when voting is live', async () => {
