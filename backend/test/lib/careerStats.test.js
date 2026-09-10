@@ -58,7 +58,7 @@ describe('lib/careerStats buildRivalry', () => {
     assert.equal(r.headToHead[0].losses, 1);
   });
 
-  it('ties share: same count and meetings → co-holders; more meetings breaks the tie', () => {
+  it('ties share: same count and meetings → co-holders; fewer wins breaks the nemesis tie', () => {
     const matches = [
       matchRow('P001', 'P002', 'P002', null),
       matchRow('P001', 'P002', 'P002', null),
@@ -67,7 +67,7 @@ describe('lib/careerStats buildRivalry', () => {
       matchRow('P001', 'P003', 'P001', null),
     ];
     const r = buildRivalry(matches, 'P001', names);
-    assert.deepEqual(r.nemesis.map(n => n.playerId), ['P003'], 'more meetings breaks tie → Bob had 2L/2M, Carol 2L/3M, most meetings wins');
+    assert.deepEqual(r.nemesis.map(n => n.playerId), ['P002'], 'fewer wins breaks tie → Bob 2L/0W, Carol 2L/1W, Bob is truer nemesis');
   });
 
   it('draws count neither as win nor loss', () => {

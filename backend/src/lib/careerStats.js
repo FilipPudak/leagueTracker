@@ -40,7 +40,8 @@ export function buildRivalry(matches, playerId, names = new Map(), { minMeetings
     const best = Math.max(...eligible.map(r => r[key]));
     const atKey = eligible.filter(r => r[key] === best);
     const tieKey = key === 'losses' ? 'wins' : 'losses';
-    const bestTie = Math.max(...atKey.map(r => r[tieKey]));
+    const tieFn = key === 'losses' ? Math.min : Math.max;
+    const bestTie = tieFn(...atKey.map(r => r[tieKey]));
     return atKey
       .filter(r => r[tieKey] === bestTie)
       .map(r => ({ playerId: r.opponentId, name: r.name, meetings: r.played, count: r[key] }));

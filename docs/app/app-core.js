@@ -46,7 +46,9 @@ const LeagueCore = (() => {
 
   function listToggleLabel(total, limit, expanded, noun) {
     if (expanded) return 'Show less';
-    return `Show all ${total} ${noun || 'leaders'}`;
+    const label = noun || 'leaders';
+    const plural = total !== 1 && !label.endsWith('s') ? label + 's' : label;
+    return `Show all ${total} ${plural}`;
   }
 
   function voteSubmitAction(currentVote) {
