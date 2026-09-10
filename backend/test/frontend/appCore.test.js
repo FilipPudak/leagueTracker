@@ -105,11 +105,11 @@ describe('frontend/app-core', () => {
 
   describe('computeSubtitle (R9: Season Ended was unreachable)', () => {
     it('renders week for live season', () => {
-      assert.equal(core.computeSubtitle({ seasonName: 'Season 7', week: 3 }), 'Season 7 • Week 3');
+      assert.equal(core.computeSubtitle({ seasonName: 'Season 7', week: 3 }), 'Season 7 • Night 3');
     });
 
-    it('renders Season Ended when week is null', () => {
-      assert.equal(core.computeSubtitle({ seasonName: 'Season 6', week: null }), 'Season 6 — Season Ended');
+    it('renders Season Complete when week is null', () => {
+      assert.equal(core.computeSubtitle({ seasonName: 'Season 6', week: null }), 'Season 6 — Season Complete');
     });
 
     it('renders empty subtitle when no season name', () => {

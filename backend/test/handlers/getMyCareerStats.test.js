@@ -62,7 +62,7 @@ describe('handleGetMyCareerStats', () => {
     assert.equal(s6.rank, 1, 'S6 derived: Alice 12 pts > Bob 10 pts');
     assert.equal(s6.isCurrent, true);
 
-    assert.deepEqual(result.peak, { rank: 1, seasonId: 6 });
+    assert.deepEqual(result.peak, [{ rank: 1, seasonId: 6 }]);
   });
 
   it('excludes cut rounds from derived season rank', async () => {
@@ -86,7 +86,7 @@ describe('handleGetMyCareerStats', () => {
     assert.equal(result.record.sinceSeason, null);
     assert.deepEqual(result.rivalry.nemesis, []);
     assert.deepEqual(result.rivalry.victim, []);
-    assert.equal(result.peak, null);
+    assert.deepEqual(result.peak, []);
     assert.ok(result.progression.every(p => p.rank === null));
   });
 

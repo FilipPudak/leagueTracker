@@ -170,7 +170,7 @@ describe('lib/careerStats buildSeasonProgression', () => {
     assert.equal(progression[1].rank, 1, 'S6: P001 first');
     assert.equal(progression[2].rank, null, 'S7: no data');
     assert.equal(progression[2].isCurrent, true);
-    assert.deepEqual(peak, { rank: 1, seasonId: 6 });
+    assert.deepEqual(peak, [{ rank: 1, seasonId: 6 }]);
   });
 
   it('excludes cut/side rounds from the derived rank', () => {

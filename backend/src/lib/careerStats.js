@@ -106,7 +106,7 @@ export function buildCareerRecord(standingsRows, matches, playerId) {
 
 export function buildSeasonProgression({ seasons, allStandings, regularRoundsBySeason, playerId, activeSeasonId }) {
   const progression = [];
-  let peak = null;
+  let peak = [];
 
   for (const season of seasons) {
     const regular = regularRoundsBySeason.get(season.id) || new Set();
@@ -138,8 +138,12 @@ export function buildSeasonProgression({ seasons, allStandings, regularRoundsByS
       fieldSize: table.length,
       isCurrent,
     };
-    if (entry.rank != null && (!peak || entry.rank < peak.rank)) {
-      peak = { rank: entry.rank, seasonId: entry.seasonId };
+    if (entry.rank != null) {
+      if (!peak.length || entry.rank < peak[0].rank) {
+        peak = [{ rank: entry.rank, seasonId: entry.seasonId }];
+      } else if (entry.rank === peak[0].rank) {
+        peak.push({ rank: entry.rank, seasonId: entry.seasonId });
+      }
     }
     progression.push(entry);
   }

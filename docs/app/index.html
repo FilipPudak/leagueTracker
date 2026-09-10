@@ -301,7 +301,7 @@
       </button>
       <button type="button" class="tab-btn" onclick="switchTab('myseason-view')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <span>Me</span>
+        <span>My Stats</span>
       </button>
     </div>
 
@@ -314,8 +314,8 @@
     <!-- LINK PANEL -->
     <div id="link-view" class="view-panel">
       <div class="card">
-        <h3 style="margin-top:0; font-family:'Orbitron', sans-serif;">Link Account</h3>
-        <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 0;">Enter your email and pick your name to link this device.</p>
+        <h3 style="margin-top:0; font-family:'Orbitron', sans-serif;">Sign In</h3>
+        <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 0;">Enter your email and pick your name to sign in.</p>
       </div>
       <div class="form-group">
         <label for="link-email">Your Email</label>
@@ -326,9 +326,9 @@
         <input type="text" id="link-player-search" class="text-input" placeholder="Type to search..." oninput="filterLinkPicker()" autocomplete="off" />
         <select id="link-player-select" size="6" style="margin-top: 8px;"><option value="">-- Choose Your Name --</option></select>
       </div>
-      <p id="link-email-hint" style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 12px;">Your name will be matched automatically from this email.</p>
-      <button type="button" id="link-mode-toggle" class="not-you" onclick="toggleLinkMode()" style="display:block; margin-bottom:12px;">First time here? Pick your name from the roster</button>
-      <button type="button" class="btn-submit" onclick="submitAccountLink()">Link Account</button>
+      <p id="link-email-hint" style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 12px;">We'll find your player profile using this email.</p>
+      <button type="button" id="link-mode-toggle" class="not-you" onclick="toggleLinkMode()" style="display:block; margin-bottom:12px;">First time here? Pick your name from the player list</button>
+      <button type="button" class="btn-submit" onclick="submitAccountLink()">Sign In</button>
     </div>
 
     <!-- VOTE PANEL -->
@@ -344,7 +344,7 @@
         <div class="form-group">
           <label for="favorite-opponent">Favorite Opponent</label>
           <select id="favorite-opponent" required><option value="">-- Select Favorite Opponent --</option></select>
-          <div style="font-size:0.78rem; color:#64748b; margin-top:4px;">Can't find your opponent? Results may not be published yet — pick someone you faced this week.</div>
+          <div style="font-size:0.78rem; color:#64748b; margin-top:4px;">Can't find who you're looking for? Pick the opponent you faced last Wednesday.</div>
         </div>
         <button type="submit" id="btn-vote-submit" class="btn-submit">Submit Votes</button>
       </form>
@@ -367,7 +367,7 @@
         <select id="standings-season-filter" onchange="loadStandingsData()"></select>
       </div>
       <div class="form-group">
-        <label for="standings-round-filter">As of Round</label>
+        <label for="standings-round-filter">Up to Night</label>
         <select id="standings-round-filter" onchange="loadStandingsData()">
         </select>
       </div>
@@ -396,7 +396,7 @@
         </div>
 
         <div id="round-results-section" style="margin-top: 24px;">
-          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Round Results</h3>
+          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Night Results</h3>
           <div id="round-results-container"></div>
         </div>
       </div>
@@ -455,7 +455,7 @@
     <div id="myseason-view" class="view-panel">
       <details id="career-details" class="section-block">
         <summary>Career</summary>
-        <div id="career-empty" style="text-align:center; color:#94a3b8; padding:12px; font-size:0.85rem; display:none;">No career history yet — your stats appear after your first synced league night.</div>
+        <div id="career-empty" style="text-align:center; color:#94a3b8; padding:12px; font-size:0.85rem; display:none;">No career history yet — your stats appear after you play your first league night.</div>
         <div id="career-record-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
         <div id="career-rivalry-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
         <div id="career-progression-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
@@ -476,7 +476,7 @@
                 <div id="milestone-bar" style="background: linear-gradient(90deg, #38bdf8, #22d3ee); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 6px;"></div>
               </div>
               <div id="milestone-text" style="font-size: 0.9rem; color: #f8fafc; font-weight: 600;"></div>
-              <div id="milestone-reward" style="font-size: 0.8rem; color: #94a3b8; margin-top: 6px;">4 votes earns you a prize — ask the organizer</div>
+              <div id="milestone-reward" style="font-size: 0.8rem; color: #94a3b8; margin-top: 6px;">4 votes earns you a prize — ask in our Discord</div>
             </div>
 
             <div style="margin-top: 12px;">
@@ -508,11 +508,11 @@
 
   <div id="unlink-confirm" class="modal-overlay">
     <div class="modal-box">
-      <h3 id="unlink-confirm-title">Unlink?</h3>
-      <p id="unlink-confirm-text">This device will be disconnected.</p>
+      <h3 id="unlink-confirm-title">Sign Out?</h3>
+      <p id="unlink-confirm-text">You'll be signed out on this device. You can sign in again anytime.</p>
       <div class="modal-actions">
         <button type="button" class="btn-ghost" onclick="cancelUnlink()">Cancel</button>
-        <button type="button" class="btn-danger" onclick="confirmUnlink()">Unlink Device</button>
+        <button type="button" class="btn-danger" onclick="confirmUnlink()">Sign Out</button>
       </div>
     </div>
   </div>

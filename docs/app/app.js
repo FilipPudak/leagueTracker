@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.1.2';
+const APP_VERSION = '4.1.3';
 
 let appState = {
   status: 'unlinked',
@@ -102,8 +102,8 @@ async function callApi(action, payload = {}, _attempt = 0) {
     const isVote = action === 'submitVote';
 
     if (isVote) {
-      const e = new Error('The server is still warming up. Please click again.');
-      e.userMessage = 'The server is still warming up. Please try again.';
+      const e = new Error('The server is taking a moment. Please click again.');
+      e.userMessage = 'The server is taking a moment. Please try again.';
       throw e;
     }
 
@@ -113,8 +113,8 @@ async function callApi(action, payload = {}, _attempt = 0) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         return callApi(action, payload, _attempt + 1);
       }
-      const e = new Error('The server is still warming up. Please click again.');
-      e.userMessage = 'The server is still warming up. Please try again.';
+      const e = new Error('The server is taking a moment. Please click again.');
+      e.userMessage = 'The server is taking a moment. Please try again.';
       throw e;
     }
 
@@ -279,7 +279,7 @@ function applyBoot(boot) {
     populateLinkPicker(LeagueCore.resolvePlayerChoices(boot));
     setLinkMode('email');
     if (boot.status === 'invalid-token') {
-      showStatus('Your session expired. Please re-link to continue.', false);
+      showStatus('Your session expired. Please sign in again.', false);
     }
   }
 }
@@ -343,7 +343,7 @@ function setLinkMode(mode) {
   const toggle = $('link-mode-toggle');
   if (picker) picker.style.display = picking ? '' : 'none';
   if (hint) hint.style.display = picking ? 'none' : '';
-  if (toggle) toggle.textContent = picking ? 'Already linked? Sign in with your email' : 'First time here? Pick your name from the roster';
+  if (toggle) toggle.textContent = picking ? 'Already have an account? Use your email to sign in' : 'First time here? Pick your name from the player list';
 }
 
 function toggleLinkMode() {
@@ -398,7 +398,7 @@ function submitAccountLink() {
 
 function unlinkCurrentDevice() {
   const name = appState.linkedPlayer ? appState.linkedPlayer.name : '';
-  openUnlinkConfirm('Unlink ' + name + '?', 'This device will be disconnected. You can re-link anytime with your email, or pick another player on this device.');
+  openUnlinkConfirm('Sign out ' + name + '?', "You'll be signed out on this device. You can sign in again with your email anytime.");
 }
 
 function openUnlinkConfirm(title, message) {
@@ -425,7 +425,7 @@ function confirmUnlink() {
   showTabs(false);
   showLinkedPresence(null);
   clearStatus();
-  showStatus('Unlinking…', false);
+  showStatus('Signing out…', false);
   showSpinner(true, 'unlink');
   const token = getToken();
 
@@ -648,7 +648,7 @@ function updateRoundFilter(rounds, asOfRound) {
   (rounds || []).forEach(r => {
     const opt = document.createElement('option');
     opt.value = r.round;
-    opt.textContent = 'Round ' + r.round;
+    opt.textContent = 'Night ' + r.round;
     if (String(r.round) === String(asOfRound)) opt.selected = true;
     sel.appendChild(opt);
   });
@@ -719,7 +719,7 @@ function renderRoundResults(rounds) {
     const isSide = round.phase === 'side';
     const phaseLabel = isCut ? 'Top Cut' : (isSide ? 'Side Event' : 'Regular');
     const dateStr = formatNightDate(round.date);
-    const title = (isCut ? 'Top Cut' : isSide ? 'Side Event' : 'Round ' + round.round) + (dateStr ? ' — ' + dateStr : '');
+    const title = (isCut ? 'Top Cut' : isSide ? 'Side Event' : 'Night ' + round.round) + (dateStr ? ' — ' + dateStr : '');
     const playerRows = (round.players || [])
       .sort((a, b) => (a.rank || 999) - (b.rank || 999))
       .map(p => {
@@ -895,7 +895,7 @@ function renderMySeasonStats(res) {
       gamSection.style.display = 'none';
     } else {
       let html = '';
-      html += `<div><span style="color:#94a3b8;">Raffle tickets:</span> <strong style="color:#fbbf24;">${escapeHtml(raffle)}</strong> <span style="font-size:0.8rem; color:#64748b;">— every vote is a ticket for the season-end raffle</span></div>`;
+      html += `<div><span style="color:#94a3b8;">Raffle tickets:</span> <strong style="color:#fbbf24;">${escapeHtml(raffle)}</strong> <span style="font-size:0.8rem; color:#64748b;">— every vote earns one ticket for the end-of-season raffle</span></div>`;
       if (view === 'full' && (streaks.currentStreak > 0 || streaks.bestStreak > 0)) {
         html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Streak:</span> <span style="font-size:0.85rem;">${escapeHtml(streaks.currentStreak)} current &bull; ${escapeHtml(streaks.bestStreak)} best</span></div>`;
       } else if (view === 'summary' && streaks.bestStreak > 0) {
@@ -976,7 +976,7 @@ function renderCareerStats(res) {
   const rec = r.matches;
   const pct = (v) => v == null ? '—' : v + '%';
   const recordHtml = `
-    <div style="font-weight:700; color:#f8fafc; margin-bottom:8px;">Career record${r.sinceSeason ? ' — since S' + escapeHtml(r.sinceSeason) : ''}</div>
+    <div style="font-weight:700; color:#f8fafc; margin-bottom:8px;">Career record${r.sinceSeason ? ' — since Season ' + escapeHtml(r.sinceSeason) : ''}</div>
     <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; font-size:0.85rem;">
       <div><span style="color:#94a3b8;">Nights</span><br><strong style="color:#f8fafc;">${escapeHtml(r.nights)}</strong></div>
       <div><span style="color:#94a3b8;">Matches</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.played)}</strong></div>
@@ -1003,7 +1003,7 @@ function renderCareerStats(res) {
     }
     if (vic.length > 0) {
       const names = vic.map(v => escapeHtml(v.name)).join(' & ');
-      rivalryHtml += `<div style="margin-bottom:6px;"><span style="color:#22c55e; font-weight:700;">Victim:</span> <span style="color:#f8fafc;">${names}</span> <span style="color:#94a3b8; font-size:0.85rem;">— you beat them ${escapeHtml(vic[0].count)}×</span></div>`;
+      rivalryHtml += `<div style="margin-bottom:6px;"><span style="color:#22c55e; font-weight:700;">Bounty:</span> <span style="color:#f8fafc;">${names}</span> <span style="color:#94a3b8; font-size:0.85rem;">— you beat them ${escapeHtml(vic[0].count)}×</span></div>`;
     }
     rivalryHtml += '<div id="career-h2h-container" style="margin-top:8px;"></div>';
   }
@@ -1023,8 +1023,9 @@ function renderCareerStats(res) {
   const prog = res.progression;
   const peak = res.peak;
   let progHtml = '<div style="font-weight:700; color:#f8fafc; margin-bottom:8px;">Season progression</div>';
-  if (peak) {
-    progHtml += `<div style="margin-bottom:8px;"><span style="color:#fbbf24;">Peak:</span> <span style="color:#f8fafc;">#${escapeHtml(peak.rank)} (S${escapeHtml(peak.seasonId)})</span></div>`;
+  if (peak && peak.length > 0) {
+    const peakStr = peak.map(p => 'Season ' + p.seasonId).join(', ');
+    progHtml += `<div style="margin-bottom:8px;"><span style="color:#fbbf24;">Peak:</span> <span style="color:#f8fafc;">#${escapeHtml(peak[0].rank)} (${escapeHtml(peakStr)})</span></div>`;
   }
   if (prog.length > 0) {
     progHtml += prog.map(p => {
@@ -1032,9 +1033,9 @@ function renderCareerStats(res) {
       const rank = p.rank != null ? '#' + p.rank : '—';
       const pts = p.points != null ? p.points + ' pts' : '';
       const currentMark = p.isCurrent ? ' ★' : '';
-      const asOf = p.asOfRound != null ? ' (as of Round ' + p.asOfRound + ')' : '';
+      const asOf = p.asOfRound != null ? ' (after Night ' + p.asOfRound + ')' : '';
       const detail = [pts].filter(Boolean).join(', ');
-      return `<span style="color:${p.isCurrent ? '#38bdf8' : '#94a3b8'}; font-size:0.85rem;">S${escapeHtml(p.seasonId)} ${escapeHtml(rank)}${detail ? ' · ' + escapeHtml(detail) : ''}${asOf}${currentMark}</span>`;
+      return `<span style="color:${p.isCurrent ? '#38bdf8' : '#94a3b8'}; font-size:0.85rem;">Season ${escapeHtml(p.seasonId)} ${escapeHtml(rank)}${detail ? ' · ' + escapeHtml(detail) : ''}${asOf}${currentMark}</span>`;
     }).filter(Boolean).join('<span style="color:#475569; margin:0 6px;">→</span>');
   }
   progressionCard.innerHTML = progHtml;
@@ -1149,7 +1150,7 @@ function initCollapsibles() {
   const careerDetails = $('career-details');
   const seasonDetails = $('season-details');
   if (careerDetails) {
-    careerDetails.open = localStorage.getItem('career-details-open') !== 'false';
+    careerDetails.open = localStorage.getItem('career-details-open') === 'true';
     careerDetails.addEventListener('toggle', () => {
       localStorage.setItem('career-details-open', careerDetails.open);
     });
@@ -1167,5 +1168,5 @@ function updateSeasonSummaryText() {
   const summary = $('season-summary');
   if (!summary) return;
   const seasonId = appState.activeSeasonId;
-  summary.textContent = seasonId ? 'Season ' + seasonId : 'Season';
+  summary.textContent = 'Season';
 }
