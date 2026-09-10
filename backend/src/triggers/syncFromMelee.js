@@ -3,6 +3,7 @@ import { getSettings, updateSetting, parseSeasonId, parseWeek, isSeasonStarted, 
 import { computeSchemer, computeAmbassador, computeChampion, computeBountyHunter, writePodiumBlock } from '../lib/awards.js';
 import { fetchLeagueTournaments, buildWeekMap, createPlayerFinder } from '../lib/meleeLeague.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';
+import { auditVotesForWeek } from '../lib/voteAudit.js';
 
 export function shouldAdvance(isoNow, marker) {
   const date = new Date(isoNow);
@@ -95,6 +96,7 @@ export async function syncFromMelee(env, deps = {}) {
   const createdPlayers = new Map();
   const finder = createPlayerFinder(DB, { onCreated: p => createdPlayers.set(p.id, p) });
   const roundAttendance = new Map();
+  const newlySyncedRounds = new Set();
 
   for (const [meleeId, info] of weekMap) {
     if (syncedStandingsRounds.has(info.round) && syncedMatchesRounds.has(info.round)) continue;
@@ -192,6 +194,8 @@ export async function syncFromMelee(env, deps = {}) {
         console.error(`[SyncFromMelee] Failed to insert match: ${err.message}`);
       }
     }
+
+    newlySyncedRounds.add(info.round);
   }
 
   if (createdPlayers.size > 0) {
@@ -207,6 +211,20 @@ export async function syncFromMelee(env, deps = {}) {
       } catch (err) {
         console.error(`[SyncFromMelee] Failed to record attendance: ${err.message}`);
       }
+    }
+  }
+
+  for (const round of newlySyncedRounds) {
+    try {
+      const audit = await auditVotesForWeek(DB, activeSeasonId, round);
+      if (audit.total === 0) continue;
+      if (audit.nonAttendees.length > 0 || audit.notFaced.length > 0) {
+        console.warn(`[VoteAudit] S${activeSeasonId} W${round}: ${audit.total} votes; non-attendee ${audit.nonAttendees.length} [${audit.nonAttendees.join(', ')}]; opponent-not-faced ${audit.notFaced.length} [${audit.notFaced.join(', ')}]`);
+      } else {
+        console.log(`[VoteAudit] S${activeSeasonId} W${round}: ${audit.total} votes reconciled, no violations`);
+      }
+    } catch (err) {
+      console.error(`[SyncFromMelee] Vote audit failed for week ${round}: ${err.message}`);
     }
   }
 

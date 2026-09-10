@@ -667,6 +667,25 @@ describe('triggers/syncFromMelee', () => {
     });
   });
 
+  it('vote audit flags pre-existing violating votes when a week syncs late', async (t) => {
+    const tables = withSeasonStarted(makeTables());
+    tables.votes = [
+      ...tables.votes,
+      { id: 99, timestamp: '2026-07-01T21:00:00.000Z', updated_at: null, season_id: 6, week: 1, player_id: 'P004', leader_id: '1', opponent_id: 'P002' },
+    ];
+    db = createMockDb(tables);
+    const warnSpy = t.mock.method(console, 'warn', () => {});
+    const { mockFetch } = buildMockFetch({ tournaments: TOURNAMENTS.slice(0, 1) });
+    globalThis.fetch = mockFetch;
+
+    await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch), now: '2026-07-01T15:00:00Z' });
+
+    const auditCall = warnSpy.mock.calls.find(c => String(c.arguments[0]).includes('[VoteAudit]'));
+    assert.ok(auditCall, 'VoteAudit warn emitted when week data lands');
+    assert.match(String(auditCall.arguments[0]), /non-attendee 1 \[P004\]/);
+    assert.ok(!String(auditCall.arguments[0]).includes('P002'), 'audit line must not carry the nominee');
+  });
+
   it('auto-creates unknown melee players from standings and matches (invariant 4)', async () => {
     db = createMockDb(withSeasonStarted(makeTables()));
     const ghostStandings = [
