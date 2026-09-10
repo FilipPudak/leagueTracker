@@ -251,7 +251,7 @@ describe('frontend wiring', () => {
     assert.ok(html.includes('id="link-mode-toggle"'), 'toggle button present');
     assert.ok(html.includes('id="link-email-hint"'), 'email-mode hint present');
     assert.match(app, /function toggleLinkMode\(/);
-    assert.match(app, /setLinkMode\('pick'\)/, 'picker is always the default, even with remembered email');
+    assert.match(app, /setLinkMode\('email'\)/, 'email is the default link mode');
     assert.match(app, /linkMode === 'email' \? '' :/);
   });
 });

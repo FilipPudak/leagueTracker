@@ -274,7 +274,7 @@ function applyBoot(boot) {
     showTabs(false);
     setActiveView('link-view', 0);
     populateLinkPicker(LeagueCore.resolvePlayerChoices(boot));
-    setLinkMode('pick');
+    setLinkMode('email');
     if (boot.status === 'invalid-token') {
       showStatus('Your session expired. Please re-link to continue.', false);
     }
@@ -330,7 +330,7 @@ function filterLinkPicker() {
 /* ---------------------------------------------------------------- intents -- */
 
 let linkInFlight = false;
-let linkMode = 'pick';
+let linkMode = 'email';
 
 function setLinkMode(mode) {
   linkMode = mode;
@@ -340,7 +340,7 @@ function setLinkMode(mode) {
   const toggle = $('link-mode-toggle');
   if (picker) picker.style.display = picking ? '' : 'none';
   if (hint) hint.style.display = picking ? 'none' : '';
-  if (toggle) toggle.textContent = picking ? 'Already linked? Sign in with your email' : 'First time here? Choose your name';
+  if (toggle) toggle.textContent = picking ? 'Already linked? Sign in with your email' : 'First time here? Pick your name from the roster';
 }
 
 function toggleLinkMode() {

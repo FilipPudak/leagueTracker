@@ -313,13 +313,13 @@
         <label for="link-email">Your Email</label>
         <input type="email" id="link-email" class="text-input" placeholder="you@example.com" autocomplete="email" required />
       </div>
-      <div class="form-group" id="link-picker-group">
+      <div class="form-group" id="link-picker-group" style="display:none;">
         <label for="link-player-select">Select Your Name</label>
         <input type="text" id="link-player-search" class="text-input" placeholder="Type to search..." oninput="filterLinkPicker()" autocomplete="off" />
         <select id="link-player-select" size="6" style="margin-top: 8px;"><option value="">-- Choose Your Name --</option></select>
       </div>
-      <p id="link-email-hint" style="display:none; font-size: 0.85rem; color: #94a3b8; margin: 0 0 12px;">Your name will be matched automatically from this email.</p>
-      <button type="button" id="link-mode-toggle" class="not-you" onclick="toggleLinkMode()" style="display:block; margin-bottom:12px;">Already linked? Sign in with your email</button>
+      <p id="link-email-hint" style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 12px;">Your name will be matched automatically from this email.</p>
+      <button type="button" id="link-mode-toggle" class="not-you" onclick="toggleLinkMode()" style="display:block; margin-bottom:12px;">First time here? Pick your name from the roster</button>
       <button type="button" class="btn-submit" onclick="submitAccountLink()">Link Account</button>
     </div>
 
