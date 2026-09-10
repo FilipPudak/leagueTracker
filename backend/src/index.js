@@ -5,6 +5,7 @@ import { handleSubmitVote } from './handlers/submitVote.js';
 import { handleUpdateVote } from './handlers/updateVote.js';
 import { handleGetLeaderboardData } from './handlers/getLeaderboardData.js';
 import { handleGetMySeasonStats } from './handlers/getMySeasonStats.js';
+import { handleGetMyCareerStats } from './handlers/getMyCareerStats.js';
 import { handleGetStandingsData } from './handlers/getStandingsData.js';
 import { handleStartNewSeason } from './handlers/startNewSeason.js';
 import { handleBackfillFromMelee } from './handlers/handleBackfillFromMelee.js';
@@ -14,7 +15,7 @@ import { handleAddLeaders, handleSetLeadersActive, handleRemoveLeaders } from '.
 import { handleMaterializePastAwards } from './handlers/materializePastAwards.js';
 import { findSessionByToken, touchSessionTimestamp } from './lib/auth.js';
 
-const TOKEN_REQUIRED = ['submitVote', 'updateVote', 'unlinkAccount', 'getMySeasonStats'];
+const TOKEN_REQUIRED = ['submitVote', 'updateVote', 'unlinkAccount', 'getMySeasonStats', 'getMyCareerStats'];
 const TOKEN_OPTIONAL = ['getAppData'];
 
 const rateLimitMap = new Map();
@@ -93,6 +94,7 @@ export default {
       updateVote: handleUpdateVote,
       getLeaderboardData: handleGetLeaderboardData,
       getMySeasonStats: handleGetMySeasonStats,
+      getMyCareerStats: handleGetMyCareerStats,
       getStandingsData: handleGetStandingsData,
       startNewSeason: handleStartNewSeason,
       backfillFromMelee: handleBackfillFromMelee,
