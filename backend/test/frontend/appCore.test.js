@@ -230,7 +230,7 @@ describe('frontend wiring', () => {
   it('stale stored votes stay editable and caches/reload stay honest', () => {
     assert.match(app, /function ensureOption\(/, 'missing stored values get injected as options');
     assert.match(app, /appState\.mystatsCache = \{\}/, 'vote success clears My Stats cache');
-    assert.match(app, /if \(isRetry\) fetchInitialAppData\(\)/, 'week-boundary retry refreshes boot state');
+    assert.match(app, /fetchInitialAppData\(\)/, 'vote success refreshes boot state');
   });
 
   it('every leader list carries the set label and most-played is expandable at 5', () => {

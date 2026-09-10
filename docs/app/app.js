@@ -238,7 +238,7 @@ function applyBoot(boot) {
     const day = appState.settings.weeklyDeadlineDay;
     const time = appState.settings.weeklyDeadlineTime;
     if (day && time) {
-      deadlineText.textContent = 'Voting closes ' + day + ' ' + time + ' before games';
+      deadlineText.textContent = 'Voting open until next Wednesday\'s games end';
       deadlineCard.style.display = appState.votingOpen ? 'block' : 'none';
     } else {
       deadlineCard.style.display = 'none';
@@ -570,7 +570,7 @@ function submitVotes(isRetry) {
 
   const action = LeagueCore.voteSubmitAction(appState.currentVote);
   callApi(action, { voteData: { leader1Id: l1, opponentId: opp } })
-    .then(() => { endFlight(); showVoteRecorded(); if (isRetry) fetchInitialAppData(); })
+    .then(() => { endFlight(); showVoteRecorded(); fetchInitialAppData(); })
     .catch((err) => {
       endFlight();
       const msg = err.userMessage || err.message || '';
