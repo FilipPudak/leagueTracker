@@ -44,8 +44,8 @@ username that is literally a GUID (P022 "Sigge Maslov").
 | **`CURRENT_WEEK`** | *The week currently open for voting* = the most recent completed league night. On season start it is `Week 1` before week 1 is played; the first sync run opens voting without advancing. |
 | **Vote referent** | A vote for week N is about **night N as it just finished**. |
 | **Voting window** | Opens at night N's sync; closes when night N+1's sync advances the week. The stored weekly deadline (Wed 17:45) is **displayed only** — a courtesy reminder before games start — and never enforced. |
-| **Cron** | Fires **twice per Wednesday: 20:15 and 21:15 UTC**. Exactly one of those is 22:15 Stockholm in either DST state (summer UTC+2 / winter UTC+1). |
-| **Advance gate** | Week-advance and voting-open happen only when computed Stockholm local time ≥ 22:10 **and** the `LAST_ADVANCED` marker (YYYY-MM-DD) is not today's date. Data sync itself runs idempotently on *every* fire: late-published Melee results are picked up automatically. |
+| **Cron** | Fires **twice on Wednesday (20:15 and 21:15 UTC)** and once on **Thursday (07:00 UTC)**. One of the Wednesday fires is always 22:15 Stockholm (DST-safe). The Thursday fire is a data-backed retry: if Wednesday's results weren't published in time, it opens voting early without advancing. |
+| **Advance gate** | Week-advance and voting-open happen only when computed Stockholm local time ≥ 22:10 **and** the `LAST_ADVANCED` marker (YYYY-MM-DD) is not today's date. The Thursday fire uses `weekDataPresent` (attendance row exists for current week) instead of the time gate. Data sync itself runs idempotently on *every* fire: late-published Melee results are picked up automatically. |
 | **Paused** | `SEASON_PAUSED=TRUE`: sync continues, but no advance, no voting open/close. Toggled by `pauseCurrentSeason` / `resumeCurrentSeason`. |
 
 **Rationale:** Cloudflare crons are UTC-only. Double-fire + deterministic local-time gate yields
@@ -132,7 +132,8 @@ ignored).
   tallies exist. (A previous "de-identified at rest" design was abandoned: it was already
   breakable via synchronized insert timestamps, and it made vote editing impossible.)
 - Voting without attending is allowed (rain-outs, arriving late to vote after the game): it earns
-  raffle tickets.
+  raffle tickets. However, the **favorite opponent must be someone the voter actually faced** that
+  week (enforced server-side at vote time; retroactively audited after sync).
 
 ## 9. Awards (six)
 
