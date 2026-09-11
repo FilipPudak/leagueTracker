@@ -968,7 +968,7 @@ function loadCareerStats() {
     .catch((err) => {
       appState.careerInFlight = false;
       console.warn('Career stats load failed:', err);
-      const section = $('career-section');
+      const section = $('career-details');
       const empty = $('career-empty');
       if (section) section.style.display = 'block';
       if (empty) { empty.textContent = 'Failed to load career stats.'; empty.style.display = 'block'; }
@@ -976,7 +976,7 @@ function loadCareerStats() {
 }
 
 function renderCareerStats(res) {
-  const section = $('career-section');
+  const section = $('career-details');
   const empty = $('career-empty');
   const recordCard = $('career-record-card');
   const rivalryCard = $('career-rivalry-card');
@@ -1089,7 +1089,7 @@ function renderCareerStats(res) {
         } else if (b.type === 'flat') {
           tierLabel = 'Earned';
         }
-        return '<div class="badge-medal ' + tierClass + '">' +
+        return '<div class="badge-medal ' + tierClass + '" title="' + escapeHtml(b.tooltip || '') + '">' +
           '<div class="badge-icon"><img src="' + iconPath + '" alt="' + escapeHtml(b.name) + '"></div>' +
           '<div class="badge-name">' + escapeHtml(b.name) + '</div>' +
           '<div class="badge-tier">' + tierLabel + '</div>' +
@@ -1206,12 +1206,18 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initCollapsibles() {
+  const careerDetails = $('career-details');
   const seasonDetails = $('season-details');
+  if (careerDetails) {
+    careerDetails.open = localStorage.getItem('career-details-open') === 'true';
+    careerDetails.addEventListener('toggle', () => {
+      localStorage.setItem('career-details-open', careerDetails.open);
+    });
+  }
   if (seasonDetails) {
     seasonDetails.open = localStorage.getItem('season-details-open') !== 'false';
     seasonDetails.addEventListener('toggle', () => {
       localStorage.setItem('season-details-open', seasonDetails.open);
-      updateSeasonSummaryText();
     });
   }
 }
@@ -1219,7 +1225,5 @@ function initCollapsibles() {
 function updateSeasonSummaryText() {
   const summary = $('season-summary');
   if (!summary) return;
-  const seasonId = appState.activeSeasonId;
-  const season = (appState.seasons || []).find(s => String(s.id) === String(seasonId));
-  summary.textContent = season ? season.name : 'Season';
+  summary.textContent = 'Seasons';
 }

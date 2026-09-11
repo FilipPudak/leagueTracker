@@ -276,23 +276,23 @@
     .badge-medal .badge-tier { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
 
     .badge-medal.badge-gold { border-color: #facc15; box-shadow: 0 0 16px rgba(250, 204, 21, 0.25); }
-    .badge-medal.badge-gold .badge-icon img { filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.6)); }
+    .badge-medal.badge-gold .badge-icon img { filter: brightness(0) saturate(100%) invert(67%) sepia(89%) saturate(1142%) hue-rotate(358deg) brightness(101%) contrast(106%); }
     .badge-medal.badge-gold .badge-tier { color: #facc15; }
 
     .badge-medal.badge-silver { border-color: #94a3b8; box-shadow: 0 0 10px rgba(148, 163, 184, 0.15); }
-    .badge-medal.badge-silver .badge-icon img { filter: drop-shadow(0 0 4px rgba(148, 163, 184, 0.5)); }
+    .badge-medal.badge-silver .badge-icon img { filter: brightness(0) saturate(100%) invert(73%) sepia(8%) saturate(1205%) hue-rotate(186deg) brightness(95%) contrast(90%); }
     .badge-medal.badge-silver .badge-tier { color: #94a3b8; }
 
     .badge-medal.badge-bronze { border-color: #cd7f32; box-shadow: 0 0 10px rgba(205, 127, 50, 0.2); }
-    .badge-medal.badge-bronze .badge-icon img { filter: drop-shadow(0 0 4px rgba(205, 127, 50, 0.5)); }
+    .badge-medal.badge-bronze .badge-icon img { filter: brightness(0) saturate(100%) invert(55%) sepia(65%) saturate(4182%) hue-rotate(14deg) brightness(95%) contrast(95%); }
     .badge-medal.badge-bronze .badge-tier { color: #cd7f32; }
 
     .badge-medal.badge-flat { border-color: rgba(250, 204, 21, 0.5); box-shadow: 0 0 12px rgba(250, 204, 21, 0.15); }
-    .badge-medal.badge-flat .badge-icon img { filter: drop-shadow(0 0 5px rgba(250, 204, 21, 0.5)); }
+    .badge-medal.badge-flat .badge-icon img { filter: brightness(0) saturate(100%) invert(67%) sepia(89%) saturate(1142%) hue-rotate(358deg) brightness(101%) contrast(106%); }
     .badge-medal.badge-flat .badge-tier { color: #facc15; }
 
     .badge-medal.badge-locked { border-color: rgba(255,255,255,0.05); opacity: 0.35; }
-    .badge-medal.badge-locked .badge-icon img { filter: grayscale(1) brightness(0.5); }
+    .badge-medal.badge-locked .badge-icon img { filter: brightness(0) saturate(100%) invert(30%) sepia(8%) saturate(1205%) hue-rotate(186deg) brightness(70%) contrast(80%); }
     .badge-medal.badge-locked .badge-tier { color: #475569; }
   </style>
 </head>
@@ -487,8 +487,8 @@
 
     <!-- MY STATS PANEL -->
     <div id="myseason-view" class="view-panel">
-      <div id="career-section" style="display:none;">
-        <div style="font-size: 0.95rem; color: #38bdf8; font-weight: 600; margin-bottom: 8px;">Career</div>
+      <details id="career-details" class="section-block">
+        <summary>Career</summary>
         <div id="career-empty" style="text-align:center; color:#94a3b8; padding:12px; font-size:0.85rem; display:none;">No career history yet — your stats appear after you play your first league night.</div>
         <div class="career-tabs">
           <button class="career-tab active" onclick="switchCareerTab('record')">Record</button>
@@ -505,7 +505,7 @@
         <div id="career-tab-badges" class="career-panel">
           <div id="career-badges-container" class="badges-grid"></div>
         </div>
-      </div>
+      </details>
 
       <details id="season-details" class="section-block" open>
         <summary id="season-summary">Season</summary>

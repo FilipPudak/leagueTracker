@@ -100,6 +100,7 @@ export async function computeBadges(db, playerId) {
       type: 'flat',
       earned: hasAttendance,
       icon: 'spacecraft-spaceship-svgrepo-com',
+      tooltip: 'Attend your first league night',
     },
     {
       id: 'nightChampion',
@@ -107,6 +108,7 @@ export async function computeBadges(db, playerId) {
       type: 'flat',
       earned: hasRankOne,
       icon: 'darth-vader',
+      tooltip: 'Finish a night in 1st place',
     },
     {
       id: 'giantSlayer',
@@ -114,6 +116,7 @@ export async function computeBadges(db, playerId) {
       type: 'flat',
       earned: giantSlayer,
       icon: 'boba-fett',
+      tooltip: 'Beat a previous Ruler or Champion',
     },
     {
       id: 'crowdFavorite',
@@ -121,6 +124,7 @@ export async function computeBadges(db, playerId) {
       type: 'flat',
       earned: crowdFavorite,
       icon: 'starwars-rebel-svgrepo-com',
+      tooltip: 'Receive 3+ favorite opponent votes in one season',
     },
     {
       id: 'loyalist',
@@ -128,6 +132,7 @@ export async function computeBadges(db, playerId) {
       type: 'flat',
       earned: loyalist,
       icon: 'shield-star-fill-svgrepo-com',
+      tooltip: 'Attend 3 consecutive seasons',
     },
     {
       id: 'nightWins',
@@ -137,15 +142,17 @@ export async function computeBadges(db, playerId) {
       tier: tierFor(totalWins, TIER_THRESHOLDS.nightWins),
       earned: totalWins >= TIER_THRESHOLDS.nightWins.bronze,
       icon: 'lightsaber-svgrepo-com',
+      tooltip: 'Win matches across league nights — Bronze: 5, Silver: 15, Gold: 30',
     },
     {
-      id: 'undefeatedNights',
-      name: 'Undefeated Nights',
+      id: 'cleanSheet',
+      name: 'Clean Sheet',
       type: 'tiered',
       value: undefeatedNights,
       tier: tierFor(undefeatedNights, TIER_THRESHOLDS.undefeatedNights),
       earned: undefeatedNights >= TIER_THRESHOLDS.undefeatedNights.bronze,
       icon: 'death-star',
+      tooltip: 'Complete a night with no losses — Bronze: 1, Silver: 3, Gold: 5',
     },
     {
       id: 'attendance',
@@ -155,6 +162,7 @@ export async function computeBadges(db, playerId) {
       tier: tierFor(attendance.length, TIER_THRESHOLDS.attendance),
       earned: attendance.length >= TIER_THRESHOLDS.attendance.bronze,
       icon: 'stormtrooper',
+      tooltip: 'Attend league nights — Bronze: 10, Silver: 25, Gold: 50',
     },
     {
       id: 'leaderVariety',
@@ -164,6 +172,7 @@ export async function computeBadges(db, playerId) {
       tier: tierFor(distinctLeaders, TIER_THRESHOLDS.leaderVariety),
       earned: distinctLeaders >= TIER_THRESHOLDS.leaderVariety.bronze,
       icon: 'medal-with-star-shape-svgrepo-com',
+      tooltip: 'Play different leaders in votes — Bronze: 3, Silver: 6, Gold: 10',
     },
     {
       id: 'sweepMaster',
@@ -173,6 +182,7 @@ export async function computeBadges(db, playerId) {
       tier: tierFor(sweepCount, TIER_THRESHOLDS.sweepMaster),
       earned: sweepCount >= TIER_THRESHOLDS.sweepMaster.bronze,
       icon: 'lightsabers-crossed',
+      tooltip: 'Win matches 2-0 — Bronze: 5, Silver: 15, Gold: 30',
     },
   ];
 }

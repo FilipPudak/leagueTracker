@@ -285,7 +285,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'undefeatedNights');
+        const b = badges.find(b => b.id === 'cleanSheet');
         assert.equal(b.value, 1);
         assert.equal(b.tier, 'bronze');
       });
@@ -303,7 +303,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'undefeatedNights');
+        const b = badges.find(b => b.id === 'cleanSheet');
         assert.equal(b.value, 3);
         assert.equal(b.tier, 'silver');
       });
@@ -320,7 +320,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'undefeatedNights');
+        const b = badges.find(b => b.id === 'cleanSheet');
         assert.equal(b.value, 1);
       });
     });
