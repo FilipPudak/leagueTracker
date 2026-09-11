@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.2.0';
+const APP_VERSION = '4.2.1';
 
 let appState = {
   status: 'unlinked',
@@ -452,6 +452,18 @@ function confirmUnlink() {
         setActiveView('link-view', 0);
       }
     });
+}
+
+const CAREER_TAB_INDEX = { record: 0, versus: 1, badges: 2 };
+
+function switchCareerTab(tabId) {
+  document.querySelectorAll('.career-tab').forEach((b) => b.classList.remove('active'));
+  document.querySelectorAll('.career-panel').forEach((p) => p.classList.remove('active'));
+  const idx = CAREER_TAB_INDEX[tabId];
+  const tabs = document.querySelectorAll('.career-tab');
+  if (tabs[idx]) tabs[idx].classList.add('active');
+  const panel = $('career-tab-' + tabId);
+  if (panel) panel.classList.add('active');
 }
 
 function switchTab(tabId) {
@@ -934,33 +946,6 @@ function renderMySeasonStats(res) {
     limit: Infinity
   });
 
-  const badges = res.badges || [];
-  const badgesSection = $('myseason-badges-section');
-  const badgesContainer = $('myseason-badges-container');
-  if (badgesSection && badgesContainer) {
-    const earned = badges.filter(b => b.earned);
-    if (earned.length > 0) {
-      badgesContainer.innerHTML = earned.map(b => {
-        const iconPath = `icons/${b.icon}.svg`;
-        if (b.type === 'tiered') {
-          return `<div class="badge-item" title="${b.name} (${b.tier})" style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#1e293b;border-radius:8px;border:1px solid #334155;">
-            <img src="${iconPath}" alt="${b.name}" width="20" height="20" style="filter:drop-shadow(0 0 4px ${b.tier === 'gold' ? '#fbbf24' : b.tier === 'silver' ? '#94a3b8' : '#cd7f32'});">
-            <span style="font-size:0.8rem;color:#e2e8f0;">${b.name}</span>
-            <span style="font-size:0.7rem;color:#94a3b8;">${b.tier}</span>
-          </div>`;
-        }
-        return `<div class="badge-item" title="${b.name}" style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#1e293b;border-radius:8px;border:1px solid #334155;">
-          <img src="${iconPath}" alt="${b.name}" width="20" height="20" style="filter:drop-shadow(0 0 4px #38bdf8);">
-          <span style="font-size:0.8rem;color:#e2e8f0;">${b.name}</span>
-        </div>`;
-      }).join('');
-      badgesSection.style.display = 'block';
-    } else {
-      badgesContainer.innerHTML = '';
-      badgesSection.style.display = 'none';
-    }
-  }
-
   const content = $('myseason-content');
   if (content) content.style.display = 'block';
 }
@@ -983,7 +968,7 @@ function loadCareerStats() {
     .catch((err) => {
       appState.careerInFlight = false;
       console.warn('Career stats load failed:', err);
-      const section = $('career-details');
+      const section = $('career-section');
       const empty = $('career-empty');
       if (section) section.style.display = 'block';
       if (empty) { empty.textContent = 'Failed to load career stats.'; empty.style.display = 'block'; }
@@ -991,11 +976,12 @@ function loadCareerStats() {
 }
 
 function renderCareerStats(res) {
-  const section = $('career-details');
+  const section = $('career-section');
   const empty = $('career-empty');
   const recordCard = $('career-record-card');
   const rivalryCard = $('career-rivalry-card');
   const progressionCard = $('career-progression-card');
+  const badgesContainer = $('career-badges-container');
   if (!section) return;
 
   if (!res || !res.hasCareerData) {
@@ -1004,6 +990,7 @@ function renderCareerStats(res) {
     recordCard.style.display = 'none';
     rivalryCard.style.display = 'none';
     progressionCard.style.display = 'none';
+    if (badgesContainer) badgesContainer.innerHTML = '';
     return;
   }
 
@@ -1087,6 +1074,31 @@ function renderCareerStats(res) {
   }
   progressionCard.innerHTML = progHtml;
   progressionCard.style.display = 'block';
+
+  const badges = res.badges || [];
+  if (badgesContainer) {
+    const earned = badges.filter(b => b.earned);
+    if (earned.length > 0) {
+      badgesContainer.innerHTML = earned.map(b => {
+        const iconPath = 'icons/' + b.icon + '.svg';
+        let tierClass = 'badge-flat';
+        let tierLabel = '';
+        if (b.type === 'tiered' && b.tier) {
+          tierClass = 'badge-' + b.tier;
+          tierLabel = b.tier.charAt(0).toUpperCase() + b.tier.slice(1);
+        } else if (b.type === 'flat') {
+          tierLabel = 'Earned';
+        }
+        return '<div class="badge-medal ' + tierClass + '">' +
+          '<div class="badge-icon"><img src="' + iconPath + '" alt="' + escapeHtml(b.name) + '"></div>' +
+          '<div class="badge-name">' + escapeHtml(b.name) + '</div>' +
+          '<div class="badge-tier">' + tierLabel + '</div>' +
+        '</div>';
+      }).join('');
+    } else {
+      badgesContainer.innerHTML = '<div style="color:#94a3b8; font-size:0.85rem; width:100%; text-align:center; padding:16px;">No badges earned yet — play league nights to unlock achievements!</div>';
+    }
+  }
 }
 
 /* -------------------------------------------------------------- utilities -- */
@@ -1194,14 +1206,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initCollapsibles() {
-  const careerDetails = $('career-details');
   const seasonDetails = $('season-details');
-  if (careerDetails) {
-    careerDetails.open = localStorage.getItem('career-details-open') === 'true';
-    careerDetails.addEventListener('toggle', () => {
-      localStorage.setItem('career-details-open', careerDetails.open);
-    });
-  }
   if (seasonDetails) {
     seasonDetails.open = localStorage.getItem('season-details-open') !== 'false';
     seasonDetails.addEventListener('toggle', () => {

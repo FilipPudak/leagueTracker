@@ -1,5 +1,6 @@
 import { getSetting, parseSeasonId, parseWeek } from '../db/queries.js';
 import { buildRivalry, buildCareerRecord, buildSeasonProgression } from '../lib/careerStats.js';
+import { computeBadges } from '../lib/badges.js';
 
 export async function handleGetMyCareerStats(body, env, session) {
   const { DB } = env;
@@ -60,5 +61,7 @@ export async function handleGetMyCareerStats(body, env, session) {
 
   const hasCareerData = record.nights > 0 || record.matches.played > 0;
 
-  return { hasCareerData, rivalry, record, progression, peak, activeSeasonId };
+  const badges = await computeBadges(DB, playerId);
+
+  return { hasCareerData, rivalry, record, progression, peak, activeSeasonId, badges };
 }

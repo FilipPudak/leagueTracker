@@ -99,7 +99,7 @@ export async function computeBadges(db, playerId) {
       name: 'First Night',
       type: 'flat',
       earned: hasAttendance,
-      icon: 'spacecraft',
+      icon: 'spacecraft-spaceship-svgrepo-com',
     },
     {
       id: 'nightChampion',
@@ -120,14 +120,14 @@ export async function computeBadges(db, playerId) {
       name: 'Crowd Favorite',
       type: 'flat',
       earned: crowdFavorite,
-      icon: 'rebel-starbird',
+      icon: 'starwars-rebel-svgrepo-com',
     },
     {
       id: 'loyalist',
       name: 'Loyalist',
       type: 'flat',
       earned: loyalist,
-      icon: 'shield-star',
+      icon: 'shield-star-fill-svgrepo-com',
     },
     {
       id: 'nightWins',
@@ -136,7 +136,7 @@ export async function computeBadges(db, playerId) {
       value: totalWins,
       tier: tierFor(totalWins, TIER_THRESHOLDS.nightWins),
       earned: totalWins >= TIER_THRESHOLDS.nightWins.bronze,
-      icon: 'lightsaber',
+      icon: 'lightsaber-svgrepo-com',
     },
     {
       id: 'undefeatedNights',
@@ -163,7 +163,7 @@ export async function computeBadges(db, playerId) {
       value: distinctLeaders,
       tier: tierFor(distinctLeaders, TIER_THRESHOLDS.leaderVariety),
       earned: distinctLeaders >= TIER_THRESHOLDS.leaderVariety.bronze,
-      icon: 'medal-star',
+      icon: 'medal-with-star-shape-svgrepo-com',
     },
     {
       id: 'sweepMaster',

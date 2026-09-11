@@ -260,6 +260,40 @@
     }
     .footer-discord:hover { color: #7983f5; }
     .footer-discord .discord-mark { width: 18px; height: 18px; }
+
+    .career-tabs { display: flex; gap: 4px; margin-bottom: 12px; background: #090d16; padding: 3px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); }
+    .career-tab { flex: 1; padding: 6px 0; border: none; background: transparent; color: #64748b; font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.5px; border-radius: 5px; cursor: pointer; transition: all 0.25s ease; }
+    .career-tab.active { background: #38bdf8; color: #050811; box-shadow: 0 0 8px rgba(56, 189, 248, 0.4); }
+    .career-panel { display: none; }
+    .career-panel.active { display: block; }
+
+    .badges-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; padding: 8px 0; }
+    .badge-medal { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 90px; padding: 14px 8px 10px; border-radius: 12px; background: #0f172a; border: 2px solid rgba(255,255,255,0.08); transition: all 0.2s ease; }
+    .badge-medal:hover { transform: translateY(-2px); }
+    .badge-medal .badge-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+    .badge-medal .badge-icon img { width: 36px; height: 36px; }
+    .badge-medal .badge-name { font-size: 0.65rem; color: #e2e8f0; text-align: center; line-height: 1.2; font-weight: 600; }
+    .badge-medal .badge-tier { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+
+    .badge-medal.badge-gold { border-color: #facc15; box-shadow: 0 0 16px rgba(250, 204, 21, 0.25); }
+    .badge-medal.badge-gold .badge-icon img { filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.6)); }
+    .badge-medal.badge-gold .badge-tier { color: #facc15; }
+
+    .badge-medal.badge-silver { border-color: #94a3b8; box-shadow: 0 0 10px rgba(148, 163, 184, 0.15); }
+    .badge-medal.badge-silver .badge-icon img { filter: drop-shadow(0 0 4px rgba(148, 163, 184, 0.5)); }
+    .badge-medal.badge-silver .badge-tier { color: #94a3b8; }
+
+    .badge-medal.badge-bronze { border-color: #cd7f32; box-shadow: 0 0 10px rgba(205, 127, 50, 0.2); }
+    .badge-medal.badge-bronze .badge-icon img { filter: drop-shadow(0 0 4px rgba(205, 127, 50, 0.5)); }
+    .badge-medal.badge-bronze .badge-tier { color: #cd7f32; }
+
+    .badge-medal.badge-flat { border-color: rgba(250, 204, 21, 0.5); box-shadow: 0 0 12px rgba(250, 204, 21, 0.15); }
+    .badge-medal.badge-flat .badge-icon img { filter: drop-shadow(0 0 5px rgba(250, 204, 21, 0.5)); }
+    .badge-medal.badge-flat .badge-tier { color: #facc15; }
+
+    .badge-medal.badge-locked { border-color: rgba(255,255,255,0.05); opacity: 0.35; }
+    .badge-medal.badge-locked .badge-icon img { filter: grayscale(1) brightness(0.5); }
+    .badge-medal.badge-locked .badge-tier { color: #475569; }
   </style>
 </head>
 <body>
@@ -453,13 +487,25 @@
 
     <!-- MY STATS PANEL -->
     <div id="myseason-view" class="view-panel">
-      <details id="career-details" class="section-block">
-        <summary>Career</summary>
+      <div id="career-section" style="display:none;">
+        <div style="font-size: 0.95rem; color: #38bdf8; font-weight: 600; margin-bottom: 8px;">Career</div>
         <div id="career-empty" style="text-align:center; color:#94a3b8; padding:12px; font-size:0.85rem; display:none;">No career history yet — your stats appear after you play your first league night.</div>
-        <div id="career-record-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
-        <div id="career-rivalry-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
-        <div id="career-progression-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
-      </details>
+        <div class="career-tabs">
+          <button class="career-tab active" onclick="switchCareerTab('record')">Record</button>
+          <button class="career-tab" onclick="switchCareerTab('versus')">Versus</button>
+          <button class="career-tab" onclick="switchCareerTab('badges')">Badges</button>
+        </div>
+        <div id="career-tab-record" class="career-panel active">
+          <div id="career-record-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
+          <div id="career-progression-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
+        </div>
+        <div id="career-tab-versus" class="career-panel">
+          <div id="career-rivalry-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
+        </div>
+        <div id="career-tab-badges" class="career-panel">
+          <div id="career-badges-container" class="badges-grid"></div>
+        </div>
+      </div>
 
       <details id="season-details" class="section-block" open>
         <summary id="season-summary">Season</summary>
@@ -492,11 +538,6 @@
           <div style="margin-top: 16px;">
             <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Leaders Played</h3>
             <div id="myseason-leaders-container"></div>
-          </div>
-
-          <div id="myseason-badges-section" style="margin-top: 16px; display: none;">
-            <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Achievement Badges</h3>
-            <div id="myseason-badges-container" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
           </div>
         </div>
       </details>
