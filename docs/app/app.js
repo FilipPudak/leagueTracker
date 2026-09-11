@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.4.2';
+const APP_VERSION = '4.4.3';
 
 let appState = {
   status: 'unlinked',
@@ -1279,6 +1279,9 @@ function initBadgeTooltips() {
       positionTooltip(tooltip, medal);
       tooltip.classList.add('visible');
     }
+  });
+  grid.addEventListener('contextmenu', (e) => {
+    if (e.target.closest('.badge-medal')) e.preventDefault();
   });
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.badges-grid')) {

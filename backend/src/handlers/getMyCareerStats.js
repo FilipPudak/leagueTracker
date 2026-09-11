@@ -61,7 +61,7 @@ export async function handleGetMyCareerStats(body, env, session) {
 
   const hasCareerData = record.nights > 0 || record.matches.played > 0;
 
-  const badges = await computeBadges(DB, playerId);
+  const badges = await computeBadges(DB, playerId, activeSeasonId, currentWeek !== null);
 
   return { hasCareerData, rivalry, record, progression, peak, activeSeasonId, badges };
 }

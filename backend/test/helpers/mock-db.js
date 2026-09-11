@@ -268,7 +268,7 @@ function executeSelect(sql, params, store) {
     for (const [, groupRows] of groups) {
       if (upper.includes('COUNT(DISTINCT')) {
         const distMatch = upper.match(/COUNT\(DISTINCT\s+(\w+(?:\.\w+)?)\)/i);
-        const col = distMatch[1].split('.').pop().replace(/"/g, '');
+        const col = distMatch[1].split('.').pop().replace(/"/g, '').toLowerCase();
         const uniqueVals = new Set(groupRows.map(r => r[col]));
         const row = {};
         for (const gc of groupCols) {

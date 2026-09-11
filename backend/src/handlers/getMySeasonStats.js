@@ -68,7 +68,7 @@ export async function handleGetMySeasonStats(body, env, session) {
 
   const [raffleTickets, badges, deckWinRates] = await Promise.all([
     getRaffleTickets(DB, sid, playerId),
-    computeBadges(DB, playerId),
+    computeBadges(DB, playerId, activeSeasonId, isCurrentSeason),
     computeDeckWinRates(DB, playerId, sid),
   ]);
   const hasVoteData = raffleTickets > 0;

@@ -23,7 +23,7 @@ function nextTierInfo(value, thresholds) {
   return { nextTier: null, nextThreshold: null };
 }
 
-export async function computeBadges(db, playerId) {
+export async function computeBadges(db, playerId, activeSeasonId = null, isSeasonActive = false) {
   const [attendanceRows, standingsRows, matchRows, votesRows, votesReceivedRows, leaderCount, champAsP1, champAsP2] = await Promise.all([
     db.prepare('SELECT season_id, week FROM attendance WHERE player_id = ?').bind(playerId).all(),
     db.prepare('SELECT season_id, round, wins, losses, rank FROM season_standings WHERE player_id = ?').bind(playerId).all(),
@@ -33,7 +33,7 @@ export async function computeBadges(db, playerId) {
     ).bind(playerId, playerId).all(),
     db.prepare('SELECT season_id, week, leader_id FROM votes WHERE player_id = ?').bind(playerId).all(),
     db.prepare(
-      'SELECT season_id, COUNT(*) as cnt FROM votes WHERE opponent_id = ? GROUP BY season_id'
+      'SELECT season_id, COUNT(DISTINCT player_id) as cnt FROM votes WHERE opponent_id = ? GROUP BY season_id'
     ).bind(playerId).all(),
     db.prepare('SELECT COUNT(DISTINCT leader_id) as cnt FROM votes WHERE player_id = ?').bind(playerId).first(),
     db.prepare(
@@ -62,6 +62,7 @@ export async function computeBadges(db, playerId) {
 
   let crowdFavorite = false;
   for (const row of receivedVotes) {
+    if (isSeasonActive && row.season_id === activeSeasonId) continue;
     if (row.cnt >= 3) { crowdFavorite = true; break; }
   }
 
@@ -107,15 +108,19 @@ export async function computeBadges(db, playerId) {
   let hasDeckMaster = false;
   const seasonIds = [...new Set(matches.map(m => m.season_id))];
   for (const sid of seasonIds) {
-    const winningLeaders = new Set();
+    const leaderWinCount = new Map();
     for (const m of matches) {
       if (m.season_id !== sid) continue;
       if (m.is_bye) continue;
       if (m.winner_id !== playerId) continue;
       const leaderId = voteByWeekSeason.get(`${sid}-${m.round}`);
-      if (leaderId) winningLeaders.add(leaderId);
+      if (leaderId) leaderWinCount.set(leaderId, (leaderWinCount.get(leaderId) || 0) + 1);
     }
-    if (winningLeaders.size >= 5) { hasDeckMaster = true; break; }
+    let leadersWithThreeWins = 0;
+    for (const count of leaderWinCount.values()) {
+      if (count >= 3) leadersWithThreeWins++;
+    }
+    if (leadersWithThreeWins >= 6) { hasDeckMaster = true; break; }
   }
 
   const totalVotes = votes.length;
@@ -151,7 +156,7 @@ export async function computeBadges(db, playerId) {
       type: 'flat',
       earned: crowdFavorite,
       icon: 'rebel',
-      tooltip: 'Receive 3+ favorite opponent votes in a single season',
+      tooltip: 'Receive 3+ favorite opponent votes from different players in a completed season',
     },
     {
       id: 'loyalist',
@@ -167,7 +172,7 @@ export async function computeBadges(db, playerId) {
       type: 'flat',
       earned: hasDeckMaster,
       icon: 'cards',
-      tooltip: 'Win with 5 different leaders in a single season',
+      tooltip: 'Win 3+ matches each with 6 different leaders in a single season',
     },
     {
       id: 'nightWins',
