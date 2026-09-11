@@ -1262,6 +1262,7 @@ function initBadgeTooltips() {
     const medal = e.target.closest('.badge-medal');
     if (!medal) return;
     const tooltip = medal.querySelector('.badge-tooltip');
+    if (tooltip && e.relatedTarget && tooltip.contains(e.relatedTarget)) return;
     if (tooltip) tooltip.classList.remove('visible');
   });
   grid.addEventListener('click', (e) => {

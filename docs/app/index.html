@@ -269,7 +269,7 @@
 
     .badges-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; justify-items: center; padding: 8px 0; }
     .badge-medal { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; max-width: 110px; padding: 14px 8px 10px; border-radius: 12px; background: #0f172a; border: 2px solid rgba(255,255,255,0.08); transition: all 0.2s ease; }
-    .badge-medal:hover { transform: translateY(-2px); }
+    .badge-medal:hover { box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15); }
     .badge-medal .badge-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
     .badge-medal .badge-icon img { width: 36px; height: 36px; }
     .badge-medal .badge-name { font-size: 0.65rem; color: #e2e8f0; text-align: center; line-height: 1.2; font-weight: 600; }
@@ -304,7 +304,7 @@
       content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
       border: 6px solid transparent; border-top-color: #38bdf8;
     }
-    .badge-medal:hover .badge-tooltip, .badge-tooltip.visible { opacity: 1; pointer-events: auto; }
+    .badge-tooltip.visible { opacity: 1; pointer-events: auto; }
   </style>
 </head>
 <body>
