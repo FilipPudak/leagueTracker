@@ -16,6 +16,13 @@ function tierFor(value, thresholds) {
   return null;
 }
 
+function nextTierInfo(value, thresholds) {
+  if (value < thresholds.bronze) return { nextTier: 'bronze', nextThreshold: thresholds.bronze };
+  if (value < thresholds.silver) return { nextTier: 'silver', nextThreshold: thresholds.silver };
+  if (value < thresholds.gold)   return { nextTier: 'gold', nextThreshold: thresholds.gold };
+  return { nextTier: null, nextThreshold: null };
+}
+
 export async function computeBadges(db, playerId) {
   const [attendanceRows, standingsRows, matchRows, votesRows, votesReceivedRows, leaderCount, champAsP1, champAsP2] = await Promise.all([
     db.prepare('SELECT season_id, week FROM attendance WHERE player_id = ?').bind(playerId).all(),
@@ -144,7 +151,7 @@ export async function computeBadges(db, playerId) {
       type: 'flat',
       earned: crowdFavorite,
       icon: 'rebel',
-      tooltip: 'Receive 3+ favorite opponent votes in one season',
+      tooltip: 'Receive 3+ favorite opponent votes in a single season',
     },
     {
       id: 'loyalist',
@@ -168,6 +175,7 @@ export async function computeBadges(db, playerId) {
       type: 'tiered',
       value: totalWins,
       tier: tierFor(totalWins, TIER_THRESHOLDS.nightWins),
+      ...nextTierInfo(totalWins, TIER_THRESHOLDS.nightWins),
       earned: totalWins >= TIER_THRESHOLDS.nightWins.bronze,
       icon: 'lightsaber',
       tooltip: 'Win matches across league nights — Bronze: 5, Silver: 15, Gold: 30',
@@ -178,6 +186,7 @@ export async function computeBadges(db, playerId) {
       type: 'tiered',
       value: undefeatedNights,
       tier: tierFor(undefeatedNights, TIER_THRESHOLDS.undefeatedNights),
+      ...nextTierInfo(undefeatedNights, TIER_THRESHOLDS.undefeatedNights),
       earned: undefeatedNights >= TIER_THRESHOLDS.undefeatedNights.bronze,
       icon: 'death-star',
       tooltip: 'Complete a night with no losses — Bronze: 1, Silver: 3, Gold: 5',
@@ -188,6 +197,7 @@ export async function computeBadges(db, playerId) {
       type: 'tiered',
       value: attendance.length,
       tier: tierFor(attendance.length, TIER_THRESHOLDS.attendance),
+      ...nextTierInfo(attendance.length, TIER_THRESHOLDS.attendance),
       earned: attendance.length >= TIER_THRESHOLDS.attendance.bronze,
       icon: 'stormtrooper',
       tooltip: 'Attend league nights — Bronze: 10, Silver: 25, Gold: 50',
@@ -198,9 +208,10 @@ export async function computeBadges(db, playerId) {
       type: 'tiered',
       value: distinctLeaders,
       tier: tierFor(distinctLeaders, TIER_THRESHOLDS.leaderVariety),
+      ...nextTierInfo(distinctLeaders, TIER_THRESHOLDS.leaderVariety),
       earned: distinctLeaders >= TIER_THRESHOLDS.leaderVariety.bronze,
       icon: 'medal',
-      tooltip: 'Play different leaders in votes — Bronze: 3, Silver: 6, Gold: 10',
+      tooltip: 'Play different leaders — Bronze: 3, Silver: 6, Gold: 10',
     },
     {
       id: 'sweepMaster',
@@ -208,6 +219,7 @@ export async function computeBadges(db, playerId) {
       type: 'tiered',
       value: sweepCount,
       tier: tierFor(sweepCount, TIER_THRESHOLDS.sweepMaster),
+      ...nextTierInfo(sweepCount, TIER_THRESHOLDS.sweepMaster),
       earned: sweepCount >= TIER_THRESHOLDS.sweepMaster.bronze,
       icon: 'crossed-lightsabers',
       tooltip: 'Win matches 2-0 — Bronze: 5, Silver: 15, Gold: 30',
@@ -218,6 +230,7 @@ export async function computeBadges(db, playerId) {
       type: 'tiered',
       value: totalVotes,
       tier: tierFor(totalVotes, TIER_THRESHOLDS.voter),
+      ...nextTierInfo(totalVotes, TIER_THRESHOLDS.voter),
       earned: totalVotes >= TIER_THRESHOLDS.voter.bronze,
       icon: 'ballot',
       tooltip: 'Submit votes — Bronze: 5, Silver: 10, Gold: 20',

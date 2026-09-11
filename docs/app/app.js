@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.4.0';
+const APP_VERSION = '4.4.1';
 
 let appState = {
   status: 'unlinked',
@@ -1082,6 +1082,7 @@ function renderCareerStats(res) {
         const iconPath = 'icons/' + b.icon + '.svg';
         let tierClass = 'badge-locked';
         let tierLabel = '';
+        let tooltipText = b.tooltip || '';
         if (b.earned) {
           if (b.type === 'tiered' && b.tier) {
             tierClass = 'badge-' + b.tier;
@@ -1090,12 +1091,14 @@ function renderCareerStats(res) {
             tierClass = 'badge-gold';
             tierLabel = 'Earned';
           }
+        } else if (b.type === 'tiered' && b.nextThreshold) {
+          tooltipText = b.value + '/' + b.nextThreshold + ' to ' + b.nextTier.charAt(0).toUpperCase() + b.nextTier.slice(1);
         }
-        return '<div class="badge-medal ' + tierClass + '" data-tooltip="' + escapeHtml(b.tooltip || '') + '">' +
+        return '<div class="badge-medal ' + tierClass + '" data-tooltip="' + escapeHtml(tooltipText) + '">' +
           '<div class="badge-icon"><img src="' + iconPath + '" alt="' + escapeHtml(b.name) + '"></div>' +
           '<div class="badge-name">' + escapeHtml(b.name) + '</div>' +
           '<div class="badge-tier">' + tierLabel + '</div>' +
-          '<div class="badge-tooltip">' + escapeHtml(b.tooltip || '') + '</div>' +
+          '<div class="badge-tooltip">' + escapeHtml(tooltipText) + '</div>' +
         '</div>';
       }).join('');
     } else {
@@ -1235,6 +1238,14 @@ function updateSeasonSummaryText() {
 function initBadgeTooltips() {
   const grid = $('career-badges-container');
   if (!grid) return;
+  const medals = grid.querySelectorAll('.badge-medal');
+  medals.forEach((medal, i) => {
+    const col = i % 4;
+    const tooltip = medal.querySelector('.badge-tooltip');
+    if (!tooltip) return;
+    if (col === 0) tooltip.classList.add('tooltip-left');
+    else if (col === 3) tooltip.classList.add('tooltip-right');
+  });
   grid.addEventListener('click', (e) => {
     const medal = e.target.closest('.badge-medal');
     if (!medal) {

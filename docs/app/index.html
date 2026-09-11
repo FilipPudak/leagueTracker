@@ -287,7 +287,8 @@
     .badge-medal.badge-bronze .badge-icon img { filter: brightness(0) saturate(100%) invert(55%) sepia(65%) saturate(4182%) hue-rotate(14deg) brightness(95%) contrast(95%); }
     .badge-medal.badge-bronze .badge-tier { color: #cd7f32; }
 
-    .badge-medal.badge-locked { border-color: rgba(255,255,255,0.05); opacity: 0.35; }
+    .badge-medal.badge-locked { border-color: rgba(255,255,255,0.05); }
+    .badge-medal.badge-locked .badge-icon, .badge-medal.badge-locked .badge-name, .badge-medal.badge-locked .badge-tier { opacity: 0.35; }
     .badge-medal.badge-locked .badge-icon img { filter: brightness(0) saturate(100%) invert(30%) sepia(8%) saturate(1205%) hue-rotate(186deg) brightness(70%) contrast(80%); }
     .badge-medal.badge-locked .badge-tier { color: #475569; }
 
@@ -303,6 +304,10 @@
       content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
       border: 6px solid transparent; border-top-color: #38bdf8;
     }
+    .badge-tooltip.tooltip-left { left: 0; transform: none; }
+    .badge-tooltip.tooltip-left::after { left: 16px; transform: none; }
+    .badge-tooltip.tooltip-right { left: auto; right: 0; transform: none; }
+    .badge-tooltip.tooltip-right::after { left: auto; right: 16px; transform: none; }
     .badge-medal:hover .badge-tooltip, .badge-tooltip.visible { opacity: 1; pointer-events: auto; }
   </style>
 </head>
