@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.4.1';
+const APP_VERSION = '4.4.2';
 
 let appState = {
   status: 'unlinked',
@@ -1082,7 +1082,7 @@ function renderCareerStats(res) {
         const iconPath = 'icons/' + b.icon + '.svg';
         let tierClass = 'badge-locked';
         let tierLabel = '';
-        let tooltipText = b.tooltip || '';
+        let tooltipHtml = escapeHtml(b.tooltip || '');
         if (b.earned) {
           if (b.type === 'tiered' && b.tier) {
             tierClass = 'badge-' + b.tier;
@@ -1092,13 +1092,13 @@ function renderCareerStats(res) {
             tierLabel = 'Earned';
           }
         } else if (b.type === 'tiered' && b.nextThreshold) {
-          tooltipText = b.value + '/' + b.nextThreshold + ' to ' + b.nextTier.charAt(0).toUpperCase() + b.nextTier.slice(1);
+          tooltipHtml += '<br>' + b.value + '/' + b.nextThreshold + ' to ' + b.nextTier.charAt(0).toUpperCase() + b.nextTier.slice(1);
         }
-        return '<div class="badge-medal ' + tierClass + '" data-tooltip="' + escapeHtml(tooltipText) + '">' +
+        return '<div class="badge-medal ' + tierClass + '">' +
           '<div class="badge-icon"><img src="' + iconPath + '" alt="' + escapeHtml(b.name) + '"></div>' +
           '<div class="badge-name">' + escapeHtml(b.name) + '</div>' +
           '<div class="badge-tier">' + tierLabel + '</div>' +
-          '<div class="badge-tooltip">' + escapeHtml(tooltipText) + '</div>' +
+          '<div class="badge-tooltip">' + tooltipHtml + '</div>' +
         '</div>';
       }).join('');
     } else {
@@ -1238,13 +1238,31 @@ function updateSeasonSummaryText() {
 function initBadgeTooltips() {
   const grid = $('career-badges-container');
   if (!grid) return;
-  const medals = grid.querySelectorAll('.badge-medal');
-  medals.forEach((medal, i) => {
-    const col = i % 4;
+  function positionTooltip(tooltip, medal) {
+    const r = medal.getBoundingClientRect();
+    const tw = Math.min(220, window.innerWidth - 32);
+    let left = r.left + r.width / 2 - tw / 2;
+    if (left < 8) left = 8;
+    if (left + tw > window.innerWidth - 8) left = window.innerWidth - tw - 8;
+    tooltip.style.left = left + 'px';
+    tooltip.style.width = tw + 'px';
+    tooltip.style.bottom = 'auto';
+    tooltip.style.top = (r.top - 8) + 'px';
+    tooltip.style.transform = 'translateY(-100%)';
+  }
+  grid.addEventListener('mouseover', (e) => {
+    const medal = e.target.closest('.badge-medal');
+    if (!medal) return;
     const tooltip = medal.querySelector('.badge-tooltip');
     if (!tooltip) return;
-    if (col === 0) tooltip.classList.add('tooltip-left');
-    else if (col === 3) tooltip.classList.add('tooltip-right');
+    positionTooltip(tooltip, medal);
+    tooltip.classList.add('visible');
+  });
+  grid.addEventListener('mouseout', (e) => {
+    const medal = e.target.closest('.badge-medal');
+    if (!medal) return;
+    const tooltip = medal.querySelector('.badge-tooltip');
+    if (tooltip) tooltip.classList.remove('visible');
   });
   grid.addEventListener('click', (e) => {
     const medal = e.target.closest('.badge-medal');
@@ -1256,6 +1274,14 @@ function initBadgeTooltips() {
     if (!tooltip) return;
     const wasVisible = tooltip.classList.contains('visible');
     grid.querySelectorAll('.badge-tooltip.visible').forEach(t => t.classList.remove('visible'));
-    if (!wasVisible) tooltip.classList.add('visible');
+    if (!wasVisible) {
+      positionTooltip(tooltip, medal);
+      tooltip.classList.add('visible');
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.badges-grid')) {
+      grid.querySelectorAll('.badge-tooltip.visible').forEach(t => t.classList.remove('visible'));
+    }
   });
 }
