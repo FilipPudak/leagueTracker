@@ -407,22 +407,144 @@ describe('lib/badges computeBadges', () => {
         assert.equal(b.value, 0);
       });
     });
+
+    describe('Deck Master', () => {
+      it('earned when won with 5 different leaders in a season', async () => {
+        const matches = [];
+        const votes = [];
+        const leaders = ['L1', 'L2', 'L3', 'L4', 'L5'];
+        for (let i = 0; i < 5; i++) {
+          matches.push(matchRow('P001', 'P002', 'P001', 'Alice won 2-0-0', { season_id: 6, round: i + 1 }));
+          votes.push({ season_id: 6, week: i + 1, player_id: 'P001', leader_id: leaders[i] });
+        }
+        const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
+        const badges = await computeBadges(db, 'P001');
+        const b = badges.find(b => b.id === 'deckMaster');
+        assert.equal(b.earned, true);
+      });
+
+      it('not earned with only 4 different leaders', async () => {
+        const matches = [];
+        const votes = [];
+        const leaders = ['L1', 'L2', 'L3', 'L4', 'L4'];
+        for (let i = 0; i < 5; i++) {
+          matches.push(matchRow('P001', 'P002', 'P001', 'Alice won 2-0-0', { season_id: 6, round: i + 1 }));
+          votes.push({ season_id: 6, week: i + 1, player_id: 'P001', leader_id: leaders[i] });
+        }
+        const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
+        const badges = await computeBadges(db, 'P001');
+        const b = badges.find(b => b.id === 'deckMaster');
+        assert.equal(b.earned, false);
+      });
+
+      it('wins spread across seasons do not combine', async () => {
+        const matches = [];
+        const votes = [];
+        for (let i = 0; i < 3; i++) {
+          matches.push(matchRow('P001', 'P002', 'P001', 'Alice won 2-0-0', { season_id: 5, round: i + 1 }));
+          votes.push({ season_id: 5, week: i + 1, player_id: 'P001', leader_id: 'L' + (i + 1) });
+        }
+        for (let i = 0; i < 3; i++) {
+          matches.push(matchRow('P001', 'P002', 'P001', 'Alice won 2-0-0', { season_id: 6, round: i + 1 }));
+          votes.push({ season_id: 6, week: i + 1, player_id: 'P001', leader_id: 'L' + (i + 4) });
+        }
+        const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
+        const badges = await computeBadges(db, 'P001');
+        const b = badges.find(b => b.id === 'deckMaster');
+        assert.equal(b.earned, false);
+      });
+
+      it('losses do not count toward deck master', async () => {
+        const matches = [];
+        const votes = [];
+        const leaders = ['L1', 'L2', 'L3', 'L4', 'L5'];
+        for (let i = 0; i < 5; i++) {
+          matches.push(matchRow('P001', 'P002', 'P002', 'Bob won 2-0-0', { season_id: 6, round: i + 1 }));
+          votes.push({ season_id: 6, week: i + 1, player_id: 'P001', leader_id: leaders[i] });
+        }
+        const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
+        const badges = await computeBadges(db, 'P001');
+        const b = badges.find(b => b.id === 'deckMaster');
+        assert.equal(b.earned, false);
+      });
+    });
+
+    describe('Voter', () => {
+      it('bronze at 5 votes', async () => {
+        const votes = [];
+        for (let i = 1; i <= 5; i++) {
+          votes.push({ season_id: 6, week: i, player_id: 'P001', leader_id: 'L1' });
+        }
+        const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes, awards: [] });
+        const badges = await computeBadges(db, 'P001');
+        const b = badges.find(b => b.id === 'voter');
+        assert.equal(b.value, 5);
+        assert.equal(b.tier, 'bronze');
+      });
+
+      it('silver at 10 votes', async () => {
+        const votes = [];
+        for (let i = 1; i <= 10; i++) {
+          votes.push({ season_id: 6, week: i, player_id: 'P001', leader_id: 'L1' });
+        }
+        const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes, awards: [] });
+        const badges = await computeBadges(db, 'P001');
+        const b = badges.find(b => b.id === 'voter');
+        assert.equal(b.value, 10);
+        assert.equal(b.tier, 'silver');
+      });
+
+      it('gold at 20 votes', async () => {
+        const votes = [];
+        for (let i = 1; i <= 20; i++) {
+          votes.push({ season_id: 6, week: i, player_id: 'P001', leader_id: 'L1' });
+        }
+        const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes, awards: [] });
+        const badges = await computeBadges(db, 'P001');
+        const b = badges.find(b => b.id === 'voter');
+        assert.equal(b.value, 20);
+        assert.equal(b.tier, 'gold');
+      });
+
+      it('not earned with 0 votes', async () => {
+        const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes: [], awards: [] });
+        const badges = await computeBadges(db, 'P001');
+        const b = badges.find(b => b.id === 'voter');
+        assert.equal(b.earned, false);
+        assert.equal(b.tier, null);
+      });
+
+      it('counts across seasons', async () => {
+        const votes = [];
+        for (let i = 1; i <= 3; i++) {
+          votes.push({ season_id: 5, week: i, player_id: 'P001', leader_id: 'L1' });
+        }
+        for (let i = 1; i <= 3; i++) {
+          votes.push({ season_id: 6, week: i, player_id: 'P001', leader_id: 'L2' });
+        }
+        const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes, awards: [] });
+        const badges = await computeBadges(db, 'P001');
+        const b = badges.find(b => b.id === 'voter');
+        assert.equal(b.value, 6);
+        assert.equal(b.tier, 'bronze');
+      });
+    });
   });
 
   describe('edge cases', () => {
     it('player with no data gets all badges unearned', async () => {
       const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes: [], awards: [] });
       const badges = await computeBadges(db, 'P999');
-      assert.equal(badges.length, 10);
+      assert.equal(badges.length, 12);
       for (const b of badges) {
         assert.equal(b.earned, false, `${b.id} should not be earned`);
       }
     });
 
-    it('returns exactly 10 badges', async () => {
+    it('returns exactly 12 badges', async () => {
       const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes: [], awards: [] });
       const badges = await computeBadges(db, 'P001');
-      assert.equal(badges.length, 10);
+      assert.equal(badges.length, 12);
     });
   });
 });

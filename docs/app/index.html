@@ -267,8 +267,8 @@
     .career-panel { display: none; }
     .career-panel.active { display: block; }
 
-    .badges-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; padding: 8px 0; }
-    .badge-medal { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 90px; padding: 14px 8px 10px; border-radius: 12px; background: #0f172a; border: 2px solid rgba(255,255,255,0.08); transition: all 0.2s ease; }
+    .badges-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; justify-items: center; padding: 8px 0; }
+    .badge-medal { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; max-width: 110px; padding: 14px 8px 10px; border-radius: 12px; background: #0f172a; border: 2px solid rgba(255,255,255,0.08); transition: all 0.2s ease; }
     .badge-medal:hover { transform: translateY(-2px); }
     .badge-medal .badge-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
     .badge-medal .badge-icon img { width: 36px; height: 36px; }
@@ -276,15 +276,15 @@
     .badge-medal .badge-tier { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
 
     .badge-medal.badge-gold { border-color: #facc15; box-shadow: 0 0 16px rgba(250, 204, 21, 0.25); }
-    .badge-medal.badge-gold .badge-icon img { filter: brightness(0) saturate(100%) invert(22%) sepia(93%) saturate(1243%) hue-rotate(188deg) brightness(95%) contrast(90%); }
+    .badge-medal.badge-gold .badge-icon img { filter: brightness(0) saturate(100%) invert(67%) sepia(89%) saturate(1142%) hue-rotate(358deg) brightness(101%) contrast(106%); }
     .badge-medal.badge-gold .badge-tier { color: #facc15; }
 
     .badge-medal.badge-silver { border-color: #94a3b8; box-shadow: 0 0 10px rgba(148, 163, 184, 0.15); }
-    .badge-medal.badge-silver .badge-icon img { filter: brightness(0) saturate(100%) invert(22%) sepia(93%) saturate(1243%) hue-rotate(188deg) brightness(95%) contrast(90%); }
+    .badge-medal.badge-silver .badge-icon img { filter: brightness(0) saturate(100%) invert(73%) sepia(8%) saturate(1205%) hue-rotate(186deg) brightness(95%) contrast(90%); }
     .badge-medal.badge-silver .badge-tier { color: #94a3b8; }
 
     .badge-medal.badge-bronze { border-color: #cd7f32; box-shadow: 0 0 10px rgba(205, 127, 50, 0.2); }
-    .badge-medal.badge-bronze .badge-icon img { filter: brightness(0) saturate(100%) invert(22%) sepia(93%) saturate(1243%) hue-rotate(188deg) brightness(95%) contrast(90%); }
+    .badge-medal.badge-bronze .badge-icon img { filter: brightness(0) saturate(100%) invert(55%) sepia(65%) saturate(4182%) hue-rotate(14deg) brightness(95%) contrast(95%); }
     .badge-medal.badge-bronze .badge-tier { color: #cd7f32; }
 
     .badge-medal.badge-locked { border-color: rgba(255,255,255,0.05); opacity: 0.35; }

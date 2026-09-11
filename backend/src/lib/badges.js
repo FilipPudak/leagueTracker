@@ -6,6 +6,7 @@ const TIER_THRESHOLDS = {
   attendance:      { bronze: 10, silver: 25, gold: 50 },
   leaderVariety:   { bronze: 3,  silver: 6,  gold: 10 },
   sweepMaster:     { bronze: 5,  silver: 15, gold: 30 },
+  voter:           { bronze: 5,  silver: 10, gold: 20 },
 };
 
 function tierFor(value, thresholds) {
@@ -16,13 +17,14 @@ function tierFor(value, thresholds) {
 }
 
 export async function computeBadges(db, playerId) {
-  const [attendanceRows, standingsRows, matchRows, votesReceived, leaderCount, champAsP1, champAsP2] = await Promise.all([
+  const [attendanceRows, standingsRows, matchRows, votesRows, votesReceivedRows, leaderCount, champAsP1, champAsP2] = await Promise.all([
     db.prepare('SELECT season_id, week FROM attendance WHERE player_id = ?').bind(playerId).all(),
     db.prepare('SELECT season_id, round, wins, losses, rank FROM season_standings WHERE player_id = ?').bind(playerId).all(),
     db.prepare(
-      `SELECT player1_id, player2_id, winner_id, result, is_bye FROM match_results
+      `SELECT player1_id, player2_id, winner_id, result, is_bye, season_id, round FROM match_results
        WHERE player1_id = ? OR player2_id = ?`
     ).bind(playerId, playerId).all(),
+    db.prepare('SELECT season_id, week, leader_id FROM votes WHERE player_id = ?').bind(playerId).all(),
     db.prepare(
       'SELECT season_id, COUNT(*) as cnt FROM votes WHERE opponent_id = ? GROUP BY season_id'
     ).bind(playerId).all(),
@@ -40,7 +42,8 @@ export async function computeBadges(db, playerId) {
   const attendance = attendanceRows.results || [];
   const standings = standingsRows.results || [];
   const matches = matchRows.results || [];
-  const receivedVotes = votesReceived.results || [];
+  const votes = votesRows.results || [];
+  const receivedVotes = votesReceivedRows.results || [];
   const distinctLeaders = (leaderCount && leaderCount.cnt) || 0;
   const beatenOpponentIds = new Set([
     ...(champAsP1.results || []).map(r => r.opponent_id),
@@ -93,13 +96,30 @@ export async function computeBadges(db, playerId) {
     if (games && games.gamesLoser === 0 && games.gamesWinner >= 2) sweepCount++;
   }
 
+  const voteByWeekSeason = new Map(votes.map(v => [`${v.season_id}-${v.week}`, v.leader_id]));
+  let hasDeckMaster = false;
+  const seasonIds = [...new Set(matches.map(m => m.season_id))];
+  for (const sid of seasonIds) {
+    const winningLeaders = new Set();
+    for (const m of matches) {
+      if (m.season_id !== sid) continue;
+      if (m.is_bye) continue;
+      if (m.winner_id !== playerId) continue;
+      const leaderId = voteByWeekSeason.get(`${sid}-${m.round}`);
+      if (leaderId) winningLeaders.add(leaderId);
+    }
+    if (winningLeaders.size >= 5) { hasDeckMaster = true; break; }
+  }
+
+  const totalVotes = votes.length;
+
   return [
     {
       id: 'firstNight',
       name: 'First Night',
       type: 'flat',
       earned: hasAttendance,
-      icon: 'spacecraft-spaceship-svgrepo-com',
+      icon: 'spacecraft',
       tooltip: 'Attend your first league night',
     },
     {
@@ -123,7 +143,7 @@ export async function computeBadges(db, playerId) {
       name: 'Crowd Favorite',
       type: 'flat',
       earned: crowdFavorite,
-      icon: 'starwars-rebel-svgrepo-com',
+      icon: 'rebel',
       tooltip: 'Receive 3+ favorite opponent votes in one season',
     },
     {
@@ -131,8 +151,16 @@ export async function computeBadges(db, playerId) {
       name: 'Loyalist',
       type: 'flat',
       earned: loyalist,
-      icon: 'shield-star-fill-svgrepo-com',
+      icon: 'shield-star',
       tooltip: 'Attend 3 consecutive seasons',
+    },
+    {
+      id: 'deckMaster',
+      name: 'Deck Master',
+      type: 'flat',
+      earned: hasDeckMaster,
+      icon: 'cards',
+      tooltip: 'Win with 5 different leaders in a single season',
     },
     {
       id: 'nightWins',
@@ -141,7 +169,7 @@ export async function computeBadges(db, playerId) {
       value: totalWins,
       tier: tierFor(totalWins, TIER_THRESHOLDS.nightWins),
       earned: totalWins >= TIER_THRESHOLDS.nightWins.bronze,
-      icon: 'lightsaber-svgrepo-com',
+      icon: 'lightsaber',
       tooltip: 'Win matches across league nights — Bronze: 5, Silver: 15, Gold: 30',
     },
     {
@@ -171,7 +199,7 @@ export async function computeBadges(db, playerId) {
       value: distinctLeaders,
       tier: tierFor(distinctLeaders, TIER_THRESHOLDS.leaderVariety),
       earned: distinctLeaders >= TIER_THRESHOLDS.leaderVariety.bronze,
-      icon: 'medal-with-star-shape-svgrepo-com',
+      icon: 'medal',
       tooltip: 'Play different leaders in votes — Bronze: 3, Silver: 6, Gold: 10',
     },
     {
@@ -181,8 +209,18 @@ export async function computeBadges(db, playerId) {
       value: sweepCount,
       tier: tierFor(sweepCount, TIER_THRESHOLDS.sweepMaster),
       earned: sweepCount >= TIER_THRESHOLDS.sweepMaster.bronze,
-      icon: 'lightsabers-crossed',
+      icon: 'crossed-lightsabers',
       tooltip: 'Win matches 2-0 — Bronze: 5, Silver: 15, Gold: 30',
+    },
+    {
+      id: 'voter',
+      name: 'Voter',
+      type: 'tiered',
+      value: totalVotes,
+      tier: tierFor(totalVotes, TIER_THRESHOLDS.voter),
+      earned: totalVotes >= TIER_THRESHOLDS.voter.bronze,
+      icon: 'ballot',
+      tooltip: 'Submit votes — Bronze: 5, Silver: 10, Gold: 20',
     },
   ];
 }

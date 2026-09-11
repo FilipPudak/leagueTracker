@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.3.0';
+const APP_VERSION = '4.4.0';
 
 let appState = {
   status: 'unlinked',
@@ -1077,17 +1077,19 @@ function renderCareerStats(res) {
 
   const badges = res.badges || [];
   if (badgesContainer) {
-    const earned = badges.filter(b => b.earned);
-    if (earned.length > 0) {
-      badgesContainer.innerHTML = earned.map(b => {
+    if (badges.length > 0) {
+      badgesContainer.innerHTML = badges.map(b => {
         const iconPath = 'icons/' + b.icon + '.svg';
-        let tierClass = 'badge-gold';
+        let tierClass = 'badge-locked';
         let tierLabel = '';
-        if (b.type === 'tiered' && b.tier) {
-          tierClass = 'badge-' + b.tier;
-          tierLabel = b.tier.charAt(0).toUpperCase() + b.tier.slice(1);
-        } else if (b.type === 'flat') {
-          tierLabel = 'Earned';
+        if (b.earned) {
+          if (b.type === 'tiered' && b.tier) {
+            tierClass = 'badge-' + b.tier;
+            tierLabel = b.tier.charAt(0).toUpperCase() + b.tier.slice(1);
+          } else if (b.type === 'flat') {
+            tierClass = 'badge-gold';
+            tierLabel = 'Earned';
+          }
         }
         return '<div class="badge-medal ' + tierClass + '" data-tooltip="' + escapeHtml(b.tooltip || '') + '">' +
           '<div class="badge-icon"><img src="' + iconPath + '" alt="' + escapeHtml(b.name) + '"></div>' +
