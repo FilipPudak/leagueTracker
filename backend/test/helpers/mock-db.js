@@ -204,7 +204,14 @@ function matchWhere(row, whereClause, params) {
       continue;
     }
 
-    // Handle: IN (...) — skip for now, assume match
+    // Handle: column IN (?,?,?) or column IN ('a','b')
+    const inMatch = trimmed.match(/^(\w+(?:\.\w+)?)\s+IN\s*\(([^)]+)\)/i);
+    if (inMatch) {
+      const col = inMatch[1].split('.').pop().replace(/"/g, '').toLowerCase();
+      const vals = inMatch[2].split(',').map(v => v.trim().replace(/^['"]|['"]$/g, ''));
+      if (!vals.includes(String(row[col]))) return false;
+      continue;
+    }
   }
 
   return true;
@@ -315,7 +322,7 @@ function executeSelect(sql, params, store) {
 
     const distinctMatch = upper.match(/COUNT\(DISTINCT\s+(\w+(?:\.\w+)?)\)/);
     if (distinctMatch) {
-      const col = distinctMatch[1].split('.').pop().replace(/"/g, '');
+      const col = distinctMatch[1].split('.').pop().replace(/"/g, '').toLowerCase();
       const uniqueVals = new Set(rows.map(r => r[col]).filter(v => v != null));
       countRow.count = uniqueVals.size;
     }

@@ -151,3 +151,66 @@ export function buildSeasonProgression({ seasons, allStandings, regularRoundsByS
 
   return { progression, peak };
 }
+
+export async function computeDeckWinRates(db, playerId, seasonId) {
+  const [votesRows, matchRows, leaderRows] = await Promise.all([
+    db.prepare(
+      'SELECT week, leader_id FROM votes WHERE player_id = ? AND season_id = ?'
+    ).bind(playerId, seasonId).all(),
+    db.prepare(
+      'SELECT round, player1_id, player2_id, winner_id, result, is_bye FROM match_results WHERE season_id = ? AND (player1_id = ? OR player2_id = ?)'
+    ).bind(seasonId, playerId, playerId).all(),
+    db.prepare('SELECT id, name FROM leaders').all(),
+  ]);
+
+  const votes = votesRows.results || [];
+  const matches = matchRows.results || [];
+  const leaders = leaderRows.results || [];
+
+  const leaderNameMap = new Map(leaders.map(l => [l.id, l.name]));
+  const voteByWeek = new Map(votes.map(v => [v.week, v.leader_id]));
+
+  const deckMap = new Map();
+
+  for (const m of matches) {
+    if (m.is_bye) continue;
+    const leaderId = voteByWeek.get(m.round);
+    if (!leaderId) continue;
+
+    const winner = m.winner_id;
+    if (!winner) {
+      if (!deckMap.has(leaderId)) {
+        deckMap.set(leaderId, { wins: 0, losses: 0, draws: 0 });
+      }
+      deckMap.get(leaderId).draws++;
+    } else if (winner === playerId) {
+      if (!deckMap.has(leaderId)) {
+        deckMap.set(leaderId, { wins: 0, losses: 0, draws: 0 });
+      }
+      deckMap.get(leaderId).wins++;
+    } else {
+      if (!deckMap.has(leaderId)) {
+        deckMap.set(leaderId, { wins: 0, losses: 0, draws: 0 });
+      }
+      deckMap.get(leaderId).losses++;
+    }
+  }
+
+  const rates = [];
+  for (const [leaderId, stats] of deckMap) {
+    const played = stats.wins + stats.losses + stats.draws;
+    const decisions = stats.wins + stats.losses;
+    rates.push({
+      leaderId,
+      leaderName: leaderNameMap.get(leaderId) || leaderId,
+      wins: stats.wins,
+      losses: stats.losses,
+      draws: stats.draws,
+      played,
+      winPct: decisions > 0 ? Math.round((stats.wins / decisions) * 1000) / 10 : null,
+    });
+  }
+
+  rates.sort((a, b) => b.played - a.played);
+  return rates;
+}

@@ -1,6 +1,8 @@
 import { getSetting, getAwardsForSeason, parseSeasonId } from '../db/queries.js';
 import { getStreaks, getRaffleTickets } from '../lib/participation.js';
 import { badRequest } from '../lib/errors.js';
+import { computeBadges } from '../lib/badges.js';
+import { computeDeckWinRates } from '../lib/careerStats.js';
 
 export async function handleGetMySeasonStats(body, env, session) {
   const { DB } = env;
@@ -64,7 +66,11 @@ export async function handleGetMySeasonStats(body, env, session) {
     plays: r.play_count,
   }));
 
-  const raffleTickets = await getRaffleTickets(DB, sid, playerId);
+  const [raffleTickets, badges, deckWinRates] = await Promise.all([
+    getRaffleTickets(DB, sid, playerId),
+    computeBadges(DB, playerId),
+    computeDeckWinRates(DB, playerId, sid),
+  ]);
   const hasVoteData = raffleTickets > 0;
 
   let streaks = await getStreaks(DB, sid, playerId);
@@ -82,10 +88,20 @@ export async function handleGetMySeasonStats(body, env, session) {
 
   return {
     awardsWon,
-    leaders,
+    leaders: leaders.map(l => {
+      const deck = deckWinRates.find(d => d.leaderId === l.id);
+      return {
+        ...l,
+        wins: deck ? deck.wins : 0,
+        losses: deck ? deck.losses : 0,
+        draws: deck ? deck.draws : 0,
+        winPct: deck ? deck.winPct : null,
+      };
+    }),
     streaks,
     raffleTickets,
     milestone,
+    badges,
     isCurrentSeason,
     hasVoteData,
   };
