@@ -268,7 +268,7 @@
     .career-panel.active { display: block; }
 
     .badges-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; padding: 8px 0; }
-    .badge-medal { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 90px; padding: 14px 8px 10px; border-radius: 12px; background: #0f172a; border: 2px solid rgba(255,255,255,0.08); transition: all 0.2s ease; }
+    .badge-medal { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 90px; padding: 14px 8px 10px; border-radius: 12px; background: #0f172a; border: 2px solid rgba(255,255,255,0.08); transition: all 0.2s ease; }
     .badge-medal:hover { transform: translateY(-2px); }
     .badge-medal .badge-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
     .badge-medal .badge-icon img { width: 36px; height: 36px; }
@@ -276,24 +276,34 @@
     .badge-medal .badge-tier { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
 
     .badge-medal.badge-gold { border-color: #facc15; box-shadow: 0 0 16px rgba(250, 204, 21, 0.25); }
-    .badge-medal.badge-gold .badge-icon img { filter: brightness(0) saturate(100%) invert(67%) sepia(89%) saturate(1142%) hue-rotate(358deg) brightness(101%) contrast(106%); }
+    .badge-medal.badge-gold .badge-icon img { filter: brightness(0) saturate(100%) invert(22%) sepia(93%) saturate(1243%) hue-rotate(188deg) brightness(95%) contrast(90%); }
     .badge-medal.badge-gold .badge-tier { color: #facc15; }
 
     .badge-medal.badge-silver { border-color: #94a3b8; box-shadow: 0 0 10px rgba(148, 163, 184, 0.15); }
-    .badge-medal.badge-silver .badge-icon img { filter: brightness(0) saturate(100%) invert(73%) sepia(8%) saturate(1205%) hue-rotate(186deg) brightness(95%) contrast(90%); }
+    .badge-medal.badge-silver .badge-icon img { filter: brightness(0) saturate(100%) invert(22%) sepia(93%) saturate(1243%) hue-rotate(188deg) brightness(95%) contrast(90%); }
     .badge-medal.badge-silver .badge-tier { color: #94a3b8; }
 
     .badge-medal.badge-bronze { border-color: #cd7f32; box-shadow: 0 0 10px rgba(205, 127, 50, 0.2); }
-    .badge-medal.badge-bronze .badge-icon img { filter: brightness(0) saturate(100%) invert(55%) sepia(65%) saturate(4182%) hue-rotate(14deg) brightness(95%) contrast(95%); }
+    .badge-medal.badge-bronze .badge-icon img { filter: brightness(0) saturate(100%) invert(22%) sepia(93%) saturate(1243%) hue-rotate(188deg) brightness(95%) contrast(90%); }
     .badge-medal.badge-bronze .badge-tier { color: #cd7f32; }
-
-    .badge-medal.badge-flat { border-color: rgba(250, 204, 21, 0.5); box-shadow: 0 0 12px rgba(250, 204, 21, 0.15); }
-    .badge-medal.badge-flat .badge-icon img { filter: brightness(0) saturate(100%) invert(67%) sepia(89%) saturate(1142%) hue-rotate(358deg) brightness(101%) contrast(106%); }
-    .badge-medal.badge-flat .badge-tier { color: #facc15; }
 
     .badge-medal.badge-locked { border-color: rgba(255,255,255,0.05); opacity: 0.35; }
     .badge-medal.badge-locked .badge-icon img { filter: brightness(0) saturate(100%) invert(30%) sepia(8%) saturate(1205%) hue-rotate(186deg) brightness(70%) contrast(80%); }
     .badge-medal.badge-locked .badge-tier { color: #475569; }
+
+    .badge-tooltip {
+      position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+      background: #1e293b; border: 1px solid #38bdf8; border-radius: 8px;
+      padding: 8px 12px; color: #e2e8f0; font-size: 0.75rem; line-height: 1.4;
+      width: max-content; max-width: 220px; text-align: center; z-index: 100;
+      white-space: normal; pointer-events: none; opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+    .badge-tooltip::after {
+      content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+      border: 6px solid transparent; border-top-color: #38bdf8;
+    }
+    .badge-medal:hover .badge-tooltip, .badge-tooltip.visible { opacity: 1; pointer-events: auto; }
   </style>
 </head>
 <body>

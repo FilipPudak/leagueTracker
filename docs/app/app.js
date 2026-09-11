@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.2.1';
+const APP_VERSION = '4.3.0';
 
 let appState = {
   status: 'unlinked',
@@ -1081,7 +1081,7 @@ function renderCareerStats(res) {
     if (earned.length > 0) {
       badgesContainer.innerHTML = earned.map(b => {
         const iconPath = 'icons/' + b.icon + '.svg';
-        let tierClass = 'badge-flat';
+        let tierClass = 'badge-gold';
         let tierLabel = '';
         if (b.type === 'tiered' && b.tier) {
           tierClass = 'badge-' + b.tier;
@@ -1089,10 +1089,11 @@ function renderCareerStats(res) {
         } else if (b.type === 'flat') {
           tierLabel = 'Earned';
         }
-        return '<div class="badge-medal ' + tierClass + '" title="' + escapeHtml(b.tooltip || '') + '">' +
+        return '<div class="badge-medal ' + tierClass + '" data-tooltip="' + escapeHtml(b.tooltip || '') + '">' +
           '<div class="badge-icon"><img src="' + iconPath + '" alt="' + escapeHtml(b.name) + '"></div>' +
           '<div class="badge-name">' + escapeHtml(b.name) + '</div>' +
           '<div class="badge-tier">' + tierLabel + '</div>' +
+          '<div class="badge-tooltip">' + escapeHtml(b.tooltip || '') + '</div>' +
         '</div>';
       }).join('');
     } else {
@@ -1203,6 +1204,7 @@ document.addEventListener('DOMContentLoaded', () => {
   applyVersion();
   fetchInitialAppData();
   initCollapsibles();
+  initBadgeTooltips();
 });
 
 function initCollapsibles() {
@@ -1226,4 +1228,21 @@ function updateSeasonSummaryText() {
   const summary = $('season-summary');
   if (!summary) return;
   summary.textContent = 'Seasons';
+}
+
+function initBadgeTooltips() {
+  const grid = $('career-badges-container');
+  if (!grid) return;
+  grid.addEventListener('click', (e) => {
+    const medal = e.target.closest('.badge-medal');
+    if (!medal) {
+      grid.querySelectorAll('.badge-tooltip.visible').forEach(t => t.classList.remove('visible'));
+      return;
+    }
+    const tooltip = medal.querySelector('.badge-tooltip');
+    if (!tooltip) return;
+    const wasVisible = tooltip.classList.contains('visible');
+    grid.querySelectorAll('.badge-tooltip.visible').forEach(t => t.classList.remove('visible'));
+    if (!wasVisible) tooltip.classList.add('visible');
+  });
 }
