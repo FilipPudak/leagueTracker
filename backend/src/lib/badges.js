@@ -136,7 +136,7 @@ export async function computeBadges(db, playerId, activeSeasonId = null, isSeaso
     },
     {
       id: 'nightChampion',
-      name: 'Night Champion',
+      name: 'Conqueror',
       type: 'flat',
       earned: hasRankOne,
       icon: 'darth-vader',

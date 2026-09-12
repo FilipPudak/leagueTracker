@@ -1280,6 +1280,19 @@ function initBadgeTooltips() {
       tooltip.classList.add('visible');
     }
   });
+  grid.addEventListener('touchstart', (e) => {
+    const medal = e.target.closest('.badge-medal');
+    if (!medal) return;
+    e.preventDefault();
+    const tooltip = medal.querySelector('.badge-tooltip');
+    if (!tooltip) return;
+    const wasVisible = tooltip.classList.contains('visible');
+    grid.querySelectorAll('.badge-tooltip.visible').forEach(t => t.classList.remove('visible'));
+    if (!wasVisible) {
+      positionTooltip(tooltip, medal);
+      tooltip.classList.add('visible');
+    }
+  }, { passive: false });
   grid.addEventListener('contextmenu', (e) => {
     if (e.target.closest('.badge-medal')) e.preventDefault();
   });
