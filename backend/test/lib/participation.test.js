@@ -51,6 +51,13 @@ function makeStreakTables() {
       { season_id: 7, week: 2, player_id: 'P102' },
       { season_id: 7, week: 3, player_id: 'P102' },
     ],
+    melee_tournaments: [
+      { season_id: 7, round: 1, phase: 'regular' },
+      { season_id: 7, round: 2, phase: 'regular' },
+      { season_id: 7, round: 3, phase: 'regular' },
+      { season_id: 7, round: 4, phase: 'regular' },
+      { season_id: 7, round: 5, phase: 'regular' },
+    ],
   };
 }
 
@@ -96,6 +103,33 @@ describe('getStreaks', () => {
     const db = createMockDb(makeStreakTables());
     const result = await getStreaks(db, 7, 'P101');
     assert.ok(result.bestStreak >= result.currentStreak);
+  });
+
+  it('cut/side attendance does not count toward streak', async () => {
+    const now = new Date().toISOString();
+    const db = createMockDb({
+      settings: [],
+      players: [{ id: 'P200', name: 'CutPlayer', melee_name: 'cut', email: 'cut@test.com', active: 1 }],
+      leaders: [],
+      seasons: [],
+      sessions: [],
+      votes: [
+        { id: 1, timestamp: now, updated_at: null, season_id: 8, week: 1, player_id: 'P200', leader_id: '1', opponent_id: null },
+        { id: 2, timestamp: now, updated_at: null, season_id: 8, week: 2, player_id: 'P200', leader_id: '1', opponent_id: null },
+      ],
+      awards: [],
+      attendance: [
+        { season_id: 8, week: 1, player_id: 'P200' },
+        { season_id: 8, week: 2, player_id: 'P200' },
+      ],
+      melee_tournaments: [
+        { season_id: 8, round: 1, phase: 'cut' },
+        { season_id: 8, round: 2, phase: 'side' },
+      ],
+    });
+    const result = await getStreaks(db, 8, 'P200');
+    assert.equal(result.currentStreak, 0, 'cut/side attendance should not form a streak');
+    assert.equal(result.bestStreak, 0);
   });
 });
 

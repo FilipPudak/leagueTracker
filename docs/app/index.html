@@ -222,7 +222,7 @@
     .player-modal-stat { display: inline-block; text-align: center; padding: 6px 12px; }
     .player-modal-stat-value { font-size: 1.2rem; font-weight: 700; color: #f8fafc; }
     .player-modal-stat-label { font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; }
-    .player-modal-section-title { font-size: 0.85rem; color: #38bdf8; font-weight: 600; margin: 12px 0 6px; }
+    .player-modal-section-title { font-size: 0.95rem; color: #38bdf8; font-weight: 600; margin: 14px 0 8px; }
     .player-modal-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid rgba(56, 189, 248, 0.1); font-size: 0.85rem; }
     .player-modal-award { padding: 8px 12px; margin-bottom: 6px; background: #1e293b; border-radius: 6px; font-size: 0.85rem; }
     .player-modal-loading { text-align: center; color: #94a3b8; padding: 24px; font-size: 0.9rem; }
@@ -273,6 +273,12 @@
     .career-tab.active { background: #38bdf8; color: #050811; box-shadow: 0 0 8px rgba(56, 189, 248, 0.4); }
     .career-panel { display: none; }
     .career-panel.active { display: block; }
+
+    .profile-tabs { display: flex; gap: 4px; margin-bottom: 12px; background: #090d16; padding: 3px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); }
+    .profile-tab { flex: 1; padding: 6px 0; border: none; background: transparent; color: #64748b; font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.5px; border-radius: 5px; cursor: pointer; transition: all 0.25s ease; }
+    .profile-tab.active { background: #38bdf8; color: #050811; box-shadow: 0 0 8px rgba(56, 189, 248, 0.4); }
+    .profile-panel { display: none; }
+    .profile-panel.active { display: block; }
 
     .badges-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; justify-items: center; padding: 8px 0; }
     .badge-medal { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; max-width: 110px; padding: 14px 8px 10px; border-radius: 12px; background: #0f172a; border: 2px solid rgba(255,255,255,0.08); transition: all 0.2s ease; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
@@ -564,23 +570,25 @@
     <!-- PLAYER PROFILE PANEL -->
     <div id="player-profile-view" class="view-panel">
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
-        <button class="btn-ghost" onclick="history.back()" style="padding:4px 8px;">&larr; Back</button>
+        <button class="btn-ghost" onclick="switchTab(appState.lastView || 'standings-view')" style="padding:4px 8px;">&larr; Back</button>
         <h2 id="profile-title" style="margin:0; font-size:1.1rem;"></h2>
       </div>
       <div id="profile-loading" class="player-modal-loading" style="display:none;">Loading profile...</div>
       <div id="profile-content" style="display:none;">
-        <details id="profile-season-details" class="section-block" open>
-          <summary id="profile-season-summary">Season</summary>
+        <div class="profile-tabs">
+          <button class="profile-tab active" onclick="switchProfileTab('season')">Season</button>
+          <button class="profile-tab" onclick="switchProfileTab('career')">Career</button>
+        </div>
+        <div id="profile-tab-season" class="profile-panel active">
           <div class="form-group">
             <label for="profile-season-filter">Select Season</label>
             <select id="profile-season-filter" onchange="loadProfileSeason()"></select>
           </div>
           <div id="profile-season-content"></div>
-        </details>
-        <details id="profile-career-details" class="section-block">
-          <summary>Career</summary>
+        </div>
+        <div id="profile-tab-career" class="profile-panel">
           <div id="profile-career-content"></div>
-        </details>
+        </div>
       </div>
     </div>
 

@@ -37,7 +37,7 @@ let appState = {
   careerInFlight: false,
   standingsInFlight: false,
   standingsInFlightSeason: null,
-  lastView: 'vote-view'
+  lastView: 'standings-view'
 };
 
 /* ---------------------------------------------------------------- session -- */
@@ -465,6 +465,18 @@ function switchCareerTab(tabId) {
   const tabs = document.querySelectorAll('.career-tab');
   if (tabs[idx]) tabs[idx].classList.add('active');
   const panel = $('career-tab-' + tabId);
+  if (panel) panel.classList.add('active');
+}
+
+const PROFILE_TAB_INDEX = { season: 0, career: 1 };
+
+function switchProfileTab(tabId) {
+  document.querySelectorAll('.profile-tab').forEach((b) => b.classList.remove('active'));
+  document.querySelectorAll('.profile-panel').forEach((p) => p.classList.remove('active'));
+  const idx = PROFILE_TAB_INDEX[tabId];
+  const tabs = document.querySelectorAll('.profile-tab');
+  if (tabs[idx]) tabs[idx].classList.add('active');
+  const panel = $('profile-tab-' + tabId);
   if (panel) panel.classList.add('active');
 }
 
@@ -1222,8 +1234,6 @@ document.addEventListener('DOMContentLoaded', () => {
 function initCollapsibles() {
   const careerDetails = $('career-details');
   const seasonDetails = $('season-details');
-  const profileCareerDetails = $('profile-career-details');
-  const profileSeasonDetails = $('profile-season-details');
 
   if (careerDetails) {
     careerDetails.open = localStorage.getItem('career-details-open') === 'true';
@@ -1235,18 +1245,6 @@ function initCollapsibles() {
     seasonDetails.open = localStorage.getItem('season-details-open') !== 'false';
     seasonDetails.addEventListener('toggle', () => {
       localStorage.setItem('season-details-open', seasonDetails.open);
-    });
-  }
-  if (profileCareerDetails) {
-    profileCareerDetails.open = localStorage.getItem('profile-career-details-open') === 'true';
-    profileCareerDetails.addEventListener('toggle', () => {
-      localStorage.setItem('profile-career-details-open', profileCareerDetails.open);
-    });
-  }
-  if (profileSeasonDetails) {
-    profileSeasonDetails.open = localStorage.getItem('profile-season-details-open') !== 'false';
-    profileSeasonDetails.addEventListener('toggle', () => {
-      localStorage.setItem('profile-season-details-open', profileSeasonDetails.open);
     });
   }
 }
@@ -1338,6 +1336,8 @@ function handleHashRoute() {
     if (playerId) {
       loadPlayerProfile(playerId);
     }
+  } else if ($('player-profile-view') && $('player-profile-view').classList.contains('active')) {
+    switchTab(appState.lastView || 'standings-view');
   }
 }
 
@@ -1408,7 +1408,7 @@ function renderSeasonContent(s, opts = {}) {
 
   let leadersHtml = '';
   if (s.leaders && s.leaders.length > 0) {
-    leadersHtml = `<${headingTag} class="${headingClass}"${headingOpen}>Leaders Used${headingClose}` +
+    leadersHtml = `<${headingTag} class="${headingClass}"${headingOpen}>Leaders Played${headingClose}` +
       s.leaders.map(l => {
         const wp = l.winPct != null ? l.winPct + '%' : '—';
         return `<div class="player-modal-item">
@@ -1424,7 +1424,7 @@ function renderSeasonContent(s, opts = {}) {
       s.awards.map(a => `<div class="player-modal-award"><strong style="color:#fbbf24;">${escapeHtml(a.award_name)}</strong></div>`).join('');
   }
 
-  return statsHtml + nightsHtml + leadersHtml + awardsHtml;
+  return statsHtml + awardsHtml + nightsHtml + leadersHtml;
 }
 
 function renderPlayerModal(data) {

@@ -110,13 +110,15 @@ export async function backfillFromMelee(env, deps = {}) {
         if (playerId) attendedThisRound.add(playerId);
       }
 
-      for (const playerId of attendedThisRound) {
-        try {
-          await DB.prepare(
-            'INSERT OR IGNORE INTO attendance (season_id, week, player_id) VALUES (?, ?, ?)'
-          ).bind(seasonNum, info.round, playerId).run();
-        } catch (err) {
-          console.error(`[Backfill] Failed to record attendance: ${err.message}`);
+      if ((info.phase || 'regular') === 'regular') {
+        for (const playerId of attendedThisRound) {
+          try {
+            await DB.prepare(
+              'INSERT OR IGNORE INTO attendance (season_id, week, player_id) VALUES (?, ?, ?)'
+            ).bind(seasonNum, info.round, playerId).run();
+          } catch (err) {
+            console.error(`[Backfill] Failed to record attendance: ${err.message}`);
+          }
         }
       }
 

@@ -2,11 +2,11 @@
 
 // Get player's current and best voting streak for a season
 export async function getStreaks(db, seasonId, playerId) {
-  // Get all weeks this player attended, ordered
   const attendedWeeks = await db.prepare(`
-    SELECT DISTINCT week FROM attendance
-    WHERE season_id = ? AND player_id = ?
-    ORDER BY week
+    SELECT DISTINCT a.week FROM attendance a
+    JOIN melee_tournaments t ON t.season_id = a.season_id AND t.round = a.week
+    WHERE a.season_id = ? AND a.player_id = ? AND t.phase = 'regular'
+    ORDER BY a.week
   `).bind(seasonId, playerId).all();
 
   if (!attendedWeeks.results || attendedWeeks.results.length === 0) {
@@ -69,8 +69,9 @@ export async function getWeeklyParticipation(db, seasonId, week) {
   `).bind(seasonId, week).first();
 
   const attendance = await db.prepare(`
-    SELECT DISTINCT player_id FROM attendance
-    WHERE season_id = ? AND week = ?
+    SELECT DISTINCT a.player_id FROM attendance a
+    JOIN melee_tournaments t ON t.season_id = a.season_id AND t.round = a.week
+    WHERE a.season_id = ? AND a.week = ? AND t.phase = 'regular'
   `).bind(seasonId, week).all();
 
   return {
@@ -82,7 +83,9 @@ export async function getWeeklyParticipation(db, seasonId, week) {
 // Get season participation aggregate (leaderboard)
 export async function getSeasonParticipation(db, seasonId) {
   const attendanceRows = await db.prepare(`
-    SELECT DISTINCT player_id FROM attendance WHERE season_id = ?
+    SELECT DISTINCT a.player_id FROM attendance a
+    JOIN melee_tournaments t ON t.season_id = a.season_id AND t.round = a.week
+    WHERE a.season_id = ? AND t.phase = 'regular'
   `).bind(seasonId).all();
 
   const votedRows = await db.prepare(`

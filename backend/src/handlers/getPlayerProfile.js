@@ -45,7 +45,7 @@ export async function handleGetPlayerProfile(body, env) {
       ORDER BY play_count DESC
     `).bind(sid, playerId).all(),
     computeDeckWinRates(DB, playerId, sid),
-    DB.prepare('SELECT COUNT(*) as cnt FROM attendance WHERE season_id = ? AND player_id = ?').bind(sid, playerId).first(),
+    DB.prepare("SELECT COUNT(*) as cnt FROM attendance a JOIN melee_tournaments t ON t.season_id = a.season_id AND t.round = a.week WHERE a.season_id = ? AND a.player_id = ? AND t.phase = 'regular'").bind(sid, playerId).first(),
     DB.prepare("SELECT COUNT(DISTINCT round) as cnt FROM melee_tournaments WHERE season_id = ? AND phase = 'regular'").bind(sid).first(),
     DB.prepare('SELECT top_results FROM seasons WHERE id = ?').bind(sid).first(),
     DB.prepare('SELECT season_id, round, player_id, wins, losses, draws, rank FROM season_standings WHERE season_id = ?').bind(sid).all(),

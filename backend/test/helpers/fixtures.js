@@ -66,7 +66,10 @@ export function basicTables() {
       { season_id: 6, week: 2, player_id: 'P002' },
       { season_id: 6, week: 2, player_id: 'P003' },
     ],
-    melee_tournaments: [],
+    melee_tournaments: [
+      { season_id: 6, round: 1, melee_id: 'm1', name: 'Week 1', phase: 'regular' },
+      { season_id: 6, round: 2, melee_id: 'm2', name: 'Week 2', phase: 'regular' },
+    ],
     season_standings: [],
     match_results: [],
   };

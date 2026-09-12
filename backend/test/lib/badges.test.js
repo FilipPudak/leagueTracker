@@ -19,6 +19,7 @@ describe('lib/badges computeBadges', () => {
       it('earned when player has any attendance', async () => {
         const db = createMockDb({
           attendance: [{ season_id: 6, week: 1, player_id: 'P001' }],
+          melee_tournaments: [{ season_id: 6, round: 1, phase: 'regular' }],
           season_standings: [],
           match_results: [],
           votes: [],
@@ -235,6 +236,11 @@ describe('lib/badges computeBadges', () => {
             { season_id: 5, week: 1, player_id: 'P001' },
             { season_id: 6, week: 1, player_id: 'P001' },
           ],
+          melee_tournaments: [
+            { season_id: 4, round: 1, phase: 'regular' },
+            { season_id: 5, round: 1, phase: 'regular' },
+            { season_id: 6, round: 1, phase: 'regular' },
+          ],
           season_standings: [],
           match_results: [],
           votes: [],
@@ -250,6 +256,10 @@ describe('lib/badges computeBadges', () => {
           attendance: [
             { season_id: 5, week: 1, player_id: 'P001' },
             { season_id: 6, week: 1, player_id: 'P001' },
+          ],
+          melee_tournaments: [
+            { season_id: 5, round: 1, phase: 'regular' },
+            { season_id: 6, round: 1, phase: 'regular' },
           ],
           season_standings: [],
           match_results: [],
@@ -267,6 +277,11 @@ describe('lib/badges computeBadges', () => {
             { season_id: 3, week: 1, player_id: 'P001' },
             { season_id: 5, week: 1, player_id: 'P001' },
             { season_id: 6, week: 1, player_id: 'P001' },
+          ],
+          melee_tournaments: [
+            { season_id: 3, round: 1, phase: 'regular' },
+            { season_id: 5, round: 1, phase: 'regular' },
+            { season_id: 6, round: 1, phase: 'regular' },
           ],
           season_standings: [],
           match_results: [],
@@ -379,10 +394,12 @@ describe('lib/badges computeBadges', () => {
     describe('Attendance', () => {
       it('bronze at 10 nights', async () => {
         const attendance = [];
+        const melee_tournaments = [];
         for (let w = 1; w <= 10; w++) {
           attendance.push({ season_id: 6, week: w, player_id: 'P001' });
+          melee_tournaments.push({ season_id: 6, round: w, phase: 'regular' });
         }
-        const db = createMockDb({ attendance, season_standings: [], match_results: [], votes: [], awards: [] });
+        const db = createMockDb({ attendance, melee_tournaments, season_standings: [], match_results: [], votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(b => b.id === 'attendance');
         assert.equal(b.value, 10);
@@ -391,11 +408,14 @@ describe('lib/badges computeBadges', () => {
 
       it('counts across seasons', async () => {
         const attendance = [];
+        const melee_tournaments = [];
         for (let w = 1; w <= 5; w++) {
           attendance.push({ season_id: 5, week: w, player_id: 'P001' });
           attendance.push({ season_id: 6, week: w, player_id: 'P001' });
+          melee_tournaments.push({ season_id: 5, round: w, phase: 'regular' });
+          melee_tournaments.push({ season_id: 6, round: w, phase: 'regular' });
         }
-        const db = createMockDb({ attendance, season_standings: [], match_results: [], votes: [], awards: [] });
+        const db = createMockDb({ attendance, melee_tournaments, season_standings: [], match_results: [], votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(b => b.id === 'attendance');
         assert.equal(b.value, 10);
@@ -621,6 +641,60 @@ describe('lib/badges computeBadges', () => {
       const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes: [], awards: [] });
       const badges = await computeBadges(db, 'P001');
       assert.equal(badges.length, 12);
+      });
+    });
+
+    describe('Phase filtering', () => {
+      it('attendance for cut/side events does not count toward First Night', async () => {
+        const db = createMockDb({
+          attendance: [{ season_id: 6, week: 12, player_id: 'P001' }],
+          melee_tournaments: [
+            { season_id: 6, round: 12, phase: 'cut' },
+          ],
+          season_standings: [],
+          match_results: [],
+          votes: [],
+          awards: [],
+        });
+        const badges = await computeBadges(db, 'P001');
+        const b = badges.find(b => b.id === 'firstNight');
+        assert.equal(b.earned, false);
+      });
+
+      it('attendance for cut events does not count toward Attendance badge', async () => {
+        const attendance = [];
+        const melee_tournaments = [];
+        for (let w = 1; w <= 10; w++) {
+          attendance.push({ season_id: 6, week: w, player_id: 'P001' });
+          melee_tournaments.push({ season_id: 6, round: w, phase: 'cut' });
+        }
+        const db = createMockDb({ attendance, melee_tournaments, season_standings: [], match_results: [], votes: [], awards: [] });
+        const badges = await computeBadges(db, 'P001');
+        const b = badges.find(b => b.id === 'attendance');
+        assert.equal(b.value, 0);
+        assert.equal(b.tier, null);
+      });
+
+      it('only regular-phase attendance counts toward Loyalist', async () => {
+        const db = createMockDb({
+          attendance: [
+            { season_id: 4, week: 1, player_id: 'P001' },
+            { season_id: 5, week: 1, player_id: 'P001' },
+            { season_id: 6, week: 12, player_id: 'P001' },
+          ],
+          melee_tournaments: [
+            { season_id: 4, round: 1, phase: 'regular' },
+            { season_id: 5, round: 1, phase: 'regular' },
+            { season_id: 6, round: 12, phase: 'cut' },
+          ],
+          season_standings: [],
+          match_results: [],
+          votes: [],
+          awards: [],
+        });
+        const badges = await computeBadges(db, 'P001');
+        const b = badges.find(b => b.id === 'loyalist');
+        assert.equal(b.earned, false, 'cut event in season 6 should not count as a regular season');
+      });
     });
   });
-});

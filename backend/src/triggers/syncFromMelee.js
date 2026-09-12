@@ -96,6 +96,7 @@ export async function syncFromMelee(env, deps = {}) {
   const createdPlayers = new Map();
   const finder = createPlayerFinder(DB, { onCreated: p => createdPlayers.set(p.id, p) });
   const roundAttendance = new Map();
+  const roundPhases = new Map();
   const newlySyncedRounds = new Set();
 
   for (const [meleeId, info] of weekMap) {
@@ -142,6 +143,7 @@ export async function syncFromMelee(env, deps = {}) {
     }
 
     roundAttendance.set(info.round, attendedThisRound);
+    roundPhases.set(info.round, info.phase || 'regular');
 
     let matchesResp;
     try {
@@ -203,6 +205,7 @@ export async function syncFromMelee(env, deps = {}) {
   }
 
   for (const [round, players] of roundAttendance) {
+    if (roundPhases.get(round) !== 'regular') continue;
     for (const playerId of players) {
       try {
         await DB.prepare(

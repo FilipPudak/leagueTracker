@@ -218,8 +218,220 @@ function matchWhere(row, whereClause, params) {
 }
 
 function executeSelect(sql, params, store) {
-  const table = extractTableName(sql);
   const upper = sql.toUpperCase();
+
+  // Handle JOINs: perform simple nested loop join
+  const joinMatch = sql.match(/FROM\s+(\w+)\s+(?:AS\s+)?(\w+)\s+JOIN\s+(\w+)\s+(?:AS\s+)?(\w+)\s+ON\s+(.+?)(?:\s+WHERE\s+|\s+GROUP\s+|\s+ORDER\s+|\s+LIMIT\s+|$)/is);
+  if (joinMatch) {
+    const leftTable = joinMatch[1];
+    const leftAlias = joinMatch[2];
+    const rightTable = joinMatch[3];
+    const rightAlias = joinMatch[4];
+    const onClause = joinMatch[5];
+
+    const leftRows = store[leftTable] || [];
+    const rightRows = store[rightTable] || [];
+
+    // Build joined rows
+    let joinedRows = [];
+    for (const lr of leftRows) {
+      for (const rr of rightRows) {
+        const conditions = onClause.split(/\s+AND\s+/i);
+        let match = true;
+        for (const cond of conditions) {
+          const eqM = cond.match(/(\w+)\.(\w+)\s*=\s*(\w+)\.(\w+)/i);
+          if (eqM) {
+            const leftSideAlias = eqM[1].toLowerCase();
+            const rightSideAlias = eqM[3].toLowerCase();
+            const lRow = leftSideAlias === leftAlias.toLowerCase() ? lr : leftSideAlias === rightAlias.toLowerCase() ? rr : lr;
+            const rRow = rightSideAlias === rightAlias.toLowerCase() ? rr : rightSideAlias === leftAlias.toLowerCase() ? lr : rr;
+            if (String(lRow[eqM[2]]) !== String(rRow[eqM[4]])) { match = false; break; }
+          }
+        }
+        if (match) {
+          const joined = {};
+          for (const [k, v] of Object.entries(lr)) joined[k] = v;
+          for (const [k, v] of Object.entries(rr)) {
+            if (!(k in joined)) joined[k] = v;
+            else joined[leftAlias + '_' + k] = v;
+          }
+          joinedRows.push(joined);
+        }
+      }
+    }
+
+    // Apply WHERE
+    const whereMatch = sql.match(/WHERE\s+(.+?)(?:\s+GROUP\s+|\s+ORDER\s+|\s+LIMIT\s+|$)/is);
+    if (whereMatch) {
+      const whereClause = whereMatch[1];
+      const conditions = whereClause.split(/\s+AND\s+/i);
+      joinedRows = joinedRows.filter(row => {
+        let paramIdx = 0;
+        for (const cond of conditions) {
+          const trimmed = cond.trim();
+          const eqM = trimmed.match(/^(\w+(?:\.\w+)?)\s*=\s*(?:'([^']*)'|\?|(\S+))/i);
+          if (eqM) {
+            const col = eqM[1].split('.').pop().replace(/"/g, '');
+            let val;
+            if (eqM[2] !== undefined) val = eqM[2];
+            else if (eqM[3] !== undefined) val = eqM[3];
+            else val = params[paramIdx++];
+            if (String(row[col]) !== String(val)) return false;
+            continue;
+          }
+          const neqM = trimmed.match(/^(\w+(?:\.\w+)?)\s*(?:!=|<>)\s*(?:'([^']*)'|\?|(\S+))/i);
+          if (neqM) {
+            const col = neqM[1].split('.').pop().replace(/"/g, '');
+            let val;
+            if (neqM[2] !== undefined) val = neqM[2];
+            else if (neqM[3] !== undefined) val = neqM[3];
+            else val = params[paramIdx++];
+            if (String(row[col]) === String(val)) return false;
+            continue;
+          }
+        }
+        return true;
+      });
+    }
+
+    // Handle GROUP BY in JOIN results
+    const hasGroupBy = /GROUP\s+BY/i.test(sql);
+    if (hasGroupBy) {
+      const groupMatch = sql.match(/GROUP\s+BY\s+([\w.",]+(?:\s*,\s*[\w.",]+)*)/i);
+      const groupCols = groupMatch[1].split(',').map(c => c.trim().split('.').pop().replace(/"/g, '').toLowerCase());
+
+      const selectClause = sql.match(/SELECT\s+(.+?)\s+FROM/i);
+      const colAliases = {};
+      let countColAlias = 'count';
+      if (selectClause && selectClause[1].trim() !== '*') {
+        const colParts = selectClause[1].split(',').map(c => c.trim());
+        for (const part of colParts) {
+          const asParts = part.split(/\s+AS\s+/i);
+          if (asParts.length === 2) {
+            const src = asParts[0].trim().split('.').pop().replace(/"/g, '').toLowerCase();
+            const alias = asParts[1].trim().toLowerCase();
+            if (/\bCOUNT\b|\bSUM\b|\bAVG\b|\bMIN\b|\bMAX\b/.test(part.toUpperCase())) {
+              countColAlias = alias;
+            } else {
+              colAliases[src] = alias;
+            }
+          }
+        }
+      }
+
+      const hasCount = upper.includes('COUNT(');
+      const groups = new Map();
+      for (const row of joinedRows) {
+        const key = groupCols.map(c => row[c]).join('||');
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(row);
+      }
+
+      joinedRows = [];
+      for (const [, groupRows] of groups) {
+        if (upper.includes('COUNT(DISTINCT')) {
+          const distMatch = upper.match(/COUNT\(DISTINCT\s+(\w+(?:\.\w+)?)\)/i);
+          const col = distMatch[1].split('.').pop().replace(/"/g, '').toLowerCase();
+          const uniqueVals = new Set(groupRows.map(r => r[col]));
+          const row = {};
+          for (const gc of groupCols) {
+            row[colAliases[gc] || gc] = groupRows[0][gc];
+          }
+          row[countColAlias] = uniqueVals.size;
+          joinedRows.push(row);
+        } else if (hasCount) {
+          const row = {};
+          for (const gc of groupCols) {
+            row[colAliases[gc] || gc] = groupRows[0][gc];
+          }
+          row[countColAlias] = groupRows.length;
+          joinedRows.push(row);
+        } else {
+          joinedRows.push(groupRows[0]);
+        }
+      }
+
+      const orderByGb = extractOrderBy(sql);
+      if (orderByGb) {
+        const parts = orderByGb.split(',').map(p => {
+          const [colRaw, dir] = p.trim().split(/\s+/);
+          const col = colRaw.replace(/"/g, '');
+          return { col, desc: (dir || 'ASC').toUpperCase() === 'DESC' };
+        });
+        joinedRows.sort((a, b) => {
+          for (const { col, desc } of parts) {
+            const va = a[col] ?? '', vb = b[col] ?? '';
+            const cmp = String(va).localeCompare(String(vb), undefined, { numeric: true });
+            if (cmp !== 0) return desc ? -cmp : cmp;
+          }
+          return 0;
+        });
+      }
+      const limitGb = extractLimit(sql);
+      if (limitGb) joinedRows = joinedRows.slice(0, limitGb);
+
+      return { table: leftTable, rows: joinedRows };
+    }
+
+    // Handle standalone COUNT (no GROUP BY)
+    const hasCount = upper.includes('COUNT(');
+    if (hasCount) {
+      const aliasMatch = upper.match(/COUNT\([^)]*\)\s+AS\s+(\w+)/i);
+      const alias = aliasMatch ? aliasMatch[1].toLowerCase() : 'count';
+      return { table: leftTable, rows: [{ [alias]: joinedRows.length }] };
+    }
+
+    // Handle DISTINCT + specific columns
+    const selectMatch = sql.match(/SELECT\s+(.+?)\s+FROM/i);
+    if (selectMatch && selectMatch[1].trim() !== '*') {
+      const isDistinct = /DISTINCT/i.test(selectMatch[1]);
+      const cols = selectMatch[1].replace(/DISTINCT/i, '').split(',').map(c => {
+        const parts = c.trim().split(/\s+AS\s+/i);
+        return { name: parts[0].trim().split('.').pop().replace(/"/g, ''), alias: parts[1]?.trim().toLowerCase() };
+      });
+      joinedRows = joinedRows.map(r => {
+        const out = {};
+        for (const col of cols) {
+          out[col.alias || col.name] = r[col.name];
+        }
+        return out;
+      });
+      if (isDistinct) {
+        const seen = new Set();
+        joinedRows = joinedRows.filter(r => {
+          const key = JSON.stringify(r);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+    }
+
+    // Handle ORDER BY
+    const orderByM = sql.match(/ORDER\s+BY\s+([\w."]+\s*(?:ASC|DESC)?(?:\s*,\s*[\w."]+\s*(?:ASC|DESC)?)*)/i);
+    if (orderByM) {
+      const parts = orderByM[1].split(',').map(p => {
+        const [colRaw, dir] = p.trim().split(/\s+/);
+        const col = colRaw.replace(/"/g, '');
+        return { col, desc: (dir || 'ASC').toUpperCase() === 'DESC' };
+      });
+      joinedRows.sort((a, b) => {
+        for (const { col, desc } of parts) {
+          const va = a[col] ?? '', vb = b[col] ?? '';
+          const cmp = String(va).localeCompare(String(vb), undefined, { numeric: true });
+          if (cmp !== 0) return desc ? -cmp : cmp;
+        }
+        return 0;
+      });
+    }
+
+    const limitM = sql.match(/LIMIT\s+(\d+)/i);
+    if (limitM) joinedRows = joinedRows.slice(0, parseInt(limitM[1], 10));
+
+    return { table: leftTable, rows: joinedRows };
+  }
+
+  const table = extractTableName(sql);
 
   if (!table || !store[table]) {
     return { table, rows: [] };

@@ -7,6 +7,9 @@ import { getSettings } from '../../src/db/queries.js';
 
 function makeTables(overrides = {}) {
   const t = basicTables();
+  t.melee_tournaments = [];
+  t.season_standings = [];
+  t.match_results = [];
   if (overrides.settings) t.settings = overrides.settings;
   if (overrides.melee_tournaments) t.melee_tournaments = overrides.melee_tournaments;
   if (overrides.season_standings) t.season_standings = overrides.season_standings;
