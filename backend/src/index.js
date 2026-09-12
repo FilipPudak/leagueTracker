@@ -7,6 +7,7 @@ import { handleGetLeaderboardData } from './handlers/getLeaderboardData.js';
 import { handleGetMySeasonStats } from './handlers/getMySeasonStats.js';
 import { handleGetMyCareerStats } from './handlers/getMyCareerStats.js';
 import { handleGetStandingsData } from './handlers/getStandingsData.js';
+import { handleGetPlayerProfile } from './handlers/getPlayerProfile.js';
 import { handleStartNewSeason } from './handlers/startNewSeason.js';
 import { handleBackfillFromMelee } from './handlers/handleBackfillFromMelee.js';
 import { handleSyncNow } from './handlers/syncNow.js';
@@ -96,6 +97,7 @@ export default {
       getMySeasonStats: handleGetMySeasonStats,
       getMyCareerStats: handleGetMyCareerStats,
       getStandingsData: handleGetStandingsData,
+      getPlayerProfile: handleGetPlayerProfile,
       startNewSeason: handleStartNewSeason,
       backfillFromMelee: handleBackfillFromMelee,
       syncNow: handleSyncNow,
