@@ -703,7 +703,7 @@ function renderStandingsTable(table) {
     const playerName = nameMap[row.playerId] || row.playerId;
     return `<tr class="standings-row${rankClass}" ${row.rank > STANDINGS_PAGE_SIZE && !standingsShowAll ? 'style="display:none;"' : ''}>
       <td style="font-weight:700;">${escapeHtml(row.rank)}</td>
-      <td style="font-weight:600; color:#38bdf8; cursor:pointer; text-decoration:underline;" onclick="openPlayerModal('${escapeHtml(row.playerId)}')">${escapeHtml(playerName)}</td>
+      <td class="player-name-link" style="font-weight:600; color:#38bdf8; cursor:pointer;" onclick="openPlayerModal('${escapeHtml(row.playerId)}')">${escapeHtml(playerName)}</td>
       <td style="text-align:center;">${escapeHtml(row.played)}</td>
       <td style="text-align:center;">${escapeHtml(row.won)}</td>
       <td style="text-align:center;">${escapeHtml(row.drawn)}</td>
