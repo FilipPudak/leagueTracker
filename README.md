@@ -49,14 +49,14 @@ cd backend && node --test "test/**/*.test.js"
 
 | Category | Files | Tests |
 |----------|-------|-------|
-| Library (awards, auth, melee, meleeLeague, pagination, participation, seasonTable) | 7 | 150+ |
-| Handlers (getAppData, submitVote, linkAccount, getStandingsData, admin, etc.) | 11 | 170+ |
+| Library (awards, auth, badges, careerStats, melee, meleeLeague, participation, seasonTable, voteAudit) | 9 | 200+ |
+| Handlers (getAppData, submitVote, updateVote, linkAccount, unlinkAccount, getStandingsData, getLeaderboardData, getMySeasonStats, getMyCareerStats, getPlayerProfile, admin, etc.) | 12 | 200+ |
 | Database (queries, schema) | 2 | 30+ |
 | Triggers (syncFromMelee, backfillFromMelee) | 2 | 45+ |
 | Router & rate limiter | 2 | 40+ |
-| Frontend core (`docs/app/app-core.js`) | 1 | 20+ |
+| Frontend (app-core + responsive redesign phases 1–7 + shortcuts) | 10 | 130+ |
 | Privacy guard | 1 | 5+ |
-| **Total** | **26 files** | **470** |
+| **Total** | **40 files** | **676** |
 
 Test infrastructure: `backend/test/helpers/mock-db.js` (D1 mock), `mock-fetch.js`,
 `mock-crypto.js`, `fixtures.js`, `test-utils.js`.
