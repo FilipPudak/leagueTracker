@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.5.0';
+const APP_VERSION = '4.6.0';
 
 let appState = {
   status: 'unlinked',
@@ -168,13 +168,18 @@ function applyVersion() {
   if (el) el.textContent = APP_VERSION;
 }
 
-function setActiveView(viewId, tabIndex) {
-  document.querySelectorAll('.view-panel').forEach((v) => v.classList.remove('active'));
+function setActiveView(viewId) {
+  const isDesktop = window.innerWidth >= 1024;
+
+  document.querySelectorAll('.view-panel').forEach((v) => {
+    if (isDesktop && v.id === 'standings-view') return;
+    v.classList.remove('active');
+  });
   document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
   const viewEl = $(viewId);
   if (viewEl) viewEl.classList.add('active');
-  const tabs = document.querySelectorAll('.tab-btn');
-  if (tabs[tabIndex]) tabs[tabIndex].classList.add('active');
+  const activeTab = document.querySelector(`.tab-btn[aria-controls="${viewId}"]`);
+  if (activeTab) activeTab.classList.add('active');
 }
 
 /* -------------------------------------------------------------- boot state -- */
@@ -248,6 +253,11 @@ function applyBoot(boot) {
     }
   }
 
+  const voteCta = $('vote-cta');
+  if (voteCta) {
+    voteCta.style.display = (appState.votingOpen && boot.status === 'linked' && !boot.alreadySubmitted && !boot.alreadyVoted) ? 'block' : 'none';
+  }
+
   if (boot.status === 'linked') {
     const voteForm = $('vote-form');
     const votedCard = $('already-voted-card');
@@ -256,7 +266,7 @@ function applyBoot(boot) {
 
     showLinkedPresence(appState.linkedPlayer);
     showTabs(true);
-    setActiveView('vote-view', 0);
+    setActiveView('vote-view');
 
     if (appState.votingOpen) {
       populateVotingDropdowns(boot.leaders, boot.players, appState.linkedPlayer.id);
@@ -275,7 +285,7 @@ function applyBoot(boot) {
   } else {
     showLinkedPresence(null);
     showTabs(false);
-    setActiveView('link-view', 0);
+    setActiveView('link-view');
     populateLinkPicker(LeagueCore.resolvePlayerChoices(boot));
     setLinkMode('email');
     if (boot.status === 'invalid-token') {
@@ -417,8 +427,6 @@ function cancelUnlink() {
   if (overlay) overlay.style.display = 'none';
 }
 
-const TAB_INDEX = { 'vote-view': 0, 'standings-view': 1, 'leaderboard-view': 2, 'myseason-view': 3 };
-
 function confirmUnlink() {
   if (unlinkInFlight) return;
   unlinkInFlight = true;
@@ -448,10 +456,10 @@ function confirmUnlink() {
       if (appState.linkedPlayer) {
         showTabs(true);
         showLinkedPresence(appState.linkedPlayer);
-        setActiveView(lastView, TAB_INDEX[lastView] || 0);
+        setActiveView(lastView);
       } else {
         showTabs(false);
-        setActiveView('link-view', 0);
+        setActiveView('link-view');
       }
     });
 }
@@ -489,7 +497,7 @@ function switchTab(tabId) {
     if (appState.linkedPlayer) {
       clearStatus();
       showSpinner(false);
-      setActiveView('vote-view', 0);
+      setActiveView('vote-view');
       const votedCard = $('already-voted-card');
       if (!appState.votingOpen && votedCard && votedCard.style.display !== 'block') {
         showStatus('Voting is currently closed for this week.', false);
@@ -503,20 +511,20 @@ function switchTab(tabId) {
   } else if (tabId === 'standings-view') {
     clearStatus();
     showSpinner(false);
-    setActiveView('standings-view', 1);
+    setActiveView('standings-view');
     appState.lastView = 'standings-view';
     loadStandingsData();
   } else if (tabId === 'leaderboard-view') {
     clearStatus();
     showSpinner(false);
-    setActiveView('leaderboard-view', 2);
+    setActiveView('leaderboard-view');
     appState.lastView = 'leaderboard-view';
     loadLeaderboardData();
   } else if (tabId === 'myseason-view') {
     if (appState.linkedPlayer) {
       clearStatus();
       showSpinner(false);
-      setActiveView('myseason-view', 3);
+      setActiveView('myseason-view');
       appState.lastView = 'myseason-view';
       loadMySeasonStats();
       loadCareerStats();
@@ -591,8 +599,10 @@ function submitVotes(isRetry) {
   function showVoteRecorded() {
     const vForm = $('vote-form');
     const vCard = $('already-voted-card');
+    const voteCta = $('vote-cta');
     if (vForm) vForm.style.display = 'none';
     if (vCard) vCard.style.display = 'block';
+    if (voteCta) voteCta.style.display = 'none';
     const changeBtn = $('btn-change-vote');
     if (changeBtn) changeBtn.style.display = appState.votingOpen ? 'inline-block' : 'none';
     clearStatus();
@@ -765,7 +775,7 @@ function renderRoundResults(rounds) {
       .join('');
 
     return `<div class="round-card">
-      <div class="round-header" onclick="this.nextElementSibling.classList.toggle('open')">
+      <div class="round-header" role="button" tabindex="0" onclick="this.nextElementSibling.classList.toggle('open')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.nextElementSibling.classList.toggle('open')}">
         <span class="round-title">${title}</span>
         <span class="round-phase ${phaseClass}">${escapeHtml(phaseLabel)}</span>
       </div>
@@ -1029,7 +1039,7 @@ function renderCareerStats(res) {
   const pct = (v) => v == null ? '—' : v + '%';
   const recordHtml = `
     <div style="font-weight:700; color:#f8fafc; margin-bottom:8px;">Career record${r.sinceSeason ? ' — since Season ' + escapeHtml(r.sinceSeason) : ''}</div>
-    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; font-size:0.85rem;">
+    <div class="career-record-grid">
       <div><span style="color:#94a3b8;">Nights</span><br><strong style="color:#f8fafc;">${escapeHtml(r.nights)}</strong></div>
       <div><span style="color:#94a3b8;">Matches</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.played)}</strong></div>
       <div><span style="color:#94a3b8;">W-D-L</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.wins)}-${escapeHtml(rec.draws)}-${escapeHtml(rec.losses)}</strong></div>
@@ -1229,6 +1239,11 @@ document.addEventListener('DOMContentLoaded', () => {
   initCollapsibles();
   initBadgeTooltips();
   window.addEventListener('hashchange', handleHashRoute);
+
+  const desktopQuery = window.matchMedia('(min-width: 1024px)');
+  desktopQuery.addEventListener('change', () => {
+    if (appState.lastView) setActiveView(appState.lastView);
+  });
 });
 
 function initCollapsibles() {
@@ -1376,7 +1391,7 @@ function renderSeasonContent(s, opts = {}) {
   const headingClose = headingTag === 'div' ? '' : '</' + headingTag + '>';
 
   const statsHtml = `
-    <div style="display:flex; justify-content:center; flex-wrap:wrap; gap:4px; margin-bottom:12px;">
+    <div class="player-modal-stats">
       <div class="player-modal-stat">
         <div class="player-modal-stat-value">${escapeHtml(s.rank != null ? '#' + s.rank : '—')}</div>
         <div class="player-modal-stat-label">Rank</div>
@@ -1528,7 +1543,7 @@ function renderProfileCareer(data) {
   const wdll = c.totalWDLL;
   const recordHtml = `
     <div style="font-weight:700; color:#f8fafc; margin-bottom:8px;">Career Record</div>
-    <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px; font-size:0.85rem;">
+    <div class="career-profile-grid">
       <div><span style="color:#94a3b8;">Nights</span><br><strong style="color:#f8fafc;">${escapeHtml(c.nightsPlayed)}</strong></div>
       <div><span style="color:#94a3b8;">W-D-L</span><br><strong style="color:#f8fafc;">${escapeHtml(wdll.won)}-${escapeHtml(wdll.drawn)}-${escapeHtml(wdll.lost)}</strong></div>
       <div><span style="color:#94a3b8;">Game diff</span><br><strong style="color:#f8fafc;">${c.gameDiff > 0 ? '+' : ''}${escapeHtml(c.gameDiff)}</strong></div>

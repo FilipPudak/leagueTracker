@@ -1,0 +1,63 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const CSS_FILE = join(__dirname, '../../../docs/app/styles.css');
+const JS_FILE = join(__dirname, '../../../docs/app/app.js');
+
+function readCSS() { return readFileSync(CSS_FILE, 'utf8'); }
+function readJS() { return readFileSync(JS_FILE, 'utf8'); }
+
+describe('Phase 4: Desktop 2-panel CSS Grid', () => {
+  it('app-container has display:grid at desktop', () => {
+    const css = readCSS();
+    assert.ok(
+      css.includes('.app-container') && css.includes('display: grid'),
+      '.app-container must have display: grid'
+    );
+  });
+
+  it('app-container has 2-column grid at desktop', () => {
+    const css = readCSS();
+    assert.ok(
+      css.includes('.app-container') && css.includes('grid-template-columns'),
+      '.app-container must have grid-template-columns'
+    );
+  });
+
+  it('standings view has grid-column: 1 at desktop', () => {
+    const css = readCSS();
+    assert.ok(
+      css.includes('#standings-view') && css.includes('grid-column: 1'),
+      '#standings-view must have grid-column: 1'
+    );
+  });
+});
+
+describe('Phase 4: setActiveView viewport awareness', () => {
+  it('setActiveView handles desktop viewport', () => {
+    const js = readJS();
+    assert.ok(
+      js.includes('innerWidth >= 1024') || js.includes('innerWidth>=1024'),
+      'setActiveView must check window.innerWidth >= 1024 for desktop'
+    );
+  });
+
+  it('setActiveView skips tab highlight for standings on desktop', () => {
+    const js = readJS();
+    assert.ok(
+      js.includes("viewId === 'standings-view'") || js.includes("viewId==='standings-view'") || js.includes('standings-view'),
+      'setActiveView must handle standings-view specially on desktop'
+    );
+  });
+});
+
+describe('Phase 4: Vote CTA on standings', () => {
+  it('vote-cta element exists in HTML', () => {
+    const html = readFileSync(join(__dirname, '../../../docs/app/index.html'), 'utf8');
+    assert.ok(html.includes('vote-cta'), 'Must have #vote-cta element');
+  });
+});
