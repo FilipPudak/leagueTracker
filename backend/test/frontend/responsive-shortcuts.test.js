@@ -13,25 +13,13 @@ function readCSS() { return readFileSync(CSS_FILE, 'utf8'); }
 function readJS() { return readFileSync(JS_FILE, 'utf8'); }
 function readHTML() { return readFileSync(HTML_FILE, 'utf8'); }
 
-describe('Shortcut fixes: Standings internal 2-column layout', () => {
-  it('standings view has internal 2-column grid at 1280px+', () => {
+describe('Shortcut fixes: Wide desktop breakpoint', () => {
+  it('has 1280px media query', () => {
     const css = readCSS();
     assert.ok(
-      css.includes('min-width: 1280px') && css.includes('2fr 1fr'),
-      'Must have 2-column grid (2fr 1fr) at 1280px+'
+      css.includes('min-width: 1280px'),
+      'Must have 1280px+ media query'
     );
-  });
-
-  it('standings-table-section is column 1 in internal grid', () => {
-    const css = readCSS();
-    const match = css.match(/min-width:\s*1280px[\s\S]*?#standings-table-section[\s\S]*?grid-column:\s*1/);
-    assert.ok(match, '#standings-table-section must be grid-column: 1 at 1280px+');
-  });
-
-  it('round-results-section is column 2 in internal grid', () => {
-    const css = readCSS();
-    const match = css.match(/min-width:\s*1280px[\s\S]*?#round-results-section[\s\S]*?grid-column:\s*2/);
-    assert.ok(match, '#round-results-section must be grid-column: 2 at 1280px+');
   });
 });
 
@@ -64,12 +52,10 @@ describe('Shortcut fixes: Vote-cta hide after vote', () => {
 });
 
 describe('Shortcut fixes: Standings tab hidden from screen readers', () => {
-  it('standings tab has display:none on desktop', () => {
+  it('myseason tab has display:none on desktop (persistent panel)', () => {
     const css = readCSS();
-    assert.ok(
-      css.includes('[aria-controls="standings-view"]') && css.includes('display: none'),
-      'Standings tab must have display:none on desktop'
-    );
+    const match = css.match(/\.nav-tabs-minimal\s+\.tab-btn\[aria-controls="myseason-view"\]\s*\{[^}]*display:\s*none/);
+    assert.ok(match, 'My Stats tab must have display:none on desktop');
   });
 });
 

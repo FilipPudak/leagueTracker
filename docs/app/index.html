@@ -25,15 +25,6 @@
       </div>
       <div class="subtitle" id="app-subtitle">Loading season information...</div>
       <div id="voting-badge" class="badge badge-active" style="display: none;">Voting Open</div>
-
-      <div id="identity-chip" class="identity-chip">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span class="chip-label">Voting as</span>
-          <span class="chip-name" id="chip-name">—</span>
-          <!-- FIX: Replaced non-semantic span with a proper accessible button -->
-          <button type="button" class="not-you" onclick="unlinkCurrentDevice()">Not you?</button>
-        </div>
-      </div>
     </div>
 
     <div class="nav-tabs" style="display:none;" role="tablist" aria-label="Main navigation">
@@ -83,6 +74,13 @@
 
     <!-- VOTE PANEL -->
     <div id="vote-view" class="view-panel" role="tabpanel" aria-labelledby="tab-vote">
+      <div id="identity-chip" class="identity-chip">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span class="chip-label">Voting as</span>
+          <span class="chip-name" id="chip-name">—</span>
+          <button type="button" class="not-you" onclick="unlinkCurrentDevice()">Not you?</button>
+        </div>
+      </div>
       <div id="deadline-copy" class="card" style="display: none; margin-bottom: 12px; padding: 10px 14px; font-size: 0.85rem; color: #94a3b8;">
         <span id="deadline-text"></span>
       </div>

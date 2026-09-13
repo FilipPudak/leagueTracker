@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.6.0';
+const APP_VERSION = '4.7.0';
 
 let appState = {
   status: 'unlinked',
@@ -266,7 +266,13 @@ function applyBoot(boot) {
 
     showLinkedPresence(appState.linkedPlayer);
     showTabs(true);
-    setActiveView('vote-view');
+
+    if (localStorage.getItem('firstLogin')) {
+      localStorage.removeItem('firstLogin');
+      setActiveView('vote-view');
+    } else {
+      setActiveView('standings-view');
+    }
 
     if (appState.votingOpen) {
       populateVotingDropdowns(boot.leaders, boot.players, appState.linkedPlayer.id);
@@ -297,8 +303,9 @@ function applyBoot(boot) {
 }
 
 function showTabs(show) {
+  const isDesktop = window.innerWidth >= 1024;
   const tabs = document.querySelector('.nav-tabs');
-  if (tabs) tabs.style.display = show ? 'flex' : 'none';
+  if (tabs) tabs.style.display = isDesktop ? 'none' : (show ? 'flex' : 'none');
 }
 
 function showLinkedPresence(player) {
@@ -396,6 +403,7 @@ function submitAccountLink() {
       };
       showSpinner(false);
       linkInFlight = false;
+      localStorage.setItem('firstLogin', '1');
       applyBoot(boot);
       if (appState.votingOpen) {
         showStatus('Account linked successfully!', true);

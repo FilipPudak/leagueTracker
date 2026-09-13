@@ -11,21 +11,17 @@ function readCSS() {
   return readFileSync(CSS_FILE, 'utf8');
 }
 
-describe('Phase 5: Standings responsive layout', () => {
-  it('standings view is positioned as left panel at desktop', () => {
+describe('Phase 5: My Stats persistent layout', () => {
+  it('myseason-view is positioned as left panel at desktop', () => {
     const css = readCSS();
-    assert.ok(
-      css.includes('#standings-view') && css.includes('grid-column: 1'),
-      'Standings view must be in grid column 1 at desktop'
-    );
+    const match = css.match(/#myseason-view\s*\{[^}]*grid-column:\s*1/);
+    assert.ok(match, 'My Stats view must be in grid column 1 at desktop');
   });
 
-  it('standings view is always visible at desktop', () => {
+  it('myseason-view is always visible at desktop', () => {
     const css = readCSS();
-    assert.ok(
-      css.includes('#standings-view') && css.includes('display: block'),
-      'Standings view must have display: block at desktop (always visible)'
-    );
+    const match = css.match(/#myseason-view\s*\{[^}]*display:\s*block/);
+    assert.ok(match, 'My Stats view must have display: block at desktop (always visible)');
   });
 });
 

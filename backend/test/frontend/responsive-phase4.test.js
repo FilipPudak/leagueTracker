@@ -28,12 +28,10 @@ describe('Phase 4: Desktop 2-panel CSS Grid', () => {
     );
   });
 
-  it('standings view has grid-column: 1 at desktop', () => {
+  it('myseason-view has grid-column: 1 at desktop (persistent left panel)', () => {
     const css = readCSS();
-    assert.ok(
-      css.includes('#standings-view') && css.includes('grid-column: 1'),
-      '#standings-view must have grid-column: 1'
-    );
+    const match = css.match(/#myseason-view\s*\{[^}]*grid-column:\s*1/);
+    assert.ok(match, '#myseason-view must have grid-column: 1');
   });
 });
 

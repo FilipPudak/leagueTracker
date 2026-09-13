@@ -73,7 +73,7 @@ body {
   flex-shrink: 0;
 }
 
-.header { text-align: center; margin-bottom: 20px; border-bottom: 1px solid rgba(56, 189, 248, 0.2); padding-bottom: 14px; }
+.header { text-align: center; margin-bottom: 12px; border-bottom: 1px solid rgba(56, 189, 248, 0.2); padding-bottom: 10px; }
 .header h1 {
   font-family: 'Orbitron', sans-serif;
   font-size: var(--font-size-title); margin: 0; color: #38bdf8; font-weight: 900; letter-spacing: 1.5px;
@@ -393,32 +393,32 @@ details[open].section-block > summary::before { content: '\25BE '; }
   .nav-tabs-minimal {
     display: flex;
     gap: 8px;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
     background-color: #090d16;
     padding: 4px;
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.05);
   }
 
-  .nav-tabs-minimal .tab-btn[aria-controls="standings-view"] {
+  .nav-tabs-minimal .tab-btn[aria-controls="myseason-view"] {
     display: none;
   }
 
   .app-container {
     display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
     gap: 0 24px;
     align-items: start;
   }
 
-  #standings-view {
+  #myseason-view {
     display: block;
     grid-column: 1;
   }
 
   #vote-view,
+  #standings-view,
   #leaderboard-view,
-  #myseason-view,
   #link-view {
     grid-column: 2;
   }
@@ -448,14 +448,7 @@ details[open].section-block > summary::before { content: '\25BE '; }
   }
 }
 
-/* Wide desktop (1280px+): standings internal 2-column */
+/* Wide desktop (1280px+) */
 @media (min-width: 1280px) {
-  #standings-view {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 0 20px;
-  }
-
-  #standings-table-section { grid-column: 1; }
-  #round-results-section { grid-column: 2; margin-top: 0; }
+  .career-record-grid { grid-template-columns: repeat(5, 1fr); }
 }
