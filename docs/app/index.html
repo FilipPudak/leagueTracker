@@ -237,8 +237,8 @@
     .standings-row { transition: background 0.15s ease; }
     .standings-row:hover { background: rgba(56, 189, 248, 0.05); }
     .standings-row td { padding: 8px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
-    .player-name-link { text-decoration: none; transition: text-decoration-color 0.15s; }
-    .player-name-link:hover { text-decoration: underline; }
+    .hover-underline { text-decoration: none; transition: text-decoration-color 0.15s; }
+    .hover-underline:hover { text-decoration: underline; }
     .standings-row.rank-1 td:first-child { color: #facc15; font-weight: 900; }
     .standings-row.rank-2 td:first-child { color: #e2e8f0; font-weight: 900; }
     .standings-row.rank-3 td:first-child { color: #f59e0b; font-weight: 900; }
@@ -623,7 +623,7 @@
       <div id="player-modal-content"></div>
       <div style="text-align:center; margin-top:16px;">
         <a href="#" id="player-modal-profile-link" onclick="openPlayerProfile(event)"
-           class="player-name-link" style="color:#38bdf8; font-size:0.9rem; cursor:pointer;">View Full Profile &rarr;</a>
+           class="hover-underline" style="color:#38bdf8; font-size:0.9rem; cursor:pointer;">View Full Profile &rarr;</a>
       </div>
     </div>
   </div>
