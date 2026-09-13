@@ -1,6 +1,6 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyPhase, isLeagueTournament, extractSeasonAndRound, sortRoundsDeterministic, buildWeekMap, createPlayerFinder } from '../../src/lib/meleeLeague.js';
+import { classifyPhase, isLeagueTournament, extractSeasonAndRound, sortRoundsDeterministic, buildWeekMap, createPlayerFinder, fetchLeagueTournaments } from '../../src/lib/meleeLeague.js';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables } from '../helpers/fixtures.js';
 
@@ -211,6 +211,89 @@ describe('meleeLeague', () => {
 
       const id = await finder.find('StaleMelee', 'Stale');
       assert.equal(id, 'P099');
+    });
+  });
+
+  describe('fetchLeagueTournaments', () => {
+    it('returns empty array when client returns no content', async () => {
+      const client = { listTournaments: async () => ({ Content: [], TotalCount: 0 }) };
+      const result = await fetchLeagueTournaments(client);
+      assert.deepEqual(result, []);
+    });
+
+    it('filters only league tournaments', async () => {
+      const tournaments = [
+        { ID: 1, Name: 'SWU Wednesday league season 6 15/7 (week 1)', StartDate: '2026-07-15' },
+        { ID: 2, Name: 'Random draft tournament', StartDate: '2026-07-16' },
+        { ID: 3, Name: 'SWU Wednesday league season 6 22/7 (week 2)', StartDate: '2026-07-22' },
+      ];
+      const client = { listTournaments: async () => ({ Content: tournaments, TotalCount: 3 }) };
+      const result = await fetchLeagueTournaments(client);
+      assert.equal(result.length, 2);
+    });
+
+    it('paginates through multiple pages', async () => {
+      const page0 = [
+        { ID: 1, Name: 'SWU Wednesday league season 6 15/7 (week 1)', StartDate: '2026-07-15' },
+      ];
+      const page1 = [
+        { ID: 2, Name: 'SWU Wednesday league season 6 22/7 (week 2)', StartDate: '2026-07-22' },
+      ];
+      let callCount = 0;
+      const client = {
+        listTournaments: async (_, page) => {
+          callCount++;
+          if (page === 0) return { Content: page0, TotalCount: 500 };
+          return { Content: page1, TotalCount: 500 };
+        },
+      };
+      const result = await fetchLeagueTournaments(client);
+      assert.equal(result.length, 2);
+      assert.equal(callCount, 2);
+    });
+
+    it('filters by targetSeason', async () => {
+      const tournaments = [
+        { ID: 1, Name: 'SWU Wednesday league season 6 15/7 (week 1)', StartDate: '2026-07-15' },
+        { ID: 2, Name: 'SWU Wednesday league season 5 10/6 (week 1)', StartDate: '2026-06-10' },
+      ];
+      const client = { listTournaments: async () => ({ Content: tournaments, TotalCount: 2 }) };
+      const result = await fetchLeagueTournaments(client, { targetSeason: 6 });
+      assert.equal(result.length, 1);
+      assert.equal(result[0].seasonNum, 6);
+    });
+
+    it('skips tournaments without dates', async () => {
+      const tournaments = [
+        { ID: 1, Name: 'SWU Wednesday league season 6 15/7 (week 1)', StartDate: null, LastPairDateTime: null },
+      ];
+      const client = { listTournaments: async () => ({ Content: tournaments, TotalCount: 1 }) };
+      const result = await fetchLeagueTournaments(client);
+      assert.equal(result.length, 0);
+    });
+
+    it('adds phase classification to results', async () => {
+      const tournaments = [
+        { ID: 1, Name: 'SWU Wednesday league season 6 15/7 (week 1)', StartDate: '2026-07-15' },
+        { ID: 2, Name: 'SWU Wednesday league season 6 TOP 4', StartDate: '2026-09-30' },
+      ];
+      const client = { listTournaments: async () => ({ Content: tournaments, TotalCount: 2 }) };
+      const result = await fetchLeagueTournaments(client);
+      const regular = result.find(r => r.ID === 1);
+      const cut = result.find(r => r.ID === 2);
+      assert.equal(regular.phase, 'regular');
+      assert.equal(cut.phase, 'cut');
+    });
+
+    it('sorts results deterministically', async () => {
+      const tournaments = [
+        { ID: 3, Name: 'SWU Wednesday league season 6 22/7 (week 2)', StartDate: '2026-07-22' },
+        { ID: 1, Name: 'SWU Wednesday league season 6 15/7 (week 1)', StartDate: '2026-07-15' },
+      ];
+      const client = { listTournaments: async () => ({ Content: tournaments, TotalCount: 2 }) };
+      const result = await fetchLeagueTournaments(client);
+      assert.equal(result[0].ID, 1);
+      assert.equal(result[1].ID, 3);
     });
   });
 });

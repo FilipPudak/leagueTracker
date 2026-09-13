@@ -231,7 +231,9 @@ describe('deleteSessionsByPlayerAndDevice', () => {
     assert.ok(deleteCall.sql.includes('sessions'));
     assert.deepEqual(deleteCall.params, ['P001', 'dev-alice']);
   });
+});
 
+describe('findSessionByToken edge cases', () => {
   it('returns null and deletes session when player is deactivated', async () => {
     const tables = basicTables();
     tables.players = tables.players.map(p =>

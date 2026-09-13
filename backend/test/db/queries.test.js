@@ -21,6 +21,7 @@ import {
   isSeasonPaused,
   findPlayerByMelee,
   hasPlayerVotedThisWeek,
+  getSeasonById,
 } from '../../src/db/queries.js';
 
 describe('db/queries', () => {
@@ -216,6 +217,20 @@ describe('db/queries', () => {
     it('has not voted → returns false', async () => {
       const result = await hasPlayerVotedThisWeek(db, 6, 1, 'P005');
       assert.equal(result, false);
+    });
+  });
+
+  describe('getSeasonById', () => {
+    it('returns season row for valid id', async () => {
+      const season = await getSeasonById(db, 6);
+      assert.ok(season);
+      assert.equal(season.id, 6);
+      assert.equal(season.name, 'Season 6');
+    });
+
+    it('returns undefined for non-existent id', async () => {
+      const season = await getSeasonById(db, 999);
+      assert.equal(season, undefined);
     });
   });
 });
