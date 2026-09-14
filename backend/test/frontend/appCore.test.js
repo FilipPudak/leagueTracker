@@ -191,7 +191,7 @@ describe('frontend wiring', () => {
 
   it('index.html loads app-core.js before app.js', () => {
     const corePos = html.indexOf('app-core.js');
-    const appPos = html.indexOf('<script src="app.js">');
+    const appPos = html.indexOf('<script src="app.js');
     assert.ok(corePos > -1, 'app-core.js script tag present');
     assert.ok(appPos > -1, 'app.js script tag present');
     assert.ok(corePos < appPos, 'core loads first');

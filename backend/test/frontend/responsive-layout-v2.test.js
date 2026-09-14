@@ -63,6 +63,12 @@ describe('Layout v3: Desktop 2-panel', () => {
     assert.ok(css.match(/\.col-right\s*\{[^}]*grid-column:\s*2/), '.col-right must be column 2');
   });
 
+  it('both wrappers pinned to grid-row 1 (auto-placement cursor must not push col-left to row 2)', () => {
+    const css = readCSS();
+    assert.ok(css.match(/\.col-left\s*\{[^}]*grid-row:\s*1/), '.col-left must have explicit grid-row: 1');
+    assert.ok(css.match(/\.col-right\s*\{[^}]*grid-row:\s*1/), '.col-right must have explicit grid-row: 1');
+  });
+
   it('wrappers collapse to invisible on mobile (display: contents)', () => {
     const css = readCSS();
     assert.ok(
@@ -211,6 +217,27 @@ describe('Layout v3: Unlinked desktop', () => {
     const css = readCSS();
     assert.ok(css.match(/body:not\(\.is-linked\)\s+\.col-left\s*\{[^}]*display:\s*none/), '.col-left must be hidden while unlinked');
     assert.ok(css.match(/body:not\(\.is-linked\)\s+\.col-right\s*\{[^}]*grid-column:\s*1 \/ -1/), '.col-right must span both columns when unlinked');
+  });
+});
+
+describe('Layout v4: Asset cache-busting stamps', () => {
+  it('all local asset links carry a ?v= stamp', () => {
+    const html = readHTML();
+    ['styles.css', 'app-core.js', 'app.js'].forEach((asset) => {
+      assert.ok(
+        html.includes(`${asset}?v=`),
+        `${asset} link must carry a ?v= cache-busting stamp`
+      );
+    });
+  });
+
+  it('stamp equals APP_VERSION so releases always fetch fresh assets', () => {
+    const html = readHTML();
+    const js = readJS();
+    const version = js.match(/APP_VERSION\s*=\s*'([^']+)'/)[1];
+    const stamps = [...html.matchAll(/[?&]v=([\d.]+)/g)].map((m) => m[1]);
+    assert.ok(stamps.length >= 3, 'at least three stamped links expected');
+    stamps.forEach((s) => assert.equal(s, version, 'each asset stamp must equal APP_VERSION'));
   });
 });
 

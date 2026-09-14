@@ -410,8 +410,8 @@ details[open].section-block > summary::before { content: '\25BE '; }
     align-items: start;
   }
 
-  .col-left { display: block; grid-column: 1; }
-  .col-right { display: block; grid-column: 2; }
+  .col-left { display: block; grid-column: 1; grid-row: 1; }
+  .col-right { display: block; grid-column: 2; grid-row: 1; }
 
   body:not(.is-linked) .col-left { display: none; }
   body:not(.is-linked) .col-right { grid-column: 1 / -1; }

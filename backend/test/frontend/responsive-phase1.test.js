@@ -25,8 +25,8 @@ describe('Phase 1: CSS extraction', () => {
   it('index.html links to styles.css', () => {
     const html = readHTML();
     assert.ok(
-      html.includes('href="styles.css"') || html.includes("href='styles.css'"),
-      'index.html must have a <link> to styles.css'
+      html.includes('href="styles.css') || html.includes("href='styles.css"),
+      'index.html must have a <link> to styles.css (optional ?v= stamp allowed)'
     );
   });
 
