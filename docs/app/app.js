@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.7.5';
+const APP_VERSION = '4.8.0';
 
 let appState = {
   status: 'unlinked',
@@ -175,6 +175,15 @@ function setActiveView(viewId) {
   if (viewEl) viewEl.classList.add('active');
   const activeTab = document.querySelector(`.tab-btn[aria-controls="${viewId}"]`);
   if (activeTab) activeTab.classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach((b) => b.setAttribute('tabindex', '-1'));
+  const rovingTarget = activeTab || document.querySelector('.tab-btn');
+  if (rovingTarget) rovingTarget.setAttribute('tabindex', '0');
+}
+
+function openSignIn() {
+  clearStatus();
+  showSpinner(false);
+  setActiveView('link-view');
 }
 
 /* -------------------------------------------------------------- boot state -- */
@@ -264,8 +273,8 @@ function applyBoot(boot) {
     showTabs(true);
 
     let landedOnVote = false;
-    if (localStorage.getItem('firstLogin')) {
-      localStorage.removeItem('firstLogin');
+    if (sessionStorage.getItem('firstLogin')) {
+      sessionStorage.removeItem('firstLogin');
       landedOnVote = true;
       switchTab('vote-view');
     } else {
@@ -294,9 +303,13 @@ function applyBoot(boot) {
   } else {
     showLinkedPresence(null);
     showTabs(false);
-    setActiveView('link-view');
     populateLinkPicker(LeagueCore.resolvePlayerChoices(boot));
     setLinkMode('email');
+    if (boot.status === 'invalid-token' && window.innerWidth < 1024) {
+      setActiveView('link-view');
+    } else {
+      switchTab('standings-view');
+    }
     if (boot.status === 'invalid-token') {
       showStatus('Your session expired. Please sign in again.', false);
     }
@@ -405,7 +418,7 @@ function submitAccountLink() {
       };
       showSpinner(false);
       linkInFlight = false;
-      localStorage.setItem('firstLogin', '1');
+      sessionStorage.setItem('firstLogin', '1');
       applyBoot(boot);
       if (appState.votingOpen) {
         showStatus('Account linked successfully!', true);
@@ -496,6 +509,25 @@ function switchProfileTab(tabId) {
   if (tabs[idx]) tabs[idx].classList.add('active');
   const panel = $('profile-tab-' + tabId);
   if (panel) panel.classList.add('active');
+}
+
+function initTabKeyboard() {
+  const tablist = document.querySelector('.nav-tabs');
+  if (!tablist) return;
+  tablist.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const tabs = Array.from(tablist.querySelectorAll('.tab-btn')).filter((b) => b.offsetParent !== null);
+    if (!tabs.length) return;
+    e.preventDefault();
+    let idx = tabs.indexOf(document.activeElement);
+    if (idx === -1) idx = 0;
+    else if (e.key === 'ArrowRight') idx = (idx + 1) % tabs.length;
+    else idx = (idx + tabs.length - 1) % tabs.length;
+    const next = tabs[idx];
+    next.focus();
+    const view = next.getAttribute('aria-controls');
+    if (view) switchTab(view);
+  });
 }
 
 function switchTab(tabId) {
@@ -1251,6 +1283,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchInitialAppData();
   initCollapsibles();
   initBadgeTooltips();
+  initTabKeyboard();
   window.addEventListener('hashchange', handleHashRoute);
 
   const desktopQuery = window.matchMedia('(min-width: 1024px)');

@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap" as="style">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="styles.css?v=4.7.5">
+  <link rel="stylesheet" href="styles.css?v=4.8.0">
 </head>
 <body>
   <div class="app-container">
@@ -30,25 +30,26 @@
           <span class="chip-name" id="chip-name">—</span>
           <button type="button" class="not-you" onclick="unlinkCurrentDevice()">· Not you?</button>
         </div>
+        <button type="button" id="signin-cta" class="signin-cta" onclick="openSignIn()">Sign in</button>
       </div>
     </div>
 
     <div class="desktop-columns">
     <div class="col-right">
     <div class="nav-tabs" style="display:none;" role="tablist" aria-label="Main navigation">
-      <button type="button" id="tab-vote" class="tab-btn" role="tab" aria-selected="false" aria-controls="vote-view" onclick="switchTab('vote-view')">
+      <button type="button" id="tab-vote" class="tab-btn" role="tab" tabindex="-1" aria-selected="false" aria-controls="vote-view" onclick="switchTab('vote-view')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
         <span>Vote</span>
       </button>
-      <button type="button" id="tab-standings" class="tab-btn" role="tab" aria-selected="false" aria-controls="standings-view" onclick="switchTab('standings-view')">
+      <button type="button" id="tab-standings" class="tab-btn" role="tab" tabindex="0" aria-selected="false" aria-controls="standings-view" onclick="switchTab('standings-view')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         <span>Standings</span>
       </button>
-      <button type="button" id="tab-leaderboard" class="tab-btn" role="tab" aria-selected="false" aria-controls="leaderboard-view" onclick="switchTab('leaderboard-view')">
+      <button type="button" id="tab-leaderboard" class="tab-btn" role="tab" tabindex="-1" aria-selected="false" aria-controls="leaderboard-view" onclick="switchTab('leaderboard-view')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
         <span>Awards</span>
       </button>
-      <button type="button" id="tab-myseason" class="tab-btn" role="tab" aria-selected="false" aria-controls="myseason-view" onclick="switchTab('myseason-view')">
+      <button type="button" id="tab-myseason" class="tab-btn" role="tab" tabindex="-1" aria-selected="false" aria-controls="myseason-view" onclick="switchTab('myseason-view')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span>My Stats</span>
       </button>
@@ -59,26 +60,6 @@
       <button type="button" class="btn-submit" style="width:auto; padding:0 24px; margin-top:0;" onclick="fetchInitialAppData()">Retry</button>
     </div>
     <div id="loading-spinner" class="loader"></div>
-
-    <!-- LINK PANEL -->
-    <div id="link-view" class="view-panel" role="tabpanel" aria-label="Sign in">
-      <div class="card">
-        <h3 style="margin-top:0; font-family:'Orbitron', sans-serif;">Sign In</h3>
-        <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 0;">Enter your email and pick your name to sign in.</p>
-      </div>
-      <div class="form-group">
-        <label for="link-email">Your Email</label>
-        <input type="email" id="link-email" class="text-input" placeholder="you@example.com" autocomplete="email" required />
-      </div>
-      <div class="form-group" id="link-picker-group" style="display:none;">
-        <label for="link-player-select">Select Your Name</label>
-        <input type="text" id="link-player-search" class="text-input" placeholder="Type to search..." oninput="filterLinkPicker()" autocomplete="off" />
-        <select id="link-player-select" size="6" style="margin-top: 8px;"><option value="">-- Choose Your Name --</option></select>
-      </div>
-      <p id="link-email-hint" style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 12px;">We'll find your player profile using this email.</p>
-      <button type="button" id="link-mode-toggle" class="not-you" onclick="toggleLinkMode()" style="display:block; margin-bottom:12px;">First time here? Pick your name from the player list</button>
-      <button type="button" class="btn-submit" onclick="submitAccountLink()">Sign In</button>
-    </div>
 
     <!-- VOTE PANEL -->
     <div id="vote-view" class="view-panel" role="tabpanel" aria-labelledby="tab-vote">
@@ -230,9 +211,30 @@
     </div><!-- /col-right -->
 
     <div class="col-left">
+    <!-- LINK PANEL (guests: welcome + sign-in; side panel on desktop, switched-in content on mobile) -->
+    <div id="link-view" class="view-panel" role="tabpanel" aria-label="Sign in">
+      <button type="button" id="link-back" class="btn-ghost" onclick="switchTab('standings-view')" style="padding:4px 8px;">&larr; Back to standings</button>
+      <div class="card">
+        <h3 style="margin-top:0; font-family:'Orbitron', sans-serif;">Sign In</h3>
+        <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 0;">Standings are open to everyone — sign in with your email to cast your weekly vote and see your stats.</p>
+      </div>
+      <div class="form-group">
+        <label for="link-email">Your Email</label>
+        <input type="email" id="link-email" class="text-input" placeholder="you@example.com" autocomplete="email" required />
+      </div>
+      <div class="form-group" id="link-picker-group" style="display:none;">
+        <label for="link-player-select">Select Your Name</label>
+        <input type="text" id="link-player-search" class="text-input" placeholder="Type to search..." oninput="filterLinkPicker()" autocomplete="off" />
+        <select id="link-player-select" size="6" style="margin-top: 8px;"><option value="">-- Choose Your Name --</option></select>
+      </div>
+      <p id="link-email-hint" style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 12px;">We'll find your player profile using this email.</p>
+      <button type="button" id="link-mode-toggle" class="not-you" onclick="toggleLinkMode()" style="display:block; margin-bottom:12px;">First time here? Pick your name from the player list</button>
+      <button type="button" class="btn-submit" onclick="submitAccountLink()">Sign In</button>
+    </div>
+
     <!-- MY STATS PANEL -->
     <div id="myseason-view" class="view-panel" role="tabpanel" aria-labelledby="tab-myseason">
-      <h3 class="myseason-heading">My Stats</h3>
+      <h3 class="myseason-heading"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>My Stats</span></h3>
       <details id="career-details" class="section-block">
         <summary>Career</summary>
         <div id="career-empty" style="text-align:center; color:#94a3b8; padding:12px; font-size:0.85rem; display:none;">No career history yet — your stats appear after you play your first league night.</div>
@@ -325,7 +327,7 @@
     </div>
   </div>
 
-  <script src="app-core.js?v=4.7.5"></script>
-<script src="app.js?v=4.7.5"></script>
+  <script src="app-core.js?v=4.8.0"></script>
+<script src="app.js?v=4.8.0"></script>
 </body>
 </html>

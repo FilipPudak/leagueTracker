@@ -184,6 +184,9 @@ never per-player rankings.
 
 ## 11. Public Displays
 
+- **Guest browsing:** the **standings view** (season table + per-night results) is readable without
+  linking — Melee-derived data is public. Linking is required for voting, My Stats, and Awards; guests
+  see the sign-in panel instead of tabs (welcome blurb + email claim). No new data crosses the boundary.
 - **Weekly participation card:** X voted ÷ Y where Y = players **who attended the current
   voting week's night** (not the whole roster — 77 historical names make "3 of 77" read like
   failure). Denominator 0 → hide the card.

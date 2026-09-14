@@ -111,10 +111,24 @@ body {
   white-space: nowrap;
 }
 .identity-chip .chip-name { color: #38bdf8; font-weight: 700; font-size: 0.9rem; }
-.identity-chip .not-you {
-  background: none; border: none; padding: 0; color: #64748b; font-size: 0.85rem;
-  cursor: pointer; font-family: inherit; min-height: var(--touch-target-min);
+
+.not-you {
+  background: none; border: none; padding: 0; color: #64748b;
+  font-family: inherit; cursor: pointer; min-height: var(--touch-target-min);
 }
+#link-mode-toggle { text-align: center; width: 100%; }
+
+.signin-cta {
+  display: none;
+  padding: 4px 12px; border-radius: 4px;
+  font-family: 'Orbitron', sans-serif; font-size: var(--font-size-badge); font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+  background-color: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid #38bdf8;
+  cursor: pointer; min-height: var(--touch-target-min);
+}
+body:not(.is-linked) .signin-cta { display: inline-block; }
+
+#link-back { margin-bottom: 16px; }
 
 .myseason-heading {
   display: none;
@@ -152,6 +166,11 @@ select {
   transition: border 0.2s ease;
 }
 select:focus { border-color: #38bdf8; box-shadow: 0 0 8px rgba(56, 189, 248, 0.3); }
+
+select[size], select[multiple] {
+  min-height: 0; padding: 8px 12px; background-image: none; height: auto;
+}
+select[size] option { padding: 6px 8px; }
 
 .text-input {
   width: 100%; min-height: 48px; font-size: 1rem; font-family: 'Rajdhani', sans-serif; font-weight: 600;
@@ -339,6 +358,8 @@ details[open].section-block > summary::before { content: '\25BE '; }
 .btn-danger:focus-visible,
 .not-you:focus-visible,
 .show-more-btn:focus-visible,
+.round-header:focus-visible,
+.signin-cta:focus-visible,
 .footer-discord:focus-visible {
   outline: 2px solid #38bdf8;
   outline-offset: 2px;
@@ -357,6 +378,7 @@ details[open].section-block > summary::before { content: '\25BE '; }
   .hover-underline:hover { text-decoration: underline; }
   .footer-discord:hover { color: #7983f5; }
   .not-you:hover { color: #f87171; text-decoration: underline; }
+  .signin-cta:hover { background-color: rgba(56, 189, 248, 0.3); }
   .standings-row:hover { background: rgba(56, 189, 248, 0.05); }
 }
 
@@ -397,7 +419,7 @@ details[open].section-block > summary::before { content: '\25BE '; }
     --font-size-subtitle: 1rem;
     --font-size-tab: 0.75rem;
     --font-size-badge: 0.75rem;
-    --badge-grid-columns: 5;
+    --badge-grid-columns: 4;
   }
 
   .nav-tabs { margin-bottom: 12px; }
@@ -405,7 +427,7 @@ details[open].section-block > summary::before { content: '\25BE '; }
 
   .desktop-columns {
     display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    grid-template-columns: 1fr 1fr;
     gap: 0 24px;
     align-items: start;
   }
@@ -413,15 +435,18 @@ details[open].section-block > summary::before { content: '\25BE '; }
   .col-left { display: block; grid-column: 1; grid-row: 1; }
   .col-right { display: block; grid-column: 2; grid-row: 1; }
 
-  body:not(.is-linked) .col-left { display: none; }
-  body:not(.is-linked) .col-right { grid-column: 1 / -1; }
-
   #myseason-view { display: block; }
+  body:not(.is-linked) #myseason-view { display: none; }
+
+  body:not(.is-linked) #link-view { display: block; }
+  body:not(.is-linked) .signin-cta { display: none; }
+  body:not(.is-linked) #link-back { display: none; }
 
   .myseason-heading {
     display: flex;
     align-items: center;
-    min-height: 57px;
+    gap: 8px;
+    min-height: 60px;
     margin-bottom: 12px;
     background-color: #090d16;
     border: 1px solid rgba(255, 255, 255, 0.05);

@@ -108,6 +108,29 @@ describe('frontend/app-core', () => {
       assert.equal(core.computeSubtitle({ seasonName: 'Season 7', week: 3 }), 'Season 7 • Night 3');
     });
 
+    it('renders night with season length when the active season row carries one', () => {
+      assert.equal(
+        core.computeSubtitle({
+          seasonName: 'Season 7',
+          week: 3,
+          seasonId: 7,
+          seasons: [{ id: 7, name: 'Season 7', length: 11 }, { id: 6, name: 'Season 6', length: 11 }]
+        }),
+        'Season 7 • Night 3 / 11'
+      );
+    });
+
+    it('falls back to plain week when season length is missing or invalid', () => {
+      assert.equal(
+        core.computeSubtitle({ seasonName: 'Season 8', week: 2, seasonId: 8, seasons: [{ id: 8, name: 'Season 8' }] }),
+        'Season 8 • Night 2'
+      );
+      assert.equal(
+        core.computeSubtitle({ seasonName: 'Season 8', week: 2, seasonId: 8, seasons: [{ id: 8, length: 0 }] }),
+        'Season 8 • Night 2'
+      );
+    });
+
     it('renders Season Complete when week is null', () => {
       assert.equal(core.computeSubtitle({ seasonName: 'Season 6', week: null }), 'Season 6 — Season Complete');
     });

@@ -81,10 +81,19 @@ describe('Layout v3: Desktop 2-panel', () => {
     const html = readHTML();
     const right = html.indexOf('class="col-right"');
     const left = html.indexOf('class="col-left"');
-    ['class="nav-tabs"', 'id="status-box"', 'id="retry-load"', 'id="loading-spinner"', 'id="vote-view"', 'id="standings-view"', 'id="leaderboard-view"', 'id="link-view"', 'id="player-profile-view"'].forEach((marker) => {
+    ['class="nav-tabs"', 'id="status-box"', 'id="retry-load"', 'id="loading-spinner"', 'id="vote-view"', 'id="standings-view"', 'id="leaderboard-view"', 'id="player-profile-view"'].forEach((marker) => {
       const idx = html.indexOf(marker);
       assert.ok(idx > right && idx < left, `${marker} must be inside .col-right`);
     });
+  });
+
+  it('link panel lives inside .col-left beside My Stats', () => {
+    const html = readHTML();
+    const left = html.indexOf('class="col-left"');
+    const link = html.indexOf('id="link-view"');
+    const myseason = html.indexOf('id="myseason-view"');
+    assert.ok(link > left, 'link-view must be inside .col-left');
+    assert.ok(link < myseason, 'link-view must precede myseason-view in the left column');
   });
 
   it('myseason panel is the single item inside .col-left', () => {
@@ -123,7 +132,7 @@ describe('Layout v3: Boot flow', () => {
       'applyBoot must call switchTab(standings-view) so standings data loads'
     );
     assert.ok(
-      js.includes("localStorage.getItem('firstLogin')"),
+      js.includes("sessionStorage.getItem('firstLogin')"),
       'applyBoot must check firstLogin before choosing view'
     );
   });
@@ -144,8 +153,8 @@ describe('Layout v3: Boot flow', () => {
   it('firstLogin flag is set on account link success', () => {
     const js = readJS();
     assert.ok(
-      js.includes("localStorage.setItem('firstLogin'") || js.includes('localStorage.setItem("firstLogin"'),
-      'submitAccountLink must set firstLogin flag in localStorage'
+      js.includes("sessionStorage.setItem('firstLogin'") || js.includes('sessionStorage.setItem("firstLogin"'),
+      'submitAccountLink must set firstLogin flag in sessionStorage'
     );
   });
 });
@@ -193,7 +202,8 @@ describe('Layout v3: My Stats panel heading', () => {
     const headingIdx = html.indexOf('class="myseason-heading"');
     const careerIdx = html.indexOf('id="career-details"');
     assert.ok(panelIdx !== -1 && headingIdx > panelIdx && headingIdx < careerIdx, '.myseason-heading must be first child of #myseason-view');
-    assert.ok(html.includes('My Stats</h3>'), 'heading must read "My Stats"');
+    assert.ok(html.includes('>My Stats</span></h3>'), 'heading must read "My Stats"');
+    assert.ok(html.match(/myseason-heading[^>]*>[\s\S]{0,40}<svg/), 'heading must carry the person icon from the My Stats tab');
   });
 
   it('heading is hidden below desktop, shown at desktop', () => {
@@ -213,10 +223,40 @@ describe('Layout v3: Unlinked desktop', () => {
     );
   });
 
-  it('col-left hidden and col-right spans when unlinked on desktop', () => {
+  it('guest left column shows the sign-in panel, never an empty My Stats', () => {
     const css = readCSS();
-    assert.ok(css.match(/body:not\(\.is-linked\)\s+\.col-left\s*\{[^}]*display:\s*none/), '.col-left must be hidden while unlinked');
-    assert.ok(css.match(/body:not\(\.is-linked\)\s+\.col-right\s*\{[^}]*grid-column:\s*1 \/ -1/), '.col-right must span both columns when unlinked');
+    assert.ok(css.match(/body:not\(\.is-linked\)\s+#link-view\s*\{[^}]*display:\s*block/), '#link-view must be forced visible for guests on desktop');
+    assert.ok(css.match(/body:not\(\.is-linked\)\s+#myseason-view\s*\{[^}]*display:\s*none/), '#myseason-view must stay hidden for guests on desktop (empty-panel leak guard)');
+    assert.ok(css.match(/body:not\(\.is-linked\)\s+#link-back\s*\{[^}]*display:\s*none/), 'guests on desktop must not see the mobile back button');
+  });
+
+  it('sign-in CTA pill lives in the header and hides on desktop', () => {
+    const css = readCSS();
+    const html = readHTML();
+    assert.ok(html.includes('id="signin-cta"'), 'header must carry the Sign in pill');
+    assert.ok(css.match(/\.signin-cta\s*\{[^}]*display:\s*none/), 'cta hidden by default');
+    assert.ok(css.match(/body:not\(\.is-linked\)\s+\.signin-cta\s*\{[^}]*display:\s*inline-block/), 'cta shown for guests');
+    const desktop = css.match(/\/\* Desktop \(1024px\+\) \*\/[\s\S]*?\n\}\n/);
+    assert.ok(desktop && /body:not\(\.is-linked\)\s+\.signin-cta\s*\{[^}]*display:\s*none/.test(desktop[0]), 'cta hidden again on desktop');
+  });
+
+  it('guest boot lands on standings with tabs hidden; invalid-token opens the form on mobile', () => {
+    const js = readJS();
+    const unlinkedBranch = js.match(/\} else \{[\s\S]*?\n  \}\n\n  handleHashRoute/);
+    assert.ok(unlinkedBranch, 'applyBoot unlinked branch must exist');
+    assert.ok(unlinkedBranch[0].includes('showTabs(false)'), 'guests never see the tab bar');
+    assert.ok(unlinkedBranch[0].includes("switchTab('standings-view')"), 'guest default view is standings');
+    assert.ok(unlinkedBranch[0].includes('innerWidth < 1024'), 'invalid-token branch differentiates mobile vs desktop');
+    assert.ok(js.includes('function openSignIn'), 'header pill calls openSignIn');
+  });
+
+  it('arrow-key tablist navigation with roving tabindex exists', () => {
+    const js = readJS();
+    assert.ok(js.includes('function initTabKeyboard'), 'initTabKeyboard must exist');
+    assert.ok(js.includes("'ArrowRight'") && js.includes("'ArrowLeft'"), 'arrow keys handled');
+    assert.ok(js.includes("setAttribute('tabindex', '-1')") && js.includes("setAttribute('tabindex', '0')"), 'setActiveView syncs roving tabindex');
+    const html = readHTML();
+    assert.ok(/tabindex="\d+"/.test(html), 'tab buttons carry initial tabindex');
   });
 });
 
@@ -275,5 +315,44 @@ describe('Layout v3: aria-labelledby targets exist', () => {
     labels.forEach((id) => {
       assert.ok(html.includes(`id="${id}"`), `referenced id "${id}" must exist on a tab button`);
     });
+  });
+});
+
+describe('v4.8.0: Style and symmetry pins', () => {
+  it('global .not-you base rule exists (no more unstyled browser-default buttons)', () => {
+    const css = readCSS();
+    const block = css.match(/\.not-you\s*\{[^}]*\}/);
+    assert.ok(block, '.not-you base rule must exist');
+    assert.ok(block[0].includes('background: none'), 'must strip native button background');
+    assert.ok(block[0].includes('border: none'), 'must strip native button border');
+    assert.ok(block[0].includes('min-height: var(--touch-target-min)'), 'must meet touch target');
+  });
+
+  it('listbox selects escape the dropdown chevron and min-height', () => {
+    const css = readCSS();
+    const block = css.match(/select\[size\],[^}]*\{[^}]*\}/);
+    assert.ok(block, 'select[size] override rule must exist');
+    assert.ok(block[0].includes('background-image: none'), 'no chevron on listboxes');
+    assert.ok(block[0].includes('min-height: 0'), 'no dropdown min-height on listboxes');
+  });
+
+  it('badge grid columns are 3 on mobile, 4 on tablet and desktop', () => {
+    const css = readCSS();
+    assert.ok(css.match(/:root\s*\{[^}]*--badge-grid-columns:\s*3/), 'mobile = 3 columns');
+    const tablet = css.match(/\/\* Tablet \(768px\+\) \*\/[\s\S]*?--badge-grid-columns:\s*(\d+)/);
+    const desktop = css.match(/\/\* Desktop \(1024px\+\) \*\/[\s\S]*?--badge-grid-columns:\s*(\d+)/);
+    assert.ok(tablet && tablet[1] === '4', 'tablet portrait = 4 columns');
+    assert.ok(desktop && desktop[1] === '4', 'desktop = 4 columns (12 badges => 4x3, no ragged rows)');
+  });
+
+  it('desktop columns are equal width for symmetric chrome bars', () => {
+    const css = readCSS();
+    assert.ok(css.match(/\.desktop-columns\s*\{[^}]*grid-template-columns:\s*1fr 1fr/), 'grid must use 1fr 1fr');
+  });
+
+  it('link back button exists in the link panel', () => {
+    const html = readHTML();
+    assert.ok(html.includes('id=\"link-back\"'), 'back button must exist');
+    assert.ok(html.includes('Back to standings'), 'back button must be labelled');
   });
 });

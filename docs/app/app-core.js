@@ -15,7 +15,9 @@ const LeagueCore = (() => {
     if (!seasonName) return '';
     const week = boot.week;
     if (week == null) return seasonName + ' — Season Complete';
-    return seasonName + ' • Night ' + week;
+    const active = (boot.seasons || []).find((s) => String(s.id) === String(boot.seasonId));
+    const seasonLength = active ? parseInt(active.length, 10) : NaN;
+    return seasonName + ' • Night ' + week + (seasonLength > 0 ? ' / ' + seasonLength : '');
   }
 
   function isFreshCache(viewCache, key, now) {
