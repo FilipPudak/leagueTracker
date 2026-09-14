@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.7.4';
+const APP_VERSION = '4.7.5';
 
 let appState = {
   status: 'unlinked',
@@ -499,6 +499,9 @@ function switchProfileTab(tabId) {
 }
 
 function switchTab(tabId) {
+  if (window.innerWidth >= 1024 && tabId === 'myseason-view') {
+    tabId = 'standings-view';
+  }
   if (window.location.hash.startsWith('#player/')) {
     history.replaceState(null, '', window.location.pathname + window.location.search);
   }
@@ -539,7 +542,7 @@ function switchTab(tabId) {
       loadMySeasonStats();
       loadCareerStats();
     } else {
-      setActiveView('link-view', 3);
+      setActiveView('link-view');
     }
   }
 }
@@ -1255,6 +1258,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.matches && appState.linkedPlayer) {
       loadMySeasonStats();
       loadCareerStats();
+    }
+    if (e.matches && appState.lastView === 'myseason-view') {
+      appState.lastView = 'standings-view';
     }
     if (appState.lastView) setActiveView(appState.lastView);
   });

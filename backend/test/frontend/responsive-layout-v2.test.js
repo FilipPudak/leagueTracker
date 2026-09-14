@@ -220,6 +220,32 @@ describe('Layout v3: Unlinked desktop', () => {
   });
 });
 
+describe('Layout v5: Review-fix guards', () => {
+  it('vote-cta uses a real design-system class (no phantom .btn/.btn-primary)', () => {
+    const html = readHTML();
+    assert.ok(!html.includes('btn btn-primary'), 'no button may use undefined .btn/.btn-primary classes');
+    const cta = html.match(/id="vote-cta"[\s\S]*?<button class="([\w-]+)"/);
+    assert.ok(cta && cta[1] === 'btn-submit', 'vote-cta button must use .btn-submit');
+  });
+
+  it('desktop never activates myseason-view as a tab view', () => {
+    const js = readJS();
+    assert.ok(
+      /function switchTab\(tabId\)\s*\{[\s\S]{0,200}innerWidth >= 1024 && tabId === 'myseason-view'/.test(js),
+      'switchTab must redirect myseason-view to standings-view on desktop'
+    );
+    assert.ok(
+      js.includes("appState.lastView === 'myseason-view'"),
+      'resize listener must normalize lastView when growing to desktop'
+    );
+  });
+
+  it('no setActiveView call passes the dead second argument', () => {
+    const js = readJS();
+    assert.ok(!/setActiveView\('[^']+',\s*\d/.test(js), 'setActiveView must be called with a single argument');
+  });
+});
+
 describe('Layout v4: Asset cache-busting stamps', () => {
   it('all local asset links carry a ?v= stamp', () => {
     const html = readHTML();
