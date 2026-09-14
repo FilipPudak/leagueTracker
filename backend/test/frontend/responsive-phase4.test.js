@@ -35,20 +35,20 @@ describe('Phase 4: Desktop 2-panel CSS Grid', () => {
   });
 });
 
-describe('Phase 4: setActiveView viewport awareness', () => {
-  it('setActiveView handles desktop viewport', () => {
+describe('Phase 4: boot view routing', () => {
+  it('applyBoot routes linked users through switchTab', () => {
     const js = readJS();
     assert.ok(
-      js.includes('innerWidth >= 1024') || js.includes('innerWidth>=1024'),
-      'setActiveView must check window.innerWidth >= 1024 for desktop'
+      js.includes("switchTab('standings-view')") && js.includes("switchTab('vote-view')"),
+      'applyBoot must route via switchTab so the shown view loads its data'
     );
   });
 
-  it('setActiveView skips tab highlight for standings on desktop', () => {
+  it('desktop boot loads persistent My Stats data', () => {
     const js = readJS();
     assert.ok(
-      js.includes("viewId === 'standings-view'") || js.includes("viewId==='standings-view'") || js.includes('standings-view'),
-      'setActiveView must handle standings-view specially on desktop'
+      js.includes('innerWidth >= 1024'),
+      'applyBoot must detect desktop to load the persistent panel'
     );
   });
 });

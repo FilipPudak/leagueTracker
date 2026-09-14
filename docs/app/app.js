@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.7.0';
+const APP_VERSION = '4.7.1';
 
 let appState = {
   status: 'unlinked',
@@ -169,12 +169,7 @@ function applyVersion() {
 }
 
 function setActiveView(viewId) {
-  const isDesktop = window.innerWidth >= 1024;
-
-  document.querySelectorAll('.view-panel').forEach((v) => {
-    if (isDesktop && v.id === 'standings-view') return;
-    v.classList.remove('active');
-  });
+  document.querySelectorAll('.view-panel').forEach((v) => v.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
   const viewEl = $(viewId);
   if (viewEl) viewEl.classList.add('active');
@@ -267,11 +262,18 @@ function applyBoot(boot) {
     showLinkedPresence(appState.linkedPlayer);
     showTabs(true);
 
+    let landedOnVote = false;
     if (localStorage.getItem('firstLogin')) {
       localStorage.removeItem('firstLogin');
-      setActiveView('vote-view');
+      landedOnVote = true;
+      switchTab('vote-view');
     } else {
-      setActiveView('standings-view');
+      switchTab('standings-view');
+    }
+
+    if (window.innerWidth >= 1024 && appState.linkedPlayer) {
+      loadMySeasonStats();
+      loadCareerStats();
     }
 
     if (appState.votingOpen) {
@@ -286,7 +288,7 @@ function applyBoot(boot) {
     } else if (!appState.votingOpen) {
       if (voteForm) voteForm.style.display = 'none';
       clearStatus();
-      showStatus('Voting is currently closed for this week.', false);
+      if (landedOnVote) showStatus('Voting is currently closed for this week.', false);
     }
   } else {
     showLinkedPresence(null);
@@ -303,9 +305,8 @@ function applyBoot(boot) {
 }
 
 function showTabs(show) {
-  const isDesktop = window.innerWidth >= 1024;
   const tabs = document.querySelector('.nav-tabs');
-  if (tabs) tabs.style.display = isDesktop ? 'none' : (show ? 'flex' : 'none');
+  if (tabs) tabs.style.display = show ? 'flex' : 'none';
 }
 
 function showLinkedPresence(player) {
@@ -1249,7 +1250,11 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('hashchange', handleHashRoute);
 
   const desktopQuery = window.matchMedia('(min-width: 1024px)');
-  desktopQuery.addEventListener('change', () => {
+  desktopQuery.addEventListener('change', (e) => {
+    if (e.matches && appState.linkedPlayer) {
+      loadMySeasonStats();
+      loadCareerStats();
+    }
     if (appState.lastView) setActiveView(appState.lastView);
   });
 });

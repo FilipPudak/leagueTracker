@@ -51,10 +51,10 @@ describe('Shortcut fixes: Vote-cta hide after vote', () => {
   });
 });
 
-describe('Shortcut fixes: Standings tab hidden from screen readers', () => {
+describe('Shortcut fixes: My Stats tab hidden on desktop', () => {
   it('myseason tab has display:none on desktop (persistent panel)', () => {
     const css = readCSS();
-    const match = css.match(/\.nav-tabs-minimal\s+\.tab-btn\[aria-controls="myseason-view"\]\s*\{[^}]*display:\s*none/);
+    const match = css.match(/\.nav-tabs\s+\.tab-btn\[aria-controls="myseason-view"\]\s*\{[^}]*display:\s*none/);
     assert.ok(match, 'My Stats tab must have display:none on desktop');
   });
 });

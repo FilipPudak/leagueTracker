@@ -13,25 +13,48 @@ function readCSS() { return readFileSync(CSS_FILE, 'utf8'); }
 function readJS() { return readFileSync(JS_FILE, 'utf8'); }
 function readHTML() { return readFileSync(HTML_FILE, 'utf8'); }
 
-describe('Layout v2: Identity chip scoped to vote tab', () => {
-  it('identity-chip is inside vote-view', () => {
+describe('Layout v3: Identity chip in header status row', () => {
+  it('identity-chip is inside header', () => {
     const html = readHTML();
     const chipIdx = html.indexOf('id="identity-chip"');
-    const voteIdx = html.indexOf('id="vote-view"');
-    const voteEnd = html.indexOf('<!-- STANDINGS PANEL -->');
-    assert.ok(chipIdx > voteIdx && chipIdx < voteEnd, 'identity-chip must be inside #vote-view');
+    const headerStart = html.indexOf('class="header"');
+    const tabsIdx = html.indexOf('class="nav-tabs"');
+    assert.ok(chipIdx > headerStart && chipIdx < tabsIdx, 'identity-chip must be inside .header');
   });
 
-  it('identity-chip is NOT inside header', () => {
+  it('identity-chip shares .header-status row with the voting badge', () => {
     const html = readHTML();
-    const headerStart = html.indexOf('class="header"');
-    const headerEnd = html.indexOf('</div>', headerStart + 100);
+    const statusIdx = html.indexOf('class="header-status"');
+    const badgeIdx = html.indexOf('id="voting-badge"');
     const chipIdx = html.indexOf('id="identity-chip"');
-    assert.ok(chipIdx < headerStart || chipIdx > headerEnd, 'identity-chip must not be inside .header');
+    assert.ok(statusIdx !== -1, '.header-status wrapper must exist');
+    assert.ok(badgeIdx > statusIdx && chipIdx > statusIdx, 'badge and chip must be inside .header-status');
+  });
+
+  it('identity-chip has no "Voting as" label', () => {
+    const html = readHTML();
+    assert.ok(!html.includes('Voting as'), 'chip must not carry the "Voting as" label');
+    assert.ok(!html.includes('chip-label'), 'chip-label element must be removed');
+  });
+
+  it('.header-status is a centered wrapping flex row', () => {
+    const css = readCSS();
+    const match = css.match(/\.header-status\s*\{[^}]*display:\s*flex[^}]*justify-content:\s*center/);
+    assert.ok(match, '.header-status must be a centered flex row');
+    assert.ok(css.match(/\.header-status\s*\{[^}]*flex-wrap:\s*wrap/), '.header-status must wrap');
+  });
+
+  it('.identity-chip is flat (no box) and nowrap', () => {
+    const css = readCSS();
+    const block = css.match(/\.identity-chip\s*\{[^}]*\}/);
+    assert.ok(block, '.identity-chip rule must exist');
+    assert.ok(!block[0].includes('background'), 'chip must have no background box');
+    assert.ok(!block[0].includes('border'), 'chip must have no border box');
+    assert.ok(block[0].includes('white-space: nowrap'), 'chip must be nowrap');
   });
 });
 
-describe('Layout v2: Desktop 2-panel reversed', () => {
+describe('Layout v3: Desktop 2-panel', () => {
   it('myseason-view has grid-column: 1 at desktop', () => {
     const css = readCSS();
     const match = css.match(/#myseason-view\s*\{[^}]*grid-column:\s*1/);
@@ -45,34 +68,48 @@ describe('Layout v2: Desktop 2-panel reversed', () => {
     assert.ok(css.match(/#leaderboard-view[\s\S]*?grid-column:\s*2/), '#leaderboard-view must be grid-column: 2');
   });
 
-  it('My Stats tab hidden from nav-tabs-minimal', () => {
+  it('header, nav-tabs, status, spinner span both grid columns', () => {
     const css = readCSS();
-    const match = css.match(/#nav-tabs-minimal[^}]*aria-controls="myseason-view"[^}]*display:\s*none/);
-    const match2 = css.match(/\.nav-tabs-minimal\s+\.tab-btn\[aria-controls="myseason-view"\]\s*\{[^}]*display:\s*none/);
-    assert.ok(match || match2, 'My Stats tab must have display:none in nav-tabs-minimal');
+    const block = css.match(/\.header,\s*#status-box,\s*#retry-load,\s*#loading-spinner\s*\{[^}]*grid-column:\s*1 \/ -1/);
+    assert.ok(block, 'header/status/spinner must span grid-column: 1 / -1');
+    assert.ok(css.match(/\.nav-tabs\s*\{\s*grid-column:\s*1 \/ -1/), '.nav-tabs must span grid-column: 1 / -1');
+  });
+
+  it('My Stats tab hidden from nav-tabs on desktop', () => {
+    const css = readCSS();
+    const match = css.match(/\.nav-tabs\s+\.tab-btn\[aria-controls="myseason-view"\]\s*\{[^}]*display:\s*none/);
+    assert.ok(match, 'My Stats tab must have display:none in .nav-tabs at desktop');
+  });
+
+  it('no .nav-tabs-minimal class exists', () => {
+    const css = readCSS();
+    assert.ok(!css.includes('.nav-tabs-minimal'), '.nav-tabs-minimal must be removed');
   });
 });
 
-describe('Layout v2: showTabs respects desktop', () => {
-  it('showTabs checks innerWidth >= 1024', () => {
+describe('Layout v3: Boot flow', () => {
+  it('standings loads via switchTab (fetches data), not bare setActiveView', () => {
     const js = readJS();
     assert.ok(
-      js.includes('innerWidth >= 1024') || js.includes('innerWidth>=1024'),
-      'showTabs must check window.innerWidth >= 1024'
-    );
-  });
-});
-
-describe('Layout v2: Default view logic', () => {
-  it('standings is default for linked users (not vote)', () => {
-    const js = readJS();
-    assert.ok(
-      js.includes("setActiveView('standings-view')"),
-      'applyBoot must call setActiveView with standings-view'
+      js.includes("switchTab('standings-view')"),
+      'applyBoot must call switchTab(standings-view) so standings data loads'
     );
     assert.ok(
       js.includes("localStorage.getItem('firstLogin')"),
       'applyBoot must check firstLogin before choosing view'
+    );
+  });
+
+  it('firstLogin path goes to vote-view', () => {
+    const js = readJS();
+    assert.ok(js.includes("switchTab('vote-view')"), 'applyBoot must route firstLogin to vote-view');
+  });
+
+  it('desktop boot loads My Stats data (persistent panel)', () => {
+    const js = readJS();
+    assert.ok(
+      js.includes('innerWidth >= 1024') && js.includes('loadMySeasonStats()') && js.includes('loadCareerStats()'),
+      'applyBoot must load season + career stats on desktop where the panel is always visible'
     );
   });
 
@@ -83,17 +120,27 @@ describe('Layout v2: Default view logic', () => {
       'submitAccountLink must set firstLogin flag in localStorage'
     );
   });
+});
 
-  it('firstLogin flag is checked in applyBoot', () => {
+describe('Layout v3: No hardcoded active tab in HTML', () => {
+  it('no tab button is active by default in HTML', () => {
+    const html = readHTML();
+    const tabsStart = html.indexOf('class="nav-tabs"');
+    const tabsEnd = html.indexOf('id="status-box"');
+    const tabsBlock = html.slice(tabsStart, tabsEnd);
+    assert.ok(!tabsBlock.includes('tab-btn active'), 'no tab may carry hardcoded active class');
+    assert.ok(!tabsBlock.includes('aria-selected="true"'), 'no tab may carry hardcoded aria-selected=true');
+  });
+
+  it('setActiveView has no viewport special-casing', () => {
     const js = readJS();
-    assert.ok(
-      js.includes('firstLogin') && js.includes('localStorage'),
-      'applyBoot must check firstLogin flag'
-    );
+    const fn = js.match(/function setActiveView\(viewId\)\s*\{[\s\S]*?\n\}/);
+    assert.ok(fn, 'setActiveView must exist');
+    assert.ok(!fn[0].includes('innerWidth'), 'setActiveView must not special-case viewport');
   });
 });
 
-describe('Layout v2: Gap fix', () => {
+describe('Layout v3: Gap fix', () => {
   it('header margin-bottom is reduced', () => {
     const css = readCSS();
     const match = css.match(/\.header\s*\{[^}]*margin-bottom:\s*(\d+)px/);
@@ -103,12 +150,10 @@ describe('Layout v2: Gap fix', () => {
     }
   });
 
-  it('nav-tabs-minimal margin-bottom is reduced', () => {
+  it('nav-tabs margin-bottom is reduced on desktop', () => {
     const css = readCSS();
-    const match = css.match(/\.nav-tabs-minimal\s*\{[^}]*margin-bottom:\s*(\d+)px/);
-    if (match) {
-      const val = parseInt(match[1]);
-      assert.ok(val <= 12, `.nav-tabs-minimal margin-bottom should be <=12px, got ${val}px`);
-    }
+    const match = css.match(/\.nav-tabs\s*\{\s*grid-column:\s*1 \/ -1;\s*margin-bottom:\s*(\d+)px/);
+    assert.ok(match, 'desktop .nav-tabs margin-bottom must be set');
+    assert.ok(parseInt(match[1]) <= 12, 'desktop .nav-tabs margin-bottom should be <=12px');
   });
 });
