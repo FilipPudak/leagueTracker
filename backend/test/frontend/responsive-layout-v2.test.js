@@ -55,38 +55,46 @@ describe('Layout v3: Identity chip in header status row', () => {
 });
 
 describe('Layout v3: Desktop 2-panel', () => {
-  it('myseason-view has grid-column: 1 at desktop', () => {
+  it('desktop uses a two-item grid of column wrappers', () => {
     const css = readCSS();
-    const match = css.match(/#myseason-view\s*\{[^}]*grid-column:\s*1/);
-    assert.ok(match, '#myseason-view must be grid-column: 1 at desktop');
+    const desktop = css.match(/\.desktop-columns\s*\{[^}]*display:\s*grid[^}]*grid-template-columns/);
+    assert.ok(desktop, '.desktop-columns must be the 2-column grid');
+    assert.ok(css.match(/\.col-left\s*\{[^}]*grid-column:\s*1/), '.col-left must be column 1');
+    assert.ok(css.match(/\.col-right\s*\{[^}]*grid-column:\s*2/), '.col-right must be column 2');
   });
 
-  it('vote-view, standings-view, leaderboard-view have grid-column: 2', () => {
+  it('wrappers collapse to invisible on mobile (display: contents)', () => {
     const css = readCSS();
-    assert.ok(css.match(/#vote-view[\s\S]*?grid-column:\s*2/), '#vote-view must be grid-column: 2');
-    assert.ok(css.match(/#standings-view[\s\S]*?grid-column:\s*2/), '#standings-view must be grid-column: 2');
-    assert.ok(css.match(/#leaderboard-view[\s\S]*?grid-column:\s*2/), '#leaderboard-view must be grid-column: 2');
+    assert.ok(
+      css.match(/\.desktop-columns,\s*\.col-right,\s*\.col-left\s*\{\s*display:\s*contents/),
+      'all three wrappers must be display:contents at base so mobile flow is unchanged'
+    );
   });
 
-  it('header spans full width while tabs sit in the right column', () => {
-    const css = readCSS();
-    assert.ok(css.match(/\.header\s*\{\s*grid-column:\s*1 \/ -1/), '.header must span grid-column: 1 / -1');
-    assert.ok(css.match(/\.nav-tabs\s*\{\s*grid-column:\s*2/), '.nav-tabs must be grid-column: 2 at desktop');
+  it('tabs, status, retry, spinner and profile panels live inside .col-right', () => {
+    const html = readHTML();
+    const right = html.indexOf('class="col-right"');
+    const left = html.indexOf('class="col-left"');
+    ['class="nav-tabs"', 'id="status-box"', 'id="retry-load"', 'id="loading-spinner"', 'id="vote-view"', 'id="standings-view"', 'id="leaderboard-view"', 'id="link-view"', 'id="player-profile-view"'].forEach((marker) => {
+      const idx = html.indexOf(marker);
+      assert.ok(idx > right && idx < left, `${marker} must be inside .col-right`);
+    });
   });
 
-  it('status, retry, spinner, profile panel are right-column chrome', () => {
-    const css = readCSS();
-    const block = css.match(/#status-box,\s*#retry-load,\s*#loading-spinner,\s*#player-profile-view\s*\{[^}]*grid-column:\s*2/);
-    assert.ok(block, 'status/retry/spinner/profile must be grid-column: 2');
-  });
-
-  it('myseason panel pinned to the tab row and top-aligned', () => {
+  it('myseason panel is the single item inside .col-left', () => {
+    const html = readHTML();
+    const left = html.indexOf('class="col-left"');
+    const panel = html.indexOf('id="myseason-view"');
+    assert.ok(panel > left, 'myseason-view must be inside .col-left');
     const css = readCSS();
     const block = css.match(/#myseason-view\s*\{[^}]*\}/);
-    assert.ok(block, '#myseason-view rule must exist');
-    assert.ok(block[0].includes('grid-column: 1'), 'must be in column 1');
-    assert.ok(block[0].includes('grid-row: 2'), 'must sit on the tab row');
-    assert.ok(block[0].includes('align-self: start'), 'must not stretch to content rows');
+    assert.ok(block && !block[0].includes('grid-row'), '#myseason-view must not be pinned to a grid row (columns are independent now)');
+  });
+
+  it('nav-tabs and heading share equal chrome heights on desktop', () => {
+    const css = readCSS();
+    assert.ok(css.match(/\.myseason-heading\s*\{[^}]*min-height:/), 'heading must have min-height matching the tab bar');
+    assert.ok(css.match(/\.myseason-heading\s*\{[^}]*background-color:\s*#090d16/), 'heading must use the tab-bar pill background');
   });
 
   it('My Stats tab hidden from nav-tabs on desktop', () => {
@@ -166,7 +174,7 @@ describe('Layout v3: Gap fix', () => {
 
   it('nav-tabs margin-bottom is reduced on desktop', () => {
     const css = readCSS();
-    const match = css.match(/\.nav-tabs\s*\{\s*grid-column:\s*2;\s*margin-bottom:\s*(\d+)px/);
+    const match = css.match(/\.nav-tabs\s*\{\s*margin-bottom:\s*(\d+)px\s*;?\s*\}/);
     assert.ok(match, 'desktop .nav-tabs margin-bottom must be set');
     assert.ok(parseInt(match[1]) <= 12, 'desktop .nav-tabs margin-bottom should be <=12px');
   });
@@ -186,7 +194,7 @@ describe('Layout v3: My Stats panel heading', () => {
     const css = readCSS();
     const base = css.match(/\.myseason-heading\s*\{[^}]*display:\s*none/);
     assert.ok(base, '.myseason-heading must default to display: none');
-    assert.ok(css.match(/\.myseason-heading\s*\{\s*display:\s*block\s*;?\s*\}/), 'desktop media query must show the heading');
+    assert.ok(css.match(/\.myseason-heading\s*\{[^}]*display:\s*flex/), 'desktop media query must show the heading as a flex bar');
   });
 });
 
@@ -199,10 +207,10 @@ describe('Layout v3: Unlinked desktop', () => {
     );
   });
 
-  it('myseason panel hidden and link-view spans when unlinked on desktop', () => {
+  it('col-left hidden and col-right spans when unlinked on desktop', () => {
     const css = readCSS();
-    assert.ok(css.includes('body:not(.is-linked) #myseason-view'), 'My Stats must be hidden while unlinked');
-    assert.ok(css.match(/body:not\(\.is-linked\)\s+#link-view\s*\{[^}]*grid-column:\s*1 \/ -1/), 'link-view must span both columns when unlinked');
+    assert.ok(css.match(/body:not\(\.is-linked\)\s+\.col-left\s*\{[^}]*display:\s*none/), '.col-left must be hidden while unlinked');
+    assert.ok(css.match(/body:not\(\.is-linked\)\s+\.col-right\s*\{[^}]*grid-column:\s*1 \/ -1/), '.col-right must span both columns when unlinked');
   });
 });
 

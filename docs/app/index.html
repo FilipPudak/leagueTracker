@@ -33,6 +33,8 @@
       </div>
     </div>
 
+    <div class="desktop-columns">
+    <div class="col-right">
     <div class="nav-tabs" style="display:none;" role="tablist" aria-label="Main navigation">
       <button type="button" id="tab-vote" class="tab-btn" role="tab" aria-selected="false" aria-controls="vote-view" onclick="switchTab('vote-view')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
@@ -201,6 +203,33 @@
       </div>
     </div>
 
+    <!-- PLAYER PROFILE PANEL -->
+    <div id="player-profile-view" class="view-panel">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
+        <button class="btn-ghost" onclick="switchTab(appState.lastView || 'standings-view')" style="padding:4px 8px;">&larr; Back</button>
+        <h2 id="profile-title" style="margin:0; font-size:1.1rem;"></h2>
+      </div>
+      <div id="profile-loading" class="player-modal-loading" style="display:none;">Loading profile...</div>
+      <div id="profile-content" style="display:none;">
+        <div class="profile-tabs">
+          <button class="profile-tab active" onclick="switchProfileTab('season')">Season</button>
+          <button class="profile-tab" onclick="switchProfileTab('career')">Career</button>
+        </div>
+        <div id="profile-tab-season" class="profile-panel active">
+          <div class="form-group">
+            <label for="profile-season-filter">Select Season</label>
+            <select id="profile-season-filter" onchange="loadProfileSeason()"></select>
+          </div>
+          <div id="profile-season-content"></div>
+        </div>
+        <div id="profile-tab-career" class="profile-panel">
+          <div id="profile-career-content"></div>
+        </div>
+      </div>
+    </div>
+    </div><!-- /col-right -->
+
+    <div class="col-left">
     <!-- MY STATS PANEL -->
     <div id="myseason-view" class="view-panel" role="tabpanel" aria-labelledby="tab-myseason">
       <h3 class="myseason-heading">My Stats</h3>
@@ -259,31 +288,8 @@
         </div>
       </details>
     </div>
-
-    <!-- PLAYER PROFILE PANEL -->
-    <div id="player-profile-view" class="view-panel">
-      <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
-        <button class="btn-ghost" onclick="switchTab(appState.lastView || 'standings-view')" style="padding:4px 8px;">&larr; Back</button>
-        <h2 id="profile-title" style="margin:0; font-size:1.1rem;"></h2>
-      </div>
-      <div id="profile-loading" class="player-modal-loading" style="display:none;">Loading profile...</div>
-      <div id="profile-content" style="display:none;">
-        <div class="profile-tabs">
-          <button class="profile-tab active" onclick="switchProfileTab('season')">Season</button>
-          <button class="profile-tab" onclick="switchProfileTab('career')">Career</button>
-        </div>
-        <div id="profile-tab-season" class="profile-panel active">
-          <div class="form-group">
-            <label for="profile-season-filter">Select Season</label>
-            <select id="profile-season-filter" onchange="loadProfileSeason()"></select>
-          </div>
-          <div id="profile-season-content"></div>
-        </div>
-        <div id="profile-tab-career" class="profile-panel">
-          <div id="profile-career-content"></div>
-        </div>
-      </div>
-    </div>
+    </div><!-- /col-left -->
+    </div><!-- /desktop-columns -->
 
     <footer class="site-footer">
       <span class="footer-version">v<span id="site-version">dev</span></span>

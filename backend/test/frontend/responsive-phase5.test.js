@@ -12,10 +12,10 @@ function readCSS() {
 }
 
 describe('Phase 5: My Stats persistent layout', () => {
-  it('myseason-view is positioned as left panel at desktop', () => {
+  it('myseason-view sits inside the left column wrapper at desktop', () => {
     const css = readCSS();
-    const match = css.match(/#myseason-view\s*\{[^}]*grid-column:\s*1/);
-    assert.ok(match, 'My Stats view must be in grid column 1 at desktop');
+    const match = css.match(/\.col-left\s*\{[^}]*grid-column:\s*1/);
+    assert.ok(match, '.col-left (containing My Stats) must be in grid column 1 at desktop');
   });
 
   it('myseason-view is always visible at desktop', () => {

@@ -58,6 +58,10 @@ body {
   box-shadow: 0 0 12px #38bdf8, 0 0 20px #38bdf8;
 }
 
+.desktop-columns,
+.col-right,
+.col-left { display: contents; }
+
 .header-content {
   display: flex;
   align-items: center;
@@ -396,42 +400,33 @@ details[open].section-block > summary::before { content: '\25BE '; }
     --badge-grid-columns: 5;
   }
 
-  .nav-tabs { grid-column: 2; margin-bottom: 12px; }
+  .nav-tabs { margin-bottom: 12px; }
   .nav-tabs .tab-btn[aria-controls="myseason-view"] { display: none; }
 
-  .app-container {
+  .desktop-columns {
     display: grid;
     grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
     gap: 0 24px;
     align-items: start;
   }
 
-  .header { grid-column: 1 / -1; }
+  .col-left { display: block; grid-column: 1; }
+  .col-right { display: block; grid-column: 2; }
 
-  #status-box,
-  #retry-load,
-  #loading-spinner,
-  #player-profile-view {
-    grid-column: 2;
-  }
+  body:not(.is-linked) .col-left { display: none; }
+  body:not(.is-linked) .col-right { grid-column: 1 / -1; }
 
-  #myseason-view {
-    display: block;
-    grid-column: 1;
-    grid-row: 2;
-    align-self: start;
-  }
+  #myseason-view { display: block; }
 
-  body:not(.is-linked) #myseason-view { display: none; }
-  body:not(.is-linked) #link-view { grid-column: 1 / -1; }
-
-  .myseason-heading { display: block; }
-
-  #vote-view,
-  #standings-view,
-  #leaderboard-view,
-  #link-view {
-    grid-column: 2;
+  .myseason-heading {
+    display: flex;
+    align-items: center;
+    min-height: 57px;
+    margin-bottom: 12px;
+    background-color: #090d16;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 4px 14px;
   }
 
   .career-record-grid { grid-template-columns: repeat(4, 1fr); }
