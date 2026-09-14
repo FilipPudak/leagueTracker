@@ -68,11 +68,25 @@ describe('Layout v3: Desktop 2-panel', () => {
     assert.ok(css.match(/#leaderboard-view[\s\S]*?grid-column:\s*2/), '#leaderboard-view must be grid-column: 2');
   });
 
-  it('header, nav-tabs, status, spinner span both grid columns', () => {
+  it('header spans full width while tabs sit in the right column', () => {
     const css = readCSS();
-    const block = css.match(/\.header,\s*#status-box,\s*#retry-load,\s*#loading-spinner\s*\{[^}]*grid-column:\s*1 \/ -1/);
-    assert.ok(block, 'header/status/spinner must span grid-column: 1 / -1');
-    assert.ok(css.match(/\.nav-tabs\s*\{\s*grid-column:\s*1 \/ -1/), '.nav-tabs must span grid-column: 1 / -1');
+    assert.ok(css.match(/\.header\s*\{\s*grid-column:\s*1 \/ -1/), '.header must span grid-column: 1 / -1');
+    assert.ok(css.match(/\.nav-tabs\s*\{\s*grid-column:\s*2/), '.nav-tabs must be grid-column: 2 at desktop');
+  });
+
+  it('status, retry, spinner, profile panel are right-column chrome', () => {
+    const css = readCSS();
+    const block = css.match(/#status-box,\s*#retry-load,\s*#loading-spinner,\s*#player-profile-view\s*\{[^}]*grid-column:\s*2/);
+    assert.ok(block, 'status/retry/spinner/profile must be grid-column: 2');
+  });
+
+  it('myseason panel pinned to the tab row and top-aligned', () => {
+    const css = readCSS();
+    const block = css.match(/#myseason-view\s*\{[^}]*\}/);
+    assert.ok(block, '#myseason-view rule must exist');
+    assert.ok(block[0].includes('grid-column: 1'), 'must be in column 1');
+    assert.ok(block[0].includes('grid-row: 2'), 'must sit on the tab row');
+    assert.ok(block[0].includes('align-self: start'), 'must not stretch to content rows');
   });
 
   it('My Stats tab hidden from nav-tabs on desktop', () => {
@@ -152,8 +166,53 @@ describe('Layout v3: Gap fix', () => {
 
   it('nav-tabs margin-bottom is reduced on desktop', () => {
     const css = readCSS();
-    const match = css.match(/\.nav-tabs\s*\{\s*grid-column:\s*1 \/ -1;\s*margin-bottom:\s*(\d+)px/);
+    const match = css.match(/\.nav-tabs\s*\{\s*grid-column:\s*2;\s*margin-bottom:\s*(\d+)px/);
     assert.ok(match, 'desktop .nav-tabs margin-bottom must be set');
     assert.ok(parseInt(match[1]) <= 12, 'desktop .nav-tabs margin-bottom should be <=12px');
+  });
+});
+
+describe('Layout v3: My Stats panel heading', () => {
+  it('myseason-view has a heading as its first child', () => {
+    const html = readHTML();
+    const panelIdx = html.indexOf('id="myseason-view"');
+    const headingIdx = html.indexOf('class="myseason-heading"');
+    const careerIdx = html.indexOf('id="career-details"');
+    assert.ok(panelIdx !== -1 && headingIdx > panelIdx && headingIdx < careerIdx, '.myseason-heading must be first child of #myseason-view');
+    assert.ok(html.includes('My Stats</h3>'), 'heading must read "My Stats"');
+  });
+
+  it('heading is hidden below desktop, shown at desktop', () => {
+    const css = readCSS();
+    const base = css.match(/\.myseason-heading\s*\{[^}]*display:\s*none/);
+    assert.ok(base, '.myseason-heading must default to display: none');
+    assert.ok(css.match(/\.myseason-heading\s*\{\s*display:\s*block\s*;?\s*\}/), 'desktop media query must show the heading');
+  });
+});
+
+describe('Layout v3: Unlinked desktop', () => {
+  it('applyBoot toggles is-linked body class from boot status', () => {
+    const js = readJS();
+    assert.ok(
+      js.includes("classList.toggle('is-linked'") && js.includes("boot.status === 'linked'"),
+      'applyBoot must toggle is-linked body class'
+    );
+  });
+
+  it('myseason panel hidden and link-view spans when unlinked on desktop', () => {
+    const css = readCSS();
+    assert.ok(css.includes('body:not(.is-linked) #myseason-view'), 'My Stats must be hidden while unlinked');
+    assert.ok(css.match(/body:not\(\.is-linked\)\s+#link-view\s*\{[^}]*grid-column:\s*1 \/ -1/), 'link-view must span both columns when unlinked');
+  });
+});
+
+describe('Layout v3: aria-labelledby targets exist', () => {
+  it('every panel aria-labelledby id matches a tab button id', () => {
+    const html = readHTML();
+    const labels = [...html.matchAll(/aria-labelledby="(tab-[\w-]+)"/g)].map((m) => m[1]);
+    assert.ok(labels.length >= 4, 'panels must reference tab labels');
+    labels.forEach((id) => {
+      assert.ok(html.includes(`id="${id}"`), `referenced id "${id}" must exist on a tab button`);
+    });
   });
 });

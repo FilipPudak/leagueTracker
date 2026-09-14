@@ -15,7 +15,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.7.1';
+const APP_VERSION = '4.7.2';
 
 let appState = {
   status: 'unlinked',
@@ -181,6 +181,7 @@ function setActiveView(viewId) {
 
 function applyBoot(boot) {
   appState.status = boot.status || 'unlinked';
+  document.body.classList.toggle('is-linked', boot.status === 'linked');
   appState.settings = LeagueCore.mapSettings(boot.settings);
   appState.linkedPlayer = boot.currentPlayer || boot.linkedPlayer || null;
   appState.votingOpen = Boolean(boot.votingOpen);

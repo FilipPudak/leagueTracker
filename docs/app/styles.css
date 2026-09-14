@@ -112,6 +112,16 @@ body {
   cursor: pointer; font-family: inherit; min-height: var(--touch-target-min);
 }
 
+.myseason-heading {
+  display: none;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.8rem;
+  color: #38bdf8;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin: 0 0 12px;
+}
+
 .nav-tabs { display: flex; gap: 8px; margin-bottom: 20px; background-color: #090d16; padding: 4px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05); }
 .tab-btn {
   flex: 1; padding: 8px 0; border: none; background: transparent; color: #64748b;
@@ -386,7 +396,7 @@ details[open].section-block > summary::before { content: '\25BE '; }
     --badge-grid-columns: 5;
   }
 
-  .nav-tabs { grid-column: 1 / -1; margin-bottom: 12px; }
+  .nav-tabs { grid-column: 2; margin-bottom: 12px; }
   .nav-tabs .tab-btn[aria-controls="myseason-view"] { display: none; }
 
   .app-container {
@@ -396,17 +406,26 @@ details[open].section-block > summary::before { content: '\25BE '; }
     align-items: start;
   }
 
-  .header,
+  .header { grid-column: 1 / -1; }
+
   #status-box,
   #retry-load,
-  #loading-spinner {
-    grid-column: 1 / -1;
+  #loading-spinner,
+  #player-profile-view {
+    grid-column: 2;
   }
 
   #myseason-view {
     display: block;
     grid-column: 1;
+    grid-row: 2;
+    align-self: start;
   }
+
+  body:not(.is-linked) #myseason-view { display: none; }
+  body:not(.is-linked) #link-view { grid-column: 1 / -1; }
+
+  .myseason-heading { display: block; }
 
   #vote-view,
   #standings-view,

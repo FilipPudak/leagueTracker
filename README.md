@@ -56,7 +56,7 @@ cd backend && node --test "test/**/*.test.js"
 | Router & rate limiter | 2 | 40+ |
 | Frontend (app-core + responsive redesign phases 1–7 + shortcuts) | 10 | 130+ |
 | Privacy guard | 1 | 5+ |
-| **Total** | **41 files** | **691** |
+| **Total** | **41 files** | **698** |
 
 Test infrastructure: `backend/test/helpers/mock-db.js` (D1 mock), `mock-fetch.js`,
 `mock-crypto.js`, `fixtures.js`, `test-utils.js`.
