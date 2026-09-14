@@ -10,9 +10,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap" as="style">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="styles.css?v=4.8.0">
+  <link rel="stylesheet" href="styles.css?v=4.8.1">
 </head>
 <body>
+  <script>document.body.classList.toggle('is-linked',!!sessionStorage.getItem('token'))</script>
   <div class="app-container">
     <div class="header">
       <div class="header-content">
@@ -186,9 +187,9 @@
 
     <!-- PLAYER PROFILE PANEL -->
     <div id="player-profile-view" class="view-panel">
-      <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
+      <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:16px;">
         <button class="btn-ghost" onclick="switchTab(appState.lastView || 'standings-view')" style="padding:4px 8px;">&larr; Back</button>
-        <h2 id="profile-title" style="margin:0; font-size:1.1rem;"></h2>
+        <h2 id="profile-title" style="margin:0; font-size:1.1rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;"></h2>
       </div>
       <div id="profile-loading" class="player-modal-loading" style="display:none;">Loading profile...</div>
       <div id="profile-content" style="display:none;">
@@ -315,7 +316,7 @@
 
   <div id="player-modal-overlay" class="modal-overlay" onclick="closePlayerModal(event)">
     <div class="modal-box" style="max-width:480px; max-height:80vh; overflow-y:auto;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:12px;">
         <h3 id="player-modal-name" style="margin:0;"></h3>
         <button class="btn-ghost" onclick="closePlayerModal()" style="padding:4px 8px;">&#10005;</button>
       </div>
@@ -327,7 +328,7 @@
     </div>
   </div>
 
-  <script src="app-core.js?v=4.8.0"></script>
-<script src="app.js?v=4.8.0"></script>
+  <script src="app-core.js?v=4.8.1"></script>
+<script src="app.js?v=4.8.1"></script>
 </body>
 </html>

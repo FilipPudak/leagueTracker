@@ -197,6 +197,10 @@ never per-player rankings.
   labeled rounds. Mirrors the league site's information architecture (cumulative table + round
   tabs), powered purely by Melee-derived data.
 - The site's ★ = count of cut wins (Champion count) — the app may render the same later.
+- **Player profile (full page):** shows season stats, career record, progression, badges, and
+  leader-use breakdown for any player. **Intentionally omits gamification** (milestones, raffle
+  tickets, streaks — private to the linked player only) and **rivalry/versus** data (personal
+  match history, kept private even in profile context).
 
 ## 12. Settings Glossary (D1 `settings`)
 

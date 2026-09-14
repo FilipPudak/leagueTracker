@@ -30,6 +30,16 @@ The backend is protected by **per-device session tokens** (see `docs/SECURITY.md
 2. Publish `docs/` on GitHub Pages and point players at the `/app/` sub-path.
 3. Configure the D1 `settings` table — see `docs/DATABASE.md`.
 
+## Local development
+
+The app's `API_URL` auto-detects `localhost` and points to a local Worker dev server:
+
+1. **Backend:** `cd backend && npx wrangler dev` — starts on `http://localhost:8787`.
+2. **Frontend:** `python3 -m http.server 8080 --directory docs/app` (or any static server).
+3. **Open:** `http://localhost:8080` — the app talks to your local Worker.
+
+No code changes needed — the `API_URL` toggle is built in.
+
 ## Docs
 
 - [Deployment & configuration](docs/DEPLOYMENT.md) — Worker deploy, GitHub Pages, D1 config.

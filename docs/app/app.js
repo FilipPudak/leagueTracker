@@ -5,7 +5,9 @@
  * ============================================================================ */
 
 // Backend deployment URL (Cloudflare Worker with D1 database).
-const API_URL = 'https://league-tracker.filip-pudak.workers.dev';
+const API_URL = location.hostname === 'localhost'
+  ? 'http://localhost:8787'
+  : 'https://league-tracker.filip-pudak.workers.dev';
 
 // localStorage keys for the per-device session.
 const KEY_TOKEN = 'lt_token';
@@ -15,7 +17,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.8.0';
+const APP_VERSION = '4.8.1';
 
 let appState = {
   status: 'unlinked',
@@ -1595,18 +1597,21 @@ function renderProfileCareer(data) {
 
   const wdll = c.totalWDLL;
   const recordHtml = `
-    <div style="font-weight:700; color:#f8fafc; margin-bottom:8px;">Career Record</div>
-    <div class="career-profile-grid">
-      <div><span style="color:#94a3b8;">Nights</span><br><strong style="color:#f8fafc;">${escapeHtml(c.nightsPlayed)}</strong></div>
-      <div><span style="color:#94a3b8;">W-D-L</span><br><strong style="color:#f8fafc;">${escapeHtml(wdll.won)}-${escapeHtml(wdll.drawn)}-${escapeHtml(wdll.lost)}</strong></div>
-      <div><span style="color:#94a3b8;">Game diff</span><br><strong style="color:#f8fafc;">${c.gameDiff > 0 ? '+' : ''}${escapeHtml(c.gameDiff)}</strong></div>
-      <div><span style="color:#94a3b8;">Avg pts/night</span><br><strong style="color:#f8fafc;">${escapeHtml(c.avgPtsPerNight)}</strong></div>
+    <div class="card" style="padding:14px; margin-bottom:10px;">
+      <div style="font-family:'Orbitron',sans-serif; font-size:0.95rem; color:#38bdf8; margin-bottom:8px;">Career Record</div>
+      <div class="career-record-grid">
+        <div><span style="color:#94a3b8;">Nights</span><br><strong style="color:#f8fafc;">${escapeHtml(c.nightsPlayed)}</strong></div>
+        <div><span style="color:#94a3b8;">W-D-L</span><br><strong style="color:#f8fafc;">${escapeHtml(wdll.won)}-${escapeHtml(wdll.drawn)}-${escapeHtml(wdll.lost)}</strong></div>
+        <div><span style="color:#94a3b8;">Game diff</span><br><strong style="color:#f8fafc;">${c.gameDiff > 0 ? '+' : ''}${escapeHtml(c.gameDiff)}</strong></div>
+        <div><span style="color:#94a3b8;">Avg pts/night</span><br><strong style="color:#f8fafc;">${escapeHtml(c.avgPtsPerNight)}</strong></div>
+      </div>
     </div>`;
 
   let progHtml = '';
   if (c.progression && c.progression.length > 0) {
     const peak = c.peak;
-    progHtml = '<div style="font-weight:700; color:#f8fafc; margin:16px 0 8px;">Season Progression</div>';
+    progHtml = '<div class="card" style="padding:14px; margin-bottom:10px;">';
+    progHtml += '<div style="font-family:\'Orbitron\',sans-serif; font-size:0.95rem; color:#38bdf8; margin-bottom:8px;">Season Progression</div>';
     if (peak && peak.length > 0) {
       const peakStr = peak.map(p => 'Season ' + p.seasonId).join(', ');
       progHtml += `<div style="margin-bottom:8px;"><span style="color:#fbbf24;">Peak:</span> <span style="color:#f8fafc;">#${escapeHtml(peak[0].rank)} (${escapeHtml(peakStr)})</span></div>`;
@@ -1619,11 +1624,12 @@ function renderProfileCareer(data) {
       const detail = [pts].filter(Boolean).join(', ');
       return `<span style="color:${p.isCurrent ? '#38bdf8' : '#94a3b8'}; font-size:0.85rem;">Season ${escapeHtml(p.seasonId)} ${escapeHtml(rank)}${detail ? ' · ' + escapeHtml(detail) : ''}${currentMark}</span>`;
     }).filter(Boolean).join('<span style="color:#475569; margin:0 6px;">→</span>');
+    progHtml += '</div>';
   }
 
   let badgesHtml = '';
   if (c.badges && c.badges.length > 0) {
-    badgesHtml = '<div style="font-weight:700; color:#f8fafc; margin:16px 0 8px;">Badges</div>' +
+    badgesHtml = '<div style="font-family:\'Orbitron\',sans-serif; font-size:0.95rem; color:#38bdf8; margin:16px 0 8px;">Badges</div>' +
       '<div class="badges-grid">' +
       c.badges.map(b => {
         const iconPath = 'icons/' + b.icon + '.svg';
