@@ -520,13 +520,30 @@ describe('v4.10.0: sign-in modal, guest banner, header sizing', () => {
     assert.ok(js.includes('function renderGuestCopy'), 'copy renderer must exist');
   });
 
-  it('guest banner is a tappable bar with session-scoped dismissal', () => {
+  it('guest banner informs and dismisses; the header pill is the CTA', () => {
     const html = readHTML();
     const js = readJS();
-    assert.ok(html.includes('class="guest-banner-cta" aria-label="Sign in to vote and see your stats" onclick="openSignIn()"'), 'banner must be tappable to sign in with an accessible name');
+    assert.ok(!html.includes('guest-banner-cta'), 'banner must not carry its own sign-in button');
     assert.ok(html.includes('aria-label="Dismiss sign-in reminder"'), 'banner close needs an accessible name');
+    assert.ok(html.includes('id="signin-cta" class="signin-cta" onclick="openSignIn(true)"'), 'header pill is the explicit CTA');
     assert.ok(js.includes("sessionStorage.setItem('lt_guestbanner_dismissed'"), 'dismissal is per session');
-    assert.ok(js.includes("sessionStorage.setItem('lt_signin_engaged'"), 'sign-in engagement hides the banner');
+    assert.ok(js.includes('if (explicit === true)'), 'engagement flag must be explicit-only');
+    assert.ok(js.includes("sessionStorage.removeItem('lt_signin_engaged')"), 'sign-out restarts the guest funnel');
+  });
+
+  it('sign-in modal submits on Enter and never lets the page behind it take focus', () => {
+    const html = readHTML();
+    const js = readJS();
+    assert.ok(html.includes('<form novalidate onsubmit="event.preventDefault(); submitAccountLink();">'), 'sign-in must be a real form');
+    assert.ok(html.includes('type="submit" id="link-submit"'), 'submit button must be type=submit');
+    assert.ok(js.includes('shell.inert = anyOpen'), 'background must be inert while an overlay is open');
+  });
+
+  it('desktop pitch card states the value once', () => {
+    const html = readHTML();
+    assert.ok(!html.includes('guest-pitch-list'), 'no bullet list duplicating the pitch sentence');
+    assert.ok(html.includes('guest-pitch-note'), 'trust footnote must exist');
+    assert.ok(html.includes('the league runs on Melee results'), 'footnote content is the honor-claim model');
   });
 
   it('sign-in pill matches badge height visually while keeping a 44px hit area', () => {

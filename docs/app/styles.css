@@ -131,16 +131,13 @@ body {
 body:not(.is-linked) .signin-cta { display: inline-block; }
 
 #guest-pitch { display: none; }
-.guest-pitch-list { margin: 0 0 12px; padding-left: 18px; font-size: 0.85rem; color: #94a3b8; text-align: left; line-height: 1.7; }
+.guest-pitch-note { font-size: 0.75rem; color: #64748b; margin: 10px 0 0; }
 .guest-banner {
   display: none; align-items: center; gap: 4px; margin-bottom: 12px;
   background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px;
+  padding: 6px 4px 6px 12px;
 }
-.guest-banner-cta {
-  flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  min-height: var(--touch-target-min); padding: 8px 4px 8px 12px;
-  background: none; border: none; color: #f8fafc; font-family: inherit; font-size: 0.85rem; font-weight: 600; text-align: left; cursor: pointer;
-}
+.guest-banner .guest-pitch-text { flex: 1; font-size: 0.85rem; font-weight: 600; color: #f8fafc; line-height: 1.45; padding: 6px 0; }
 .guest-banner-close { flex-shrink: 0; width: 44px; min-height: 44px; background: none; border: none; color: #64748b; font-size: 0.9rem; cursor: pointer; }
 .link-modal-box { max-width: 480px; max-height: 85vh; overflow-y: auto; }
 
@@ -395,7 +392,6 @@ details[open].section-block > summary::before { content: '\25BE '; }
 .btn-danger:focus-visible,
 .name-btn:focus-visible,
 .picker-row:focus-visible,
-.guest-banner-cta:focus-visible,
 .guest-banner-close:focus-visible,
 .not-you:focus-visible,
 .show-more-btn:focus-visible,

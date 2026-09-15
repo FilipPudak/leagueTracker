@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.10.0';
+const APP_VERSION = '4.10.1';
 
 const appState = {
   status: 'unlinked',
@@ -227,14 +227,16 @@ function clearLinkStatus() {
   }
 }
 
-function openSignIn() {
+function openSignIn(explicit) {
   const overlay = $('link-modal-overlay');
   if (!overlay) return;
   clearStatus();
   clearLinkStatus();
   showSpinner(false);
-  sessionStorage.setItem('lt_signin_engaged', '1');
-  updateGuestBanner();
+  if (explicit === true) {
+    sessionStorage.setItem('lt_signin_engaged', '1');
+    updateGuestBanner();
+  }
   openOverlay('link-modal-overlay');
   const email = $('link-email');
   if (email) email.focus();
@@ -575,6 +577,8 @@ function confirmUnlink() {
   callApi('unlinkAccount', { token: token })
     .then(() => {
       unlinkInFlight = false;
+      sessionStorage.removeItem('lt_signin_engaged');
+      sessionStorage.removeItem('lt_guestbanner_dismissed');
       clearSession();
       appState.linkedPlayer = null;
       appState.status = 'unlinked';
@@ -1481,6 +1485,8 @@ function updateBodyScrollLock() {
     (o) => o.style.display === 'flex'
   );
   document.body.style.overflow = anyOpen ? 'hidden' : '';
+  const shell = document.querySelector('.app-container');
+  if (shell) shell.inert = anyOpen;
 }
 
 function initCollapsibles() {

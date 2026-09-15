@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap" as="style">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="styles.css?v=4.10.0">
+  <link rel="stylesheet" href="styles.css?v=4.10.1">
 </head>
 <body>
   <script>document.body.classList.toggle('is-linked',!!localStorage.getItem('lt_token'))</script>
@@ -31,7 +31,7 @@
           <span class="chip-name" id="chip-name">—</span>
           <button type="button" class="not-you" onclick="unlinkCurrentDevice()">· Not you?</button>
         </div>
-        <button type="button" id="signin-cta" class="signin-cta" onclick="openSignIn()">Sign in</button>
+        <button type="button" id="signin-cta" class="signin-cta" onclick="openSignIn(true)">Sign in</button>
       </div>
     </div>
 
@@ -94,7 +94,7 @@
     <!-- STANDINGS PANEL -->
     <div id="standings-view" class="view-panel" role="tabpanel" aria-labelledby="tab-standings">
       <div id="guest-banner" class="guest-banner">
-        <button type="button" class="guest-banner-cta" aria-label="Sign in to vote and see your stats" onclick="openSignIn()"><span class="guest-pitch-text"></span><span aria-hidden="true">&rarr;</span></button>
+        <span class="guest-pitch-text"></span>
         <button type="button" class="guest-banner-close" aria-label="Dismiss sign-in reminder" onclick="dismissGuestBanner()">&#10005;</button>
       </div>
       <div id="vote-cta" style="display:none;" class="vote-cta">
@@ -221,13 +221,9 @@
     <!-- GUEST PITCH CARD (desktop left column for guests; the sign-in form itself is a modal) -->
     <div id="guest-pitch" class="card">
       <h3 class="section-heading">Sign In</h3>
-      <p class="guest-pitch-text" style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 8px;"></p>
-      <ul class="guest-pitch-list">
-        <li>Cast your weekly vote for best leader and favorite opponent</li>
-        <li>See your record, streaks and badges</li>
-        <li>Earn a raffle ticket with every vote</li>
-      </ul>
-      <button type="button" class="btn-submit" onclick="openSignIn()">Sign In</button>
+      <p class="guest-pitch-text" style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 12px;"></p>
+      <button type="button" class="btn-submit" onclick="openSignIn(true)">Sign In</button>
+      <p class="guest-pitch-note">Your email is only used to recognize this device — the league runs on Melee results.</p>
     </div>
 
     <!-- MY STATS PANEL -->
@@ -336,6 +332,7 @@
       </div>
       <div id="link-modal-error" class="status-msg status-error"></div>
       <p class="guest-pitch-text" style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 14px;"></p>
+      <form novalidate onsubmit="event.preventDefault(); submitAccountLink();">
       <div class="form-group">
         <label for="link-email">Your Email</label>
         <input type="email" id="link-email" class="text-input" placeholder="you@example.com" autocomplete="email" required>
@@ -348,11 +345,12 @@
       </div>
       <p id="link-email-hint" style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 12px;">We'll find your player profile using this email.</p>
       <button type="button" id="link-mode-toggle" class="not-you" onclick="toggleLinkMode()" style="display:block; margin-bottom:12px;">First time here? Pick your name from the player list</button>
-      <button type="button" id="link-submit" class="btn-submit" onclick="submitAccountLink()">Sign In</button>
+      <button type="submit" id="link-submit" class="btn-submit">Sign In</button>
+      </form>
     </div>
   </div>
 
-  <script src="app-core.js?v=4.10.0"></script>
-<script src="app.js?v=4.10.0"></script>
+  <script src="app-core.js?v=4.10.1"></script>
+<script src="app.js?v=4.10.1"></script>
 </body>
 </html>
