@@ -190,10 +190,62 @@ function setActiveView(viewId) {
   if (rovingTarget) rovingTarget.setAttribute('tabindex', '0');
 }
 
+function renderGuestCopy() {
+  document.querySelectorAll('.guest-pitch-text').forEach((el) => { el.textContent = LeagueCore.GUEST_PITCH; });
+}
+
+function updateGuestBanner() {
+  const banner = $('guest-banner');
+  if (!banner) return;
+  const hidden = window.innerWidth >= 1024
+    || Boolean(appState.linkedPlayer)
+    || sessionStorage.getItem('lt_guestbanner_dismissed') === '1'
+    || sessionStorage.getItem('lt_signin_engaged') === '1';
+  banner.style.display = hidden ? 'none' : 'flex';
+}
+
+function dismissGuestBanner() {
+  sessionStorage.setItem('lt_guestbanner_dismissed', '1');
+  updateGuestBanner();
+}
+
+function showLinkStatus(msg) {
+  const box = $('link-modal-error');
+  if (!box) {
+    showStatus(msg, false);
+    return;
+  }
+  box.textContent = msg;
+  box.style.display = 'block';
+}
+
+function clearLinkStatus() {
+  const box = $('link-modal-error');
+  if (box) {
+    box.textContent = '';
+    box.style.display = 'none';
+  }
+}
+
 function openSignIn() {
+  const overlay = $('link-modal-overlay');
+  if (!overlay) return;
   clearStatus();
+  clearLinkStatus();
   showSpinner(false);
-  setActiveView('link-view');
+  sessionStorage.setItem('lt_signin_engaged', '1');
+  updateGuestBanner();
+  overlay.style.display = 'flex';
+  updateBodyScrollLock();
+  const email = $('link-email');
+  if (email) email.focus();
+}
+
+function closeSignIn(event) {
+  if (event && event.target !== event.currentTarget) return;
+  const overlay = $('link-modal-overlay');
+  if (overlay) overlay.style.display = 'none';
+  updateBodyScrollLock();
 }
 
 /* -------------------------------------------------------------- boot state -- */
@@ -321,13 +373,11 @@ function applyBoot(boot) {
     showTabs(false);
     populateLinkPicker(LeagueCore.resolvePlayerChoices(boot));
     setLinkMode('email');
-    if (boot.status === 'invalid-token' && window.innerWidth < 1024) {
-      setActiveView('link-view');
-    } else {
-      switchTab('standings-view');
-    }
+    switchTab('standings-view');
+    updateGuestBanner();
     if (boot.status === 'invalid-token') {
-      showStatus('Your session expired. Please sign in again.', false);
+      showLinkStatus('Your session expired. Please sign in again.');
+      openSignIn();
     }
   }
 
@@ -447,12 +497,14 @@ function submitAccountLink() {
   const email = emailEl ? emailEl.value.trim() : '';
   const playerId = linkMode === 'email' ? '' : linkPickerSelection;
 
-  if (!email) { showStatus('Please enter your email address.', false); return; }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showStatus('Please enter a valid email address.', false); return; }
-  if (linkMode === 'pick' && !playerId) { showStatus('Please select your player name.', false); return; }
+  if (!email) { showLinkStatus('Please enter your email address.'); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showLinkStatus('Please enter a valid email address.'); return; }
+  if (linkMode === 'pick' && !playerId) { showLinkStatus('Please select your player name.'); return; }
 
   linkInFlight = true;
-  showSpinner(true, 'link'); clearStatus();
+  const submitBtn = $('link-submit');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Signing in…'; }
+  showSpinner(true, 'link'); clearStatus(); clearLinkStatus();
 
   callApi('linkAccount', { playerId: playerId, email: email })
     .then((res) => {
@@ -478,7 +530,9 @@ function submitAccountLink() {
       };
       showSpinner(false);
       linkInFlight = false;
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Sign In'; }
       sessionStorage.setItem('firstLogin', '1');
+      closeSignIn();
       applyBoot(boot);
       if (appState.votingOpen) {
         showStatus('Account linked successfully!', true);
@@ -487,7 +541,8 @@ function submitAccountLink() {
     .catch((err) => {
       showSpinner(false);
       linkInFlight = false;
-      showStatus(err.userMessage || err.message || 'Failed to link account.', false);
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Sign In'; }
+      showLinkStatus(err.userMessage || err.message || 'Could not link account.');
     });
 }
 
@@ -622,7 +677,7 @@ function switchTab(tabId) {
         showStatus('Voting is currently closed for this week.', false);
       }
     } else {
-      setActiveView('link-view');
+      openSignIn();
     }
   } else if (tabId === 'standings-view') {
     clearStatus();
@@ -645,7 +700,7 @@ function switchTab(tabId) {
       loadMySeasonStats();
       loadCareerStats();
     } else {
-      setActiveView('link-view');
+      openSignIn();
     }
   }
 }
@@ -1359,6 +1414,7 @@ async function fetchInitialAppData() {
 
 document.addEventListener('DOMContentLoaded', () => {
   applyVersion();
+  renderGuestCopy();
   fetchInitialAppData();
   initCollapsibles();
   initBadgeTooltips();
@@ -1376,6 +1432,7 @@ document.addEventListener('DOMContentLoaded', () => {
       appState.lastView = 'standings-view';
     }
     if (appState.lastView) setActiveView(appState.lastView);
+    updateGuestBanner();
   });
 });
 
@@ -1387,13 +1444,20 @@ function initModalKeys() {
         closePlayerModal();
         return;
       }
+      const lm = $('link-modal-overlay');
+      if (lm && lm.style.display === 'flex') {
+        closeSignIn();
+        return;
+      }
       const uc = $('unlink-confirm');
       if (uc && uc.style.display === 'flex') cancelUnlink();
       return;
     }
     if (e.key === 'Tab') {
-      const pm = $('player-modal-overlay');
-      if (pm && pm.style.display === 'flex') trapFocus(e, pm);
+      ['player-modal-overlay', 'link-modal-overlay', 'unlink-confirm'].forEach((id) => {
+        const el = $(id);
+        if (el && el.style.display === 'flex') trapFocus(e, el);
+      });
     }
   });
 }

@@ -1,6 +1,10 @@
 const LeagueCore = (() => {
   const CACHE_TTL_MS = 15 * 1000;
 
+  // Canonical guest onboarding sentence — rendered verbatim into the desktop
+  // pitch card and the mobile guest banner so the wording can never drift.
+  const GUEST_PITCH = 'Standings are open to everyone — sign in with your email to cast your weekly vote and see your stats.';
+
   function mapSettings(raw) {
     const s = raw || {};
     return {
@@ -68,7 +72,7 @@ const LeagueCore = (() => {
     return selectValue == null ? '' : String(selectValue);
   }
 
-  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, gamificationViewFor, leaderOptionLabel, visibleListSlice, listToggleLabel, voteSubmitAction, shouldRetryAsNewVote, resolveStandingsAsOf, CACHE_TTL_MS };
+  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, gamificationViewFor, leaderOptionLabel, visibleListSlice, listToggleLabel, voteSubmitAction, shouldRetryAsNewVote, resolveStandingsAsOf, GUEST_PITCH, CACHE_TTL_MS };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.LeagueCore = LeagueCore;

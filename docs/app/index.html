@@ -93,6 +93,10 @@
 
     <!-- STANDINGS PANEL -->
     <div id="standings-view" class="view-panel" role="tabpanel" aria-labelledby="tab-standings">
+      <div id="guest-banner" class="guest-banner">
+        <button type="button" class="guest-banner-cta" aria-label="Sign in to vote and see your stats" onclick="openSignIn()"><span class="guest-pitch-text"></span><span aria-hidden="true">&rarr;</span></button>
+        <button type="button" class="guest-banner-close" aria-label="Dismiss sign-in reminder" onclick="dismissGuestBanner()">&#10005;</button>
+      </div>
       <div id="vote-cta" style="display:none;" class="vote-cta">
         <button type="button" class="btn-submit" onclick="switchTab('vote-view')">Vote now &rarr;</button>
       </div>
@@ -214,26 +218,16 @@
     </div><!-- /col-right -->
 
     <div class="col-left">
-    <!-- LINK PANEL (guests: welcome + sign-in; side panel on desktop, switched-in content on mobile) -->
-    <div id="link-view" class="view-panel" role="tabpanel" aria-label="Sign in">
-      <button type="button" id="link-back" class="link-back-text" onclick="switchTab('standings-view')">&larr; Back to standings</button>
-      <div class="card">
-        <h3 class="section-heading">Sign In</h3>
-        <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 0;">Standings are open to everyone — sign in with your email to cast your weekly vote and see your stats.</p>
-      </div>
-      <div class="form-group">
-        <label for="link-email">Your Email</label>
-        <input type="email" id="link-email" class="text-input" placeholder="you@example.com" autocomplete="email" required>
-      </div>
-      <div class="form-group" id="link-picker-group" style="display:none;">
-        <label for="link-player-search">Select Your Name</label>
-        <input type="text" id="link-player-search" class="text-input" placeholder="Type to search..." oninput="filterLinkPicker()" autocomplete="off">
-        <div id="link-player-select" class="picker-list" role="group" aria-label="Player names" style="margin-top: 8px;"></div>
-        <div id="link-picker-empty" class="picker-empty" style="display:none;">No match — names appear exactly as registered at the table. Sign in with your email instead, or ask on Discord.</div>
-      </div>
-      <p id="link-email-hint" style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 12px;">We'll find your player profile using this email.</p>
-      <button type="button" id="link-mode-toggle" class="not-you" onclick="toggleLinkMode()" style="display:block; margin-bottom:12px;">First time here? Pick your name from the player list</button>
-      <button type="button" class="btn-submit" onclick="submitAccountLink()">Sign In</button>
+    <!-- GUEST PITCH CARD (desktop left column for guests; the sign-in form itself is a modal) -->
+    <div id="guest-pitch" class="card">
+      <h3 class="section-heading">Sign In</h3>
+      <p class="guest-pitch-text" style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 8px;"></p>
+      <ul class="guest-pitch-list">
+        <li>Cast your weekly vote for best leader and favorite opponent</li>
+        <li>See your record, streaks and badges</li>
+        <li>Earn a raffle ticket with every vote</li>
+      </ul>
+      <button type="button" class="btn-submit" onclick="openSignIn()">Sign In</button>
     </div>
 
     <!-- MY STATS PANEL -->
@@ -331,6 +325,30 @@
         <a href="#" id="player-modal-profile-link" onclick="openPlayerProfile(event)"
            class="hover-underline" style="color:#38bdf8; font-size:0.9rem; cursor:pointer;">View Full Profile &rarr;</a>
       </div>
+    </div>
+  </div>
+
+  <div id="link-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="link-modal-title" onclick="closeSignIn(event)">
+    <div class="modal-box link-modal-box">
+      <div class="player-modal-head">
+        <h3 id="link-modal-title" style="margin:0;">Sign In</h3>
+        <button type="button" id="link-modal-close" class="btn-ghost player-modal-close" aria-label="Close sign in" onclick="closeSignIn()">&#10005;</button>
+      </div>
+      <div id="link-modal-error" class="status-msg status-error"></div>
+      <p class="guest-pitch-text" style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 14px;"></p>
+      <div class="form-group">
+        <label for="link-email">Your Email</label>
+        <input type="email" id="link-email" class="text-input" placeholder="you@example.com" autocomplete="email" required>
+      </div>
+      <div class="form-group" id="link-picker-group" style="display:none;">
+        <label for="link-player-search">Select Your Name</label>
+        <input type="text" id="link-player-search" class="text-input" placeholder="Type to search..." oninput="filterLinkPicker()" autocomplete="off">
+        <div id="link-player-select" class="picker-list" role="group" aria-label="Player names" style="margin-top: 8px;"></div>
+        <div id="link-picker-empty" class="picker-empty" style="display:none;">No match — names appear exactly as registered at the table. Sign in with your email instead, or ask on Discord.</div>
+      </div>
+      <p id="link-email-hint" style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 12px;">We'll find your player profile using this email.</p>
+      <button type="button" id="link-mode-toggle" class="not-you" onclick="toggleLinkMode()" style="display:block; margin-bottom:12px;">First time here? Pick your name from the player list</button>
+      <button type="button" id="link-submit" class="btn-submit" onclick="submitAccountLink()">Sign In</button>
     </div>
   </div>
 

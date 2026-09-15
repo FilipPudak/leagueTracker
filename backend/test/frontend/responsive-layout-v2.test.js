@@ -87,13 +87,13 @@ describe('Layout v3: Desktop 2-panel', () => {
     });
   });
 
-  it('link panel lives inside .col-left beside My Stats', () => {
+  it('guest pitch card lives inside .col-left beside My Stats', () => {
     const html = readHTML();
     const left = html.indexOf('class="col-left"');
-    const link = html.indexOf('id="link-view"');
+    const pitch = html.indexOf('id="guest-pitch"');
     const myseason = html.indexOf('id="myseason-view"');
-    assert.ok(link > left, 'link-view must be inside .col-left');
-    assert.ok(link < myseason, 'link-view must precede myseason-view in the left column');
+    assert.ok(pitch > left, 'guest-pitch must be inside .col-left');
+    assert.ok(pitch < myseason, 'guest-pitch must precede myseason-view in the left column');
   });
 
   it('myseason panel is the single item inside .col-left', () => {
@@ -223,11 +223,12 @@ describe('Layout v3: Unlinked desktop', () => {
     );
   });
 
-  it('guest left column shows the sign-in panel, never an empty My Stats', () => {
+  it('guest left column shows the pitch card, never an empty My Stats', () => {
     const css = readCSS();
-    assert.ok(css.match(/body:not\(\.is-linked\)\s+#link-view\s*\{[^}]*display:\s*block/), '#link-view must be forced visible for guests on desktop');
+    assert.ok(css.match(/body:not\(\.is-linked\)\s+#guest-pitch\s*\{[^}]*display:\s*block/), '#guest-pitch must be visible for guests on desktop');
     assert.ok(css.match(/body:not\(\.is-linked\)\s+#myseason-view\s*\{[^}]*display:\s*none/), '#myseason-view must stay hidden for guests on desktop (empty-panel leak guard)');
-    assert.ok(css.match(/body:not\(\.is-linked\)\s+#link-back\s*\{[^}]*display:\s*none/), 'guests on desktop must not see the mobile back button');
+    assert.ok(!css.includes('#link-view'), 'legacy link view rules must be gone');
+    assert.ok(!css.includes('#link-back'), 'legacy link back button rules must be gone');
   });
 
   it('sign-in CTA pill lives in the header and hides on desktop', () => {
@@ -240,14 +241,14 @@ describe('Layout v3: Unlinked desktop', () => {
     assert.ok(desktop && /body:not\(\.is-linked\)\s+\.signin-cta\s*\{[^}]*display:\s*none/.test(desktop[0]), 'cta hidden again on desktop');
   });
 
-  it('guest boot lands on standings with tabs hidden; invalid-token opens the form on mobile', () => {
+  it('guest boot lands on standings with tabs hidden; invalid-token opens the sign-in modal', () => {
     const js = readJS();
     const unlinkedBranch = js.match(/\} else \{[\s\S]*?\n {2}\}\n\n {2}handleHashRoute/);
     assert.ok(unlinkedBranch, 'applyBoot unlinked branch must exist');
     assert.ok(unlinkedBranch[0].includes('showTabs(false)'), 'guests never see the tab bar');
     assert.ok(unlinkedBranch[0].includes("switchTab('standings-view')"), 'guest default view is standings');
-    assert.ok(unlinkedBranch[0].includes('innerWidth < 1024'), 'invalid-token branch differentiates mobile vs desktop');
-    assert.ok(js.includes('function openSignIn'), 'header pill calls openSignIn');
+    assert.ok(unlinkedBranch[0].includes('openSignIn()'), 'invalid-token opens the sign-in modal on every viewport');
+    assert.ok(!unlinkedBranch[0].includes("setActiveView('link-view')"), 'legacy link view routing must be gone');
   });
 
   it('arrow-key tablist navigation with roving tabindex exists', () => {
@@ -348,12 +349,6 @@ describe('v4.8.0: Style and symmetry pins', () => {
   it('desktop columns are equal width for symmetric chrome bars', () => {
     const css = readCSS();
     assert.ok(css.match(/\.desktop-columns\s*\{[^}]*grid-template-columns:\s*1fr 1fr/), 'grid must use 1fr 1fr');
-  });
-
-  it('link back button exists in the link panel', () => {
-    const html = readHTML();
-    assert.ok(html.includes('id="link-back"'), 'back button must exist');
-    assert.ok(html.includes('Back to standings'), 'back button must be labelled');
   });
 });
 
@@ -463,9 +458,9 @@ describe('v4.9.1: badge tap fix and modal a11y finishing', () => {
   it('open modals lock body scroll and trap tab focus', () => {
     const js = readJS();
     assert.ok(js.includes('function updateBodyScrollLock'), 'scroll lock helper must exist');
-    assert.equal((js.match(/updateBodyScrollLock\(\);/g) || []).length, 4, 'all four open/close sites must call it');
+    assert.ok((js.match(/updateBodyScrollLock\(\);/g) || []).length >= 6, 'every overlay open/close site must lock/unlock');
     assert.ok(js.includes('function trapFocus'), 'focus trap must exist');
-    assert.ok(js.includes("trapFocus(e, pm)"), 'Tab must be routed through the trap');
+    assert.ok(js.includes('trapFocus(e, el)'), 'Tab must be routed through the trap');
   });
 });
 
@@ -497,5 +492,47 @@ describe('v4.9.3: season switch lands on the latest night', () => {
     assert.ok(js.includes('LeagueCore.resolveStandingsAsOf('), 'request must go through the as-of resolver');
     assert.ok(js.includes('standingsRenderedSeason'), 'rendered season must be tracked');
     assert.ok(js.includes('String(appState.standingsRenderedSeason'), 'season comparison must be normalized');
+  });
+});
+
+describe('v4.10.0: sign-in modal, guest banner, header sizing', () => {
+  it('sign-in is a dialog with full dismissal affordances', () => {
+    const html = readHTML();
+    assert.ok(html.includes('id="link-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true"'), 'sign-in must be a dialog');
+    assert.ok(html.includes('aria-label="Close sign in"'), 'sign-in close needs an accessible name');
+    assert.ok(html.includes('onclick="closeSignIn(event)"'), 'backdrop tap must close sign-in');
+  });
+
+  it('link form messages surface inside the modal, not behind the backdrop', () => {
+    const html = readHTML();
+    const js = readJS();
+    assert.ok(html.includes('id="link-modal-error"'), 'in-modal error slot must exist');
+    assert.ok(js.includes('function showLinkStatus'), 'link messages must route to the modal');
+    assert.ok(!js.includes("showStatus('Please enter your email address.', false)"), 'validation must not use the hidden global status box');
+  });
+
+  it('guest pitch copy is single-sourced from LeagueCore', () => {
+    const js = readJS();
+    const core = readFileSync(join(__dirname, '../../../docs/app/app-core.js'), 'utf8');
+    assert.ok(core.includes("const GUEST_PITCH = 'Standings are open to everyone"), 'canonical sentence must live in app-core');
+    assert.ok(js.includes('LeagueCore.GUEST_PITCH'), 'surfaces must render the shared constant');
+    assert.ok(js.includes('function renderGuestCopy'), 'copy renderer must exist');
+  });
+
+  it('guest banner is a tappable bar with session-scoped dismissal', () => {
+    const html = readHTML();
+    const js = readJS();
+    assert.ok(html.includes('class="guest-banner-cta" aria-label="Sign in to vote and see your stats" onclick="openSignIn()"'), 'banner must be tappable to sign in with an accessible name');
+    assert.ok(html.includes('aria-label="Dismiss sign-in reminder"'), 'banner close needs an accessible name');
+    assert.ok(js.includes("sessionStorage.setItem('lt_guestbanner_dismissed'"), 'dismissal is per session');
+    assert.ok(js.includes("sessionStorage.setItem('lt_signin_engaged'"), 'sign-in engagement hides the banner');
+  });
+
+  it('sign-in pill matches badge height visually while keeping a 44px hit area', () => {
+    const css = readCSS();
+    assert.ok(css.match(/\.signin-cta\s*\{[^}]*padding:\s*4px 12px/), 'cta visual padding matches the badge');
+    assert.ok(css.includes('.signin-cta::after'), 'invisible hit-area extension must exist');
+    assert.ok(css.match(/\.signin-cta::after\s*\{[^}]*inset:\s*-10px/), 'hit area must extend at least 10px');
+    assert.ok(!css.match(/\.signin-cta\s*\{[^}]*min-height:\s*var\(--touch-target-min\)/), 'cta must not grow a tall visual box again');
   });
 });

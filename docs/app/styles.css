@@ -120,16 +120,29 @@ body {
 
 .signin-cta {
   display: none;
-  min-height: var(--touch-target-min);
-  padding: 8px 14px; border-radius: 4px;
+  position: relative;
+  padding: 4px 12px; border-radius: 4px;
   font-family: 'Orbitron', sans-serif; font-size: var(--font-size-badge); font-weight: 700;
   letter-spacing: 1px; text-transform: uppercase;
   background: transparent; color: #38bdf8; border: 1px solid #38bdf8;
   cursor: pointer;
 }
+.signin-cta::after { content: ''; position: absolute; inset: -10px; }
 body:not(.is-linked) .signin-cta { display: inline-block; }
 
-#link-back { margin-bottom: 16px; }
+#guest-pitch { display: none; }
+.guest-pitch-list { margin: 0 0 12px; padding-left: 18px; font-size: 0.85rem; color: #94a3b8; text-align: left; line-height: 1.7; }
+.guest-banner {
+  display: none; align-items: center; gap: 4px; margin-bottom: 12px;
+  background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px;
+}
+.guest-banner-cta {
+  flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  min-height: var(--touch-target-min); padding: 8px 4px 8px 12px;
+  background: none; border: none; color: #f8fafc; font-family: inherit; font-size: 0.85rem; font-weight: 600; text-align: left; cursor: pointer;
+}
+.guest-banner-close { flex-shrink: 0; width: 44px; min-height: 44px; background: none; border: none; color: #64748b; font-size: 0.9rem; cursor: pointer; }
+.link-modal-box { max-width: 480px; max-height: 85vh; overflow-y: auto; }
 
 .link-back-text {
   background: none; border: none; padding: 0;
@@ -382,6 +395,8 @@ details[open].section-block > summary::before { content: '\25BE '; }
 .btn-danger:focus-visible,
 .name-btn:focus-visible,
 .picker-row:focus-visible,
+.guest-banner-cta:focus-visible,
+.guest-banner-close:focus-visible,
 .not-you:focus-visible,
 .show-more-btn:focus-visible,
 .round-header:focus-visible,
@@ -408,6 +423,7 @@ details[open].section-block > summary::before { content: '\25BE '; }
   .footer-discord:hover { color: #7983f5; }
   .not-you:hover { color: #f87171; text-decoration: underline; }
   .signin-cta:hover { border-color: #7dd3fc; color: #7dd3fc; }
+  .guest-banner-close:hover { color: #94a3b8; }
   .standings-row:hover { background: rgba(56, 189, 248, 0.05); }
 }
 
@@ -467,9 +483,8 @@ details[open].section-block > summary::before { content: '\25BE '; }
   #myseason-view { display: block; }
   body:not(.is-linked) #myseason-view { display: none; }
 
-  body:not(.is-linked) #link-view { display: block; }
+  body:not(.is-linked) #guest-pitch { display: block; }
   body:not(.is-linked) .signin-cta { display: none; }
-  body:not(.is-linked) #link-back { display: none; }
 
   .myseason-heading {
     display: flex;
