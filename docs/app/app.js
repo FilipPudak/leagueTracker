@@ -463,6 +463,7 @@ function submitAccountLink() {
         status: 'linked',
         votingOpen: res.votingOpen,
         alreadySubmitted: res.alreadyVoted,
+        currentVote: res.currentVote || null,
         linkedPlayer: res.linkedPlayer || res.player,
         leaders: res.leaders,
         players: res.players,

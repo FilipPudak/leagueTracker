@@ -76,13 +76,17 @@ export async function handleLinkAccount(body, env) {
   const currentWeek = allSettings.CURRENT_WEEK;
   const weekNum = parseWeek(currentWeek);
 
-  // Check if already voted
+  // Check if already voted (and carry the choice so Change Vote can prefill).
   let alreadyVoted = false;
+  let currentVote = null;
   if (activeSeasonId && weekNum) {
-    const row = await DB.prepare(
-      'SELECT 1 FROM votes WHERE season_id = ? AND week = ? AND player_id = ?'
+    const vote = await DB.prepare(
+      'SELECT leader_id, opponent_id FROM votes WHERE season_id = ? AND week = ? AND player_id = ?'
     ).bind(activeSeasonId, weekNum, playerId).first();
-    alreadyVoted = !!row;
+    if (vote) {
+      alreadyVoted = true;
+      currentVote = { leaderId: vote.leader_id, opponentId: vote.opponent_id };
+    }
   }
 
   // Get leaders and players for the response. The opponent picker is narrowed to
@@ -116,6 +120,7 @@ export async function handleLinkAccount(body, env) {
     linkedPlayer: { id: player.id, name: player.name, email: email.trim().toLowerCase() },
     votingOpen,
     alreadyVoted,
+    currentVote,
     leaders: (leaders.results || []).map(l => ({ id: l.id, name: l.name, set: l.set })),
     players: players.map(p => ({ id: p.id, name: p.name })),
     roster: roster.map(p => ({ id: p.id, name: p.name })),

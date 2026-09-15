@@ -141,6 +141,21 @@ describe('handleLinkAccount', () => {
     assert.equal(typeof result.votingOpen, 'boolean');
   });
 
+  it('returns currentVote on relink when the player already voted this week', async () => {
+    const tables = linkTables();
+    tables.votes = [
+      { id: 1, timestamp: '2026-06-15T18:00:00Z', updated_at: null, season_id: 6, week: 3, player_id: 'P001', leader_id: '2', opponent_id: 'P003' },
+    ];
+    env = { DB: createMockDb(tables) };
+
+    const result = await handleLinkAccount(
+      { playerId: 'P001', email: 'alice@test.com', deviceId: 'dev-relink' },
+      env
+    );
+    assert.equal(result.alreadyVoted, true);
+    assert.deepEqual(result.currentVote, { leaderId: '2', opponentId: 'P003' });
+  });
+
   it('narrows opponent list to faced players when match data exists', async () => {
     const tables = linkTables();
     tables.match_results = [
