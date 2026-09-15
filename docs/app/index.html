@@ -21,7 +21,7 @@
           class="header-logo" 
           src="rebel-alliance.svg" 
           alt="Rebel Alliance Logo" 
-        />
+        >
         <h1 id="app-title">SWU League Stockholm</h1>
       </div>
       <div class="subtitle" id="app-subtitle">Loading season information...</div>
@@ -94,7 +94,7 @@
     <!-- STANDINGS PANEL -->
     <div id="standings-view" class="view-panel" role="tabpanel" aria-labelledby="tab-standings">
       <div id="vote-cta" style="display:none;" class="vote-cta">
-        <button class="btn-submit" onclick="switchTab('vote-view')">Vote now &rarr;</button>
+        <button type="button" class="btn-submit" onclick="switchTab('vote-view')">Vote now &rarr;</button>
       </div>
       <div class="form-group">
         <label for="standings-season-filter">Select Season</label>
@@ -190,14 +190,14 @@
     <!-- PLAYER PROFILE PANEL -->
     <div id="player-profile-view" class="view-panel">
       <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:16px;">
-        <button class="link-back-text" onclick="switchTab(appState.lastView || 'standings-view')">&larr; Back to standings</button>
+        <button type="button" class="link-back-text" onclick="switchTab(appState.lastView || 'standings-view')">&larr; Back to standings</button>
         <h2 id="profile-title" style="margin:0; font-size:1.1rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;"></h2>
       </div>
       <div id="profile-loading" class="player-modal-loading" style="display:none;">Loading profile...</div>
       <div id="profile-content" style="display:none;">
         <div class="profile-tabs">
-          <button class="profile-tab active" onclick="switchProfileTab('season')">Season</button>
-          <button class="profile-tab" onclick="switchProfileTab('career')">Career</button>
+          <button type="button" class="profile-tab active" onclick="switchProfileTab('season')">Season</button>
+          <button type="button" class="profile-tab" onclick="switchProfileTab('career')">Career</button>
         </div>
         <div id="profile-tab-season" class="profile-panel active">
           <div class="form-group">
@@ -223,11 +223,11 @@
       </div>
       <div class="form-group">
         <label for="link-email">Your Email</label>
-        <input type="email" id="link-email" class="text-input" placeholder="you@example.com" autocomplete="email" required />
+        <input type="email" id="link-email" class="text-input" placeholder="you@example.com" autocomplete="email" required>
       </div>
       <div class="form-group" id="link-picker-group" style="display:none;">
         <label for="link-player-select">Select Your Name</label>
-        <input type="text" id="link-player-search" class="text-input" placeholder="Type to search..." oninput="filterLinkPicker()" autocomplete="off" />
+        <input type="text" id="link-player-search" class="text-input" placeholder="Type to search..." oninput="filterLinkPicker()" autocomplete="off">
         <select id="link-player-select" size="6" style="margin-top: 8px;"><option value="">-- Choose Your Name --</option></select>
       </div>
       <p id="link-email-hint" style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 12px;">We'll find your player profile using this email.</p>
@@ -242,9 +242,9 @@
         <summary>Career</summary>
         <div id="career-empty" style="text-align:center; color:#94a3b8; padding:12px; font-size:0.85rem; display:none;">No career history yet — your stats appear after you play your first league night.</div>
         <div class="career-tabs">
-          <button class="career-tab active" onclick="switchCareerTab('record')">Record</button>
-          <button class="career-tab" onclick="switchCareerTab('versus')">Versus</button>
-          <button class="career-tab" onclick="switchCareerTab('badges')">Badges</button>
+          <button type="button" class="career-tab active" onclick="switchCareerTab('record')">Record</button>
+          <button type="button" class="career-tab" onclick="switchCareerTab('versus')">Versus</button>
+          <button type="button" class="career-tab" onclick="switchCareerTab('badges')">Badges</button>
         </div>
         <div id="career-tab-record" class="career-panel active">
           <div id="career-record-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
@@ -320,7 +320,7 @@
     <div class="modal-box" style="max-width:480px; max-height:80vh; overflow-y:auto;">
       <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:12px;">
         <h3 id="player-modal-name" style="margin:0;"></h3>
-        <button class="btn-ghost" onclick="closePlayerModal()" style="padding:4px 8px;">&#10005;</button>
+        <button type="button" class="btn-ghost" onclick="closePlayerModal()" style="padding:4px 8px;">&#10005;</button>
       </div>
       <div id="player-modal-content"></div>
       <div style="text-align:center; margin-top:16px;">

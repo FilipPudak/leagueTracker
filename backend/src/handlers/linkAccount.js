@@ -57,7 +57,7 @@ export async function handleLinkAccount(body, env) {
       .bind(email.trim().toLowerCase(), playerId).run();
   }
 
-  let session = await findSessionByPlayerAndDevice(DB, playerId, deviceId);
+  const session = await findSessionByPlayerAndDevice(DB, playerId, deviceId);
   let token;
   const now = new Date().toISOString();
   if (session) {

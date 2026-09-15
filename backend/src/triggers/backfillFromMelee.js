@@ -67,8 +67,7 @@ export async function backfillFromMelee(env, deps = {}) {
         }
       }
 
-      if (resync && targetSeasonId === seasonNum) {
-      } else {
+      if (!(resync && targetSeasonId === seasonNum)) {
         const hasStanding = await DB.prepare(
           'SELECT 1 FROM season_standings WHERE season_id = ? AND round = ? LIMIT 1'
         ).bind(seasonNum, info.round).first();

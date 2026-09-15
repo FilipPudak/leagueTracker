@@ -356,7 +356,6 @@ details[open].section-block > summary::before { content: '\25BE '; }
 .career-record-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 0.85rem; }
 .career-profile-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 0.85rem; }
 .player-modal-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
-.player-modal-stat { text-align: center; padding: 8px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; }
 
 /* Focus-visible styles for accessibility */
 .tab-btn:focus-visible,

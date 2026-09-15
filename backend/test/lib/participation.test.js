@@ -1,7 +1,7 @@
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMockDb } from '../helpers/mock-db.js';
-import { basicTables, emptyTables } from '../helpers/fixtures.js';
+import { emptyTables } from '../helpers/fixtures.js';
 import {
   getStreaks,
   getRaffleTickets,

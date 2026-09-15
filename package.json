@@ -1,0 +1,21 @@
+{
+  "name": "league-tracker",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Repo-wide tooling (lint). Worker app lives in backend/, frontend in docs/app/.",
+  "scripts": {
+    "lint": "npm run lint:js && npm run lint:css && npm run lint:html",
+    "lint:js": "eslint .",
+    "lint:css": "stylelint \"docs/**/*.css\"",
+    "lint:html": "html-validate docs",
+    "lint:fix": "eslint . --fix && stylelint \"docs/**/*.css\" --fix"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.10.0",
+    "globals": "^17.12.0",
+    "html-validate": "^11.15.0",
+    "stylelint": "^17.15.0",
+    "stylelint-config-recommended": "^18.0.0"
+  }
+}

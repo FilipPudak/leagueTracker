@@ -7,11 +7,8 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CSS_FILE = join(__dirname, '../../../docs/app/styles.css');
 const JS_FILE = join(__dirname, '../../../docs/app/app.js');
-const HTML_FILE = join(__dirname, '../../../docs/app/index.html');
-
 function readCSS() { return readFileSync(CSS_FILE, 'utf8'); }
 function readJS() { return readFileSync(JS_FILE, 'utf8'); }
-function readHTML() { return readFileSync(HTML_FILE, 'utf8'); }
 
 describe('Shortcut fixes: Wide desktop breakpoint', () => {
   it('has 1280px media query', () => {

@@ -1,4 +1,4 @@
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables } from '../helpers/fixtures.js';
@@ -31,7 +31,7 @@ describe('handleUpdateVote', () => {
     });
     db = createMockDb(tables);
 
-    const result = await handleUpdateVote(
+    await handleUpdateVote(
       { voteData: { leader1Id: '2', opponentId: 'P003' } },
       { DB: db },
       makeSession()

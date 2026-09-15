@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HANDLERS_DIR = join(__dirname, '../../src/handlers');
-const LIB_DIR = join(__dirname, '../../src/lib');
 
 function getAllJsFiles(dir) {
   const files = [];

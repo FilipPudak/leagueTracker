@@ -19,7 +19,7 @@ const KEY_PLAYER = 'lt_playerId';
 // version is visible in the footer (avoids debugging a stale cache).
 const APP_VERSION = '4.8.3';
 
-let appState = {
+const appState = {
   status: 'unlinked',
   linkedPlayer: null,
   votingOpen: false,
@@ -94,7 +94,7 @@ async function callApi(action, payload = {}, _attempt = 0) {
       redirect: 'follow'
     });
   } catch (err) {
-    throw new Error('Could not connect to the server. Check your connection and try again.');
+    throw new Error('Could not connect to the server. Check your connection and try again.', { cause: err });
   }
   let json;
   try {
@@ -124,7 +124,7 @@ async function callApi(action, payload = {}, _attempt = 0) {
       await new Promise((resolve) => setTimeout(resolve, 800));
       return callApi(action, payload, 1);
     }
-    throw new Error('The server returned an unexpected response. Please try again.');
+    throw new Error('The server returned an unexpected response. Please try again.', { cause: err });
   }
   if (!json.success) {
     const e = new Error(json.error || 'Server error.');
@@ -1442,7 +1442,7 @@ async function openPlayerModal(playerId) {
     const data = await callApi('getPlayerProfile', { playerId, seasonId });
     playerModalData = data;
     renderPlayerModal(data);
-  } catch (err) {
+  } catch {
     content.innerHTML = '<div style="text-align:center; color:#ef4444; padding:16px;">Could not load profile.</div>';
   }
 }
@@ -1573,7 +1573,7 @@ async function loadPlayerProfile(playerId) {
 
     if (loadingEl) loadingEl.style.display = 'none';
     if (contentEl) contentEl.style.display = 'block';
-  } catch (err) {
+  } catch {
     if (loadingEl) loadingEl.innerHTML = '<div style="color:#ef4444;">Could not load profile.</div>';
   }
 }
@@ -1591,7 +1591,7 @@ async function loadProfileSeason() {
     profileData = await callApi('getPlayerProfile', { playerId: profileData.playerId, seasonId });
     profileCurrentSeasonId = seasonId;
     renderProfileSeason(profileData);
-  } catch (err) {
+  } catch {
     if (container) container.innerHTML = '<div style="color:#ef4444; padding:8px;">Failed to load season data.</div>';
   }
 }
@@ -1655,7 +1655,7 @@ function renderProfileCareer(data) {
       c.badges.map(b => {
         const iconPath = 'icons/' + b.icon + '.svg';
         let tierClass = 'badge-gold';
-        let tierLabel = '';
+        let tierLabel;
         if (b.type === 'tiered' && b.tier) {
           tierClass = 'badge-' + b.tier;
           tierLabel = b.tier.charAt(0).toUpperCase() + b.tier.slice(1);

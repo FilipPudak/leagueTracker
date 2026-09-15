@@ -1,4 +1,4 @@
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { assignStandardRanks, computeSchemer, computeAmbassador, computeChampion, computeBountyHunter, writePodiumBlock, AWARD_NAMES } from '../../src/lib/awards.js';
 import { createMockDb } from '../helpers/mock-db.js';

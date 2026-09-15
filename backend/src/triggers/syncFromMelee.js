@@ -367,7 +367,8 @@ export async function syncFromMelee(env, deps = {}) {
       ? '[SyncFromMelee] First run — voting opened.'
       : '[SyncFromMelee] Week data present — voting opened by retry fire.');
     return { status: 'voting-opened' };
-  } else if (canAdvance) {
+  }
+  if (canAdvance) {
     const nextWeek = Math.max((currentWeek || 0) + 1, latestRegularAttended);
     if (nextWeek > seasonLength) {
       const champion = await computeChampion(DB, activeSeasonId);
@@ -379,14 +380,12 @@ export async function syncFromMelee(env, deps = {}) {
       await updateSetting(DB, 'SEASON_STARTED', 'FALSE');
       console.log('[SyncFromMelee] Season ended.');
       return { status: 'season-ended' };
-    } else {
-      await updateSetting(DB, 'CURRENT_WEEK', `Week ${nextWeek}`);
-      await updateSetting(DB, 'LAST_ADVANCED', today);
-      console.log(`[SyncFromMelee] Advanced to Week ${nextWeek}.`);
-      return { status: 'advanced', week: nextWeek };
     }
-  } else {
-    console.log('[SyncFromMelee] Gate not met; data synced, no advance.');
-    return { status: 'synced-no-advance' };
+    await updateSetting(DB, 'CURRENT_WEEK', `Week ${nextWeek}`);
+    await updateSetting(DB, 'LAST_ADVANCED', today);
+    console.log(`[SyncFromMelee] Advanced to Week ${nextWeek}.`);
+    return { status: 'advanced', week: nextWeek };
   }
+  console.log('[SyncFromMelee] Gate not met; data synced, no advance.');
+  return { status: 'synced-no-advance' };
 }

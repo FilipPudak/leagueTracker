@@ -34,7 +34,7 @@ export function createMockDb(tables = {}) {
 
     async all() {
       calls.push({ sql: this._sql, params: [...this._params] });
-      const { table, rows } = executeSelect(this._sql, this._params, store);
+      const { rows } = executeSelect(this._sql, this._params, store);
       return { results: rows, success: true };
     }
 
@@ -82,7 +82,6 @@ export function createMockDb(tables = {}) {
 // --- SQL execution helpers ---
 
 function extractTableName(sql) {
-  const upper = sql.toUpperCase();
   // INSERT INTO table / SELECT ... FROM table / UPDATE table / DELETE FROM table
   let m = sql.match(/INSERT\s+(?:OR\s+(?:REPLACE|IGNORE)\s+)?INTO\s+(\w+)/i);
   if (m) return m[1];
@@ -700,12 +699,11 @@ function executeUpdate(sql, params, store) {
   if (!setMatch) return { success: true, changes: 0 };
 
   const where = extractWhere(sql);
-  let paramIdx = 0;
 
   // Count SET params (everything before WHERE)
   const setClauses = setMatch[1].split(',').map(c => c.trim());
   const setParams = params.slice(0, setClauses.length);
-  paramIdx = setClauses.length;
+  const paramIdx = setClauses.length;
 
   // Get WHERE params
   const whereParams = where ? params.slice(paramIdx) : [];

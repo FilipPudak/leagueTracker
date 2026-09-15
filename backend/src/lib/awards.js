@@ -147,11 +147,6 @@ export async function computeBountyHunter(db, seasonId) {
 
   if (top4Ids.length === 0) return [];
 
-  const regularTournaments = await db.prepare(
-    'SELECT melee_id FROM melee_tournaments WHERE season_id = ? AND phase = ?'
-  ).bind(seasonId, 'regular').all();
-  const regularIds = new Set((regularTournaments.results || []).map(t => t.melee_id));
-
   const allMatches = await db.prepare(
     'SELECT melee_match_id, player1_id, player2_id, winner_id, is_bye FROM match_results WHERE season_id = ?'
   ).bind(seasonId).all();

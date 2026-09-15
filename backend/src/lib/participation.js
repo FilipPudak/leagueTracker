@@ -24,7 +24,6 @@ export async function getStreaks(db, seasonId, playerId) {
   // Calculate streaks
   let currentStreak = 0;
   let bestStreak = 0;
-  let tempStreak = 0;
 
   // Iterate from most recent to oldest for current streak
   const weeks = attendedWeeks.results.map(r => r.week);
@@ -39,7 +38,7 @@ export async function getStreaks(db, seasonId, playerId) {
   }
 
   // Best streak: longest consecutive run of voted weeks
-  tempStreak = 0;
+  let tempStreak = 0;
   for (const week of weeks) {
     if (votedSet.has(week)) {
       tempStreak++;

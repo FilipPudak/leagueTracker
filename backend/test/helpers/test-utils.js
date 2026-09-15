@@ -7,7 +7,7 @@ import { basicTables } from './fixtures.js';
 
 let _fetchMock = null;
 
-export function createTestEnv(tables, opts = {}) {
+export function createTestEnv(tables) {
   const db = createMockDb(tables || basicTables());
   const fetchMock = createFetchMock();
   _fetchMock = fetchMock;
@@ -28,18 +28,14 @@ export function createTestEnv(tables, opts = {}) {
 
 export function cleanupTestEnv() {
   if (_fetchMock) _fetchMock.reset();
-  uninstallCryptoCounter();
+  uninstallCryptoMock();
   if (globalThis._originalFetch) {
     globalThis.fetch = globalThis._originalFetch;
     delete globalThis._originalFetch;
   }
 }
 
-function uninstallCryptoCounter() {
-  // No-op placeholder — actual cleanup via uninstallCryptoMock
-}
-
-export function resetTestEnv(env, tables, opts = {}) {
+export function resetTestEnv(env, tables) {
   const newDb = createMockDb(tables || basicTables());
   env.DB = newDb;
   env.db = newDb;

@@ -2,7 +2,7 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resetCryptoCounter } from '../helpers/mock-crypto.js';
 import { createMockDb } from '../helpers/mock-db.js';
-import { basicTables, emptyTables } from '../helpers/fixtures.js';
+import { basicTables } from '../helpers/fixtures.js';
 import {
   findSessionByToken,
   findSessionByPlayerAndDevice,

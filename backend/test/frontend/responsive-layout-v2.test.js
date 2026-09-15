@@ -242,7 +242,7 @@ describe('Layout v3: Unlinked desktop', () => {
 
   it('guest boot lands on standings with tabs hidden; invalid-token opens the form on mobile', () => {
     const js = readJS();
-    const unlinkedBranch = js.match(/\} else \{[\s\S]*?\n  \}\n\n  handleHashRoute/);
+    const unlinkedBranch = js.match(/\} else \{[\s\S]*?\n {2}\}\n\n {2}handleHashRoute/);
     assert.ok(unlinkedBranch, 'applyBoot unlinked branch must exist');
     assert.ok(unlinkedBranch[0].includes('showTabs(false)'), 'guests never see the tab bar');
     assert.ok(unlinkedBranch[0].includes("switchTab('standings-view')"), 'guest default view is standings');
@@ -264,7 +264,7 @@ describe('Layout v5: Review-fix guards', () => {
   it('vote-cta uses a real design-system class (no phantom .btn/.btn-primary)', () => {
     const html = readHTML();
     assert.ok(!html.includes('btn btn-primary'), 'no button may use undefined .btn/.btn-primary classes');
-    const cta = html.match(/id="vote-cta"[\s\S]*?<button class="([\w-]+)"/);
+    const cta = html.match(/id="vote-cta"[\s\S]*?<button[^>]*class="([\w-]+)"/);
     assert.ok(cta && cta[1] === 'btn-submit', 'vote-cta button must use .btn-submit');
   });
 
@@ -352,7 +352,7 @@ describe('v4.8.0: Style and symmetry pins', () => {
 
   it('link back button exists in the link panel', () => {
     const html = readHTML();
-    assert.ok(html.includes('id=\"link-back\"'), 'back button must exist');
+    assert.ok(html.includes('id="link-back"'), 'back button must exist');
     assert.ok(html.includes('Back to standings'), 'back button must be labelled');
   });
 });

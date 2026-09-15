@@ -360,10 +360,7 @@ describe('router/index.js – fetch handler', () => {
     assert.equal(json.success, false);
   });
 
-  it('handler throwing non-Error returns 500 with generic message', async () => {
-    const badHandlers = { badAction: () => { throw 'string error'; } };
-    const origHandlers = worker.fetch;
-
+  it('unknown action returns 400 with error message', async () => {
     const req = new Request('https://example.com', {
       method: 'POST',
       body: JSON.stringify({ action: 'nonExistentAction' }),
