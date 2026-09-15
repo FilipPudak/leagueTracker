@@ -134,6 +134,10 @@ ignored).
 - Voting without attending is allowed (rain-outs, arriving late to vote after the game): it earns
   raffle tickets. However, the **favorite opponent must be someone the voter actually faced** that
   week (enforced server-side at vote time; retroactively audited after sync).
+- **Deck attribution:** Melee publishes no decks, so the app has no record of which leader a
+  player actually played. Wherever leader-level records appear ("Leaders Played" with W/D/L and
+  win %), the leader a player **voted** for in week N is attributed as the leader they **played**
+  in week N. This is the app's only deck signal — an assumption, not data.
 
 ## 9. Awards (six)
 
@@ -201,6 +205,10 @@ never per-player rankings.
   leader-use breakdown for any player. **Intentionally omits gamification** (milestones, raffle
   tickets, streaks — private to the linked player only) and **rivalry/versus** data (personal
   match history, kept private even in profile context).
+- **Season views in modal + profile mirror the season table:** regular nights only, with
+  rank/points/W-D-L taken from the derived best-X row as-of the viewing point — never raw
+  all-night sums, never cut/side rows. Cut results are browsable only in Night Results (labeled
+  pills) and appear in the modal solely via the Galactic Champion award entry.
 
 ## 12. Settings Glossary (D1 `settings`)
 

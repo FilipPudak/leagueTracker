@@ -356,3 +356,47 @@ describe('v4.8.0: Style and symmetry pins', () => {
     assert.ok(html.includes('Back to standings'), 'back button must be labelled');
   });
 });
+
+describe('v4.8.5: modal and profile UX guards', () => {
+  it('player modal is a dialog with close affordances', () => {
+    const html = readHTML();
+    assert.ok(html.includes('id="player-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true"'), 'overlay must declare dialog semantics');
+    assert.ok(html.includes('aria-label="Close player summary"'), 'close button needs an accessible name');
+    assert.ok(html.includes('id="player-modal-close"'), 'close button needs a stable id for focus handling');
+  });
+
+  it('modal box sizing lives in CSS, not inline styles (desktop 640px rule must apply)', () => {
+    const html = readHTML();
+    const css = readCSS();
+    assert.ok(!html.includes('max-width:480px; max-height:80vh'), 'no inline sizing on the modal box');
+    assert.ok(css.includes('.player-modal-box'), '.player-modal-box class must exist');
+    assert.ok(css.includes('position: sticky'), 'modal header must be sticky');
+  });
+
+  it('Escape closes the player modal', () => {
+    const js = readJS();
+    assert.ok(js.includes("e.key !== 'Escape'"), 'a global Escape handler must exist');
+    assert.ok(js.includes('function initModalKeys'), 'Escape wiring must live in initModalKeys');
+  });
+
+  it('modal shows an empty state instead of zero-filled tiles', () => {
+    const js = readJS();
+    assert.ok(js.includes('No season results yet.'), 'empty-state copy must exist');
+    assert.ok(js.includes('player-modal-empty'), 'empty-state class must exist');
+  });
+
+  it('player names are real buttons everywhere they open the modal', () => {
+    const js = readJS();
+    assert.equal((js.match(/class="name-btn/g) || []).length, 2, 'standings cell and round rows must both use name-btn');
+  });
+
+  it('one section-heading atom replaces the inline heading idioms', () => {
+    const html = readHTML();
+    const css = readCSS();
+    const js = readJS();
+    assert.ok(css.includes('.section-heading'), 'shared heading class must exist');
+    assert.ok(!css.includes('.player-modal-section-title'), 'outlier bordered heading class must be gone');
+    assert.ok(!/<h3 style=/.test(html), 'no inline-styled h3 headings in the markup');
+    assert.ok(!js.includes('headingStyle'), 'heading-style opts machinery must be gone');
+  });
+});

@@ -34,8 +34,9 @@ export async function handleGetPlayerProfile(body, env) {
 
   const MATCH_COLS = 'season_id, round, player1_id, player2_id, winner_id, result, is_bye';
 
-  const [seasonStandingsResult, leadersRaw, deckWinRates, nightsAttendedResult, totalNightsResult, seasonRow, allSeasonStandingsResult] = await Promise.all([
+  const [seasonStandingsResult, seasonTournamentsResult, leadersRaw, deckWinRates, nightsAttendedResult, totalNightsResult, seasonRow, allSeasonStandingsResult] = await Promise.all([
     DB.prepare('SELECT season_id, round, player_id, wins, losses, draws, rank FROM season_standings WHERE season_id = ? AND player_id = ?').bind(sid, playerId).all(),
+    DB.prepare('SELECT round, phase FROM melee_tournaments WHERE season_id = ?').bind(sid).all(),
     DB.prepare(`
       SELECT l.id, l.name, l."set", COUNT(v.id) as play_count
       FROM votes v
@@ -51,7 +52,10 @@ export async function handleGetPlayerProfile(body, env) {
     DB.prepare('SELECT season_id, round, player_id, wins, losses, draws, rank FROM season_standings WHERE season_id = ?').bind(sid).all(),
   ]);
 
-  const seasonStandings = seasonStandingsResult.results || [];
+  const regularRoundSet = new Set(
+    (seasonTournamentsResult.results || []).filter(t => t.phase === 'regular').map(t => t.round)
+  );
+  const seasonStandings = (seasonStandingsResult.results || []).filter(s => regularRoundSet.has(s.round));
 
   const leaders = (leadersRaw.results || []).map(r => {
     const deck = deckWinRates.find(d => d.leaderId === r.id);
@@ -85,7 +89,7 @@ export async function handleGetPlayerProfile(body, env) {
   const nightsAttended = nightsAttendedResult ? nightsAttendedResult.cnt : 0;
   const totalNights = totalNightsResult ? totalNightsResult.cnt : 0;
   const topResults = (seasonRow && seasonRow.top_results) || 7;
-  const allSeasonStandings = allSeasonStandingsResult.results || [];
+  const allSeasonStandings = (allSeasonStandingsResult.results || []).filter(s => regularRoundSet.has(s.round));
 
   const seasonTableEntries = allSeasonStandings.map(s => ({
     playerId: s.player_id,
@@ -108,10 +112,6 @@ export async function handleGetPlayerProfile(body, env) {
     points: (s.wins || 0) * 3 + (s.draws || 0),
     rank: s.rank,
   }));
-
-  const totalW = seasonStandings.reduce((sum, s) => sum + (s.wins || 0), 0);
-  const totalD = seasonStandings.reduce((sum, s) => sum + (s.draws || 0), 0);
-  const totalL = seasonStandings.reduce((sum, s) => sum + (s.losses || 0), 0);
 
   const [allStandingsResult, allMatchAsP1, allMatchAsP2, tournamentsResult, seasonsResult] = await Promise.all([
     DB.prepare('SELECT season_id, round, player_id, wins, losses, draws, rank FROM season_standings').all(),
@@ -151,10 +151,10 @@ export async function handleGetPlayerProfile(body, env) {
       points: seasonPoints,
       nightsAttended,
       totalNights,
-      played: totalW + totalD + totalL,
-      won: totalW,
-      drawn: totalD,
-      lost: totalL,
+      played: playerRow ? playerRow.played : 0,
+      won: playerRow ? playerRow.won : 0,
+      drawn: playerRow ? playerRow.drawn : 0,
+      lost: playerRow ? playerRow.lost : 0,
       nights,
       leaders,
       awards: awardsWon,

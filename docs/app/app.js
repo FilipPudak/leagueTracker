@@ -17,7 +17,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.8.4';
+const APP_VERSION = '4.8.5';
 
 const appState = {
   status: 'unlinked',
@@ -716,7 +716,7 @@ function loadStandingsData() {
       appState.standingsInFlight = false;
       appState.standingsInFlightSeason = null;
       showSpinner(false, 'standings');
-      showStatus(err.userMessage || err.message || 'Failed to load standings.', false);
+      showStatus(err.userMessage || err.message || 'Could not load standings.', false);
     });
 }
 
@@ -761,7 +761,7 @@ function renderStandingsTable(table) {
     const playerName = nameMap[row.playerId] || row.playerId;
     return `<tr class="standings-row${rankClass}" ${row.rank > STANDINGS_PAGE_SIZE && !standingsShowAll ? 'style="display:none;"' : ''}>
       <td style="font-weight:700; text-align:left;">${escapeHtml(row.rank)}</td>
-      <td class="hover-underline" style="font-weight:600; color:#38bdf8; cursor:pointer; text-align:left;" onclick="openPlayerModal('${escapeHtml(row.playerId)}')">${escapeHtml(playerName)}</td>
+      <td style="text-align:left;"><button type="button" class="name-btn" onclick="openPlayerModal('${escapeHtml(row.playerId)}')">${escapeHtml(playerName)}</button></td>
       <td style="text-align:center;">${escapeHtml(row.played)}</td>
       <td style="text-align:center;">${escapeHtml(row.won)}</td>
       <td style="text-align:center;">${escapeHtml(row.drawn)}</td>
@@ -815,7 +815,7 @@ function renderRoundResults(rounds) {
         return `<div class="stats-row" style="padding:6px 10px;">
           <div class="stats-left">
             <div class="rank-pill" style="width:24px; height:24px; font-size:0.65rem;">#${escapeHtml(p.rank || '-')}</div>
-            <span class="stats-title" style="font-size:0.85rem;">${escapeHtml(playerName)}</span>
+            <button type="button" class="name-btn stats-title" style="font-size:0.85rem;" onclick="openPlayerModal('${escapeHtml(p.playerId)}')">${escapeHtml(playerName)}</button>
           </div>
           <span class="stats-score" style="font-size:0.8rem;">${escapeHtml(p.points)} pts</span>
         </div>`;
@@ -866,7 +866,7 @@ function loadLeaderboardData() {
       appState.leaderboardInFlight = false;
       appState.leaderboardInFlightSeason = null;
       showSpinner(false, 'leaderboard');
-      showStatus(err.userMessage || err.message || 'Failed to load leaderboard.', false);
+      showStatus(err.userMessage || err.message || 'Could not load awards.', false);
     });
 }
 
@@ -951,7 +951,7 @@ function loadMySeasonStats() {
       appState.mystatsInFlight = false;
       appState.mystatsInFlightSeason = null;
       showSpinner(false, 'mystats');
-      showStatus(err.userMessage || err.message || 'Failed to load your stats.', false);
+      showStatus(err.userMessage || err.message || 'Could not load your stats.', false);
     });
 }
 
@@ -1047,7 +1047,7 @@ function loadCareerStats() {
       const section = $('career-details');
       const empty = $('career-empty');
       if (section) section.style.display = 'block';
-      if (empty) { empty.textContent = 'Failed to load career stats.'; empty.style.display = 'block'; }
+      if (empty) { empty.textContent = 'Could not load career stats.'; empty.style.display = 'block'; }
     });
 }
 
@@ -1142,7 +1142,7 @@ function renderCareerStats(res) {
       if (p.rank == null && !p.isCurrent) return null;
       const rank = p.rank != null ? '#' + p.rank : '—';
       const pts = p.points != null ? p.points + ' pts' : '';
-      const currentMark = p.isCurrent ? ' ★' : '';
+      const currentMark = p.isCurrent ? ' (current)' : '';
       const asOf = p.asOfRound != null ? ' (after Night ' + p.asOfRound + ')' : '';
       const detail = [pts].filter(Boolean).join(', ');
       return `<span style="color:${p.isCurrent ? '#38bdf8' : '#94a3b8'}; font-size:0.85rem;">Season ${escapeHtml(p.seasonId)} ${escapeHtml(rank)}${detail ? ' · ' + escapeHtml(detail) : ''}${asOf}${currentMark}</span>`;
@@ -1287,6 +1287,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCollapsibles();
   initBadgeTooltips();
   initTabKeyboard();
+  initModalKeys();
   window.addEventListener('hashchange', handleHashRoute);
 
   const desktopQuery = window.matchMedia('(min-width: 1024px)');
@@ -1301,6 +1302,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (appState.lastView) setActiveView(appState.lastView);
   });
 });
+
+function initModalKeys() {
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const pm = $('player-modal-overlay');
+    if (pm && pm.style.display === 'flex') {
+      closePlayerModal();
+      return;
+    }
+    const uc = $('unlink-confirm');
+    if (uc && uc.style.display === 'flex') cancelUnlink();
+  });
+}
 
 function initCollapsibles() {
   const careerDetails = $('career-details');
@@ -1414,6 +1428,8 @@ function initBadgeTooltips() {
 let playerModalData = null;
 let profileData = null;
 let profileCurrentSeasonId = null;
+let modalReturnFocus = null;
+let modalRequestToken = 0;
 
 function handleHashRoute() {
   const hash = window.location.hash.slice(1);
@@ -1433,17 +1449,23 @@ async function openPlayerModal(playerId) {
   const content = $('player-modal-content');
   if (!overlay || !content) return;
 
-  nameEl.textContent = 'Loading...';
-  content.innerHTML = '<div class="player-modal-loading">Loading stats...</div>';
+  modalReturnFocus = document.activeElement;
+  const token = ++modalRequestToken;
+  nameEl.textContent = 'Loading…';
+  content.innerHTML = '<div class="player-modal-loading">Loading stats…</div>';
   overlay.style.display = 'flex';
+  const closeBtn = $('player-modal-close');
+  if (closeBtn) closeBtn.focus();
 
   try {
     const seasonId = appState.activeSeasonId || appState.seasonId;
     const data = await callApi('getPlayerProfile', { playerId, seasonId });
+    if (token !== modalRequestToken) return;
     playerModalData = data;
     renderPlayerModal(data);
   } catch {
-    content.innerHTML = '<div style="text-align:center; color:#ef4444; padding:16px;">Could not load profile.</div>';
+    if (token !== modalRequestToken) return;
+    content.innerHTML = '<div class="player-modal-empty" style="color:#ef4444;">Could not load player.</div>';
   }
 }
 
@@ -1451,17 +1473,18 @@ function closePlayerModal(event) {
   if (event && event.target !== event.currentTarget) return;
   const overlay = $('player-modal-overlay');
   if (overlay) overlay.style.display = 'none';
+  modalRequestToken++;
   playerModalData = null;
+  if (modalReturnFocus && typeof modalReturnFocus.focus === 'function') modalReturnFocus.focus();
+  modalReturnFocus = null;
 }
 
 function renderSeasonContent(s, opts = {}) {
-  const headingTag = opts.headingTag || 'div';
-  const headingClass = opts.headingClass || 'player-modal-section-title';
-  const headingStyle = opts.headingStyle || '';
-  const headingOpen = headingTag === 'div' ? '' : ' style="' + escapeHtml(headingStyle) + '"';
-  const headingClose = headingTag === 'div' ? '' : '</' + headingTag + '>';
+  const headingTag = opts.headingTag === 'h3' ? 'h3' : 'div';
+  const head = (text) => `<${headingTag} class="section-heading">${text}</${headingTag}>`;
 
-  const statsHtml = `
+  const statsHtml = (s.rank != null || s.nightsAttended > 0 || (s.nights && s.nights.length > 0))
+    ? `
     <div class="player-modal-stats">
       <div class="player-modal-stat">
         <div class="player-modal-stat-value">${escapeHtml(s.rank != null ? '#' + s.rank : '—')}</div>
@@ -1479,11 +1502,12 @@ function renderSeasonContent(s, opts = {}) {
         <div class="player-modal-stat-value">${escapeHtml(s.won)}-${escapeHtml(s.drawn)}-${escapeHtml(s.lost)}</div>
         <div class="player-modal-stat-label">W-D-L</div>
       </div>
-    </div>`;
+    </div>`
+    : '<div class="player-modal-empty">No season results yet.</div>';
 
   let nightsHtml = '';
   if (s.nights && s.nights.length > 0) {
-    nightsHtml = `<${headingTag} class="${headingClass}"${headingOpen}>Night-by-night${headingClose}` +
+    nightsHtml = head('Night-by-night') +
       '<div class="player-modal-items">' +
       s.nights.sort((a, b) => a.round - b.round).map(n =>
         `<div class="player-modal-item">
@@ -1496,7 +1520,7 @@ function renderSeasonContent(s, opts = {}) {
 
   let leadersHtml = '';
   if (s.leaders && s.leaders.length > 0) {
-    leadersHtml = `<${headingTag} class="${headingClass}"${headingOpen}>Leaders Played${headingClose}` +
+    leadersHtml = head('Leaders Played') +
       '<div class="player-modal-items">' +
       s.leaders.map(l => {
         const wp = l.winPct != null ? l.winPct + '%' : '—';
@@ -1510,7 +1534,7 @@ function renderSeasonContent(s, opts = {}) {
 
   let awardsHtml = '';
   if (s.awards && s.awards.length > 0) {
-    awardsHtml = `<${headingTag} class="${headingClass}"${headingOpen}>Awards${headingClose}` +
+    awardsHtml = head('Awards') +
       s.awards.map(a => `<div class="player-modal-award"><strong style="color:#fbbf24;">${escapeHtml(a.award_name)}</strong></div>`).join('');
   }
 
@@ -1523,14 +1547,19 @@ function renderPlayerModal(data) {
   if (!nameEl || !content) return;
 
   nameEl.textContent = data.playerName || data.playerId;
-  content.innerHTML = renderSeasonContent(data.season, { headingTag: 'div', headingClass: 'player-modal-section-title' });
+  content.innerHTML = renderSeasonContent(data.season);
 }
 
 function openPlayerProfile(event) {
   event.preventDefault();
   const playerId = playerModalData && playerModalData.playerId;
-  if (playerId) {
-    closePlayerModal();
+  if (!playerId) return;
+  profileData = playerModalData;
+  profileCurrentSeasonId = appState.activeSeasonId || appState.seasonId;
+  closePlayerModal();
+  if (window.location.hash === '#player/' + playerId) {
+    handleHashRoute();
+  } else {
     window.location.hash = 'player/' + playerId;
   }
 }
@@ -1550,8 +1579,10 @@ async function loadPlayerProfile(playerId) {
 
   try {
     const seasonId = appState.activeSeasonId || appState.seasonId;
-    profileData = await callApi('getPlayerProfile', { playerId, seasonId });
-    profileCurrentSeasonId = seasonId;
+    if (!(profileData && profileData.playerId === playerId && String(profileCurrentSeasonId) === String(seasonId))) {
+      profileData = await callApi('getPlayerProfile', { playerId, seasonId });
+      profileCurrentSeasonId = seasonId;
+    }
 
     const titleEl = $('profile-title');
     if (titleEl) titleEl.textContent = profileData.playerName || playerId;
@@ -1585,25 +1616,22 @@ async function loadProfileSeason() {
   if (seasonId === profileCurrentSeasonId) return;
 
   const container = $('profile-season-content');
-  if (container) container.innerHTML = '<div class="player-modal-loading">Loading...</div>';
+  if (container) container.innerHTML = '<div class="player-modal-loading">Loading…</div>';
 
   try {
     profileData = await callApi('getPlayerProfile', { playerId: profileData.playerId, seasonId });
     profileCurrentSeasonId = seasonId;
     renderProfileSeason(profileData);
   } catch {
-    if (container) container.innerHTML = '<div style="color:#ef4444; padding:8px;">Failed to load season data.</div>';
+    if (container) container.innerHTML = '<div class="player-modal-empty" style="color:#ef4444;">Could not load season data.</div>';
   }
 }
 
 function renderProfileSeason(data) {
   const container = $('profile-season-content');
   if (!container) return;
-  const raw = renderSeasonContent(data.season, {
-    headingTag: 'h3',
-    headingStyle: 'font-size:0.95rem; color:#38bdf8; margin:16px 0 8px;',
-  });
-  container.innerHTML = '<div class="card" style="padding:14px; margin-bottom:10px;">' + raw + '</div>';
+  const raw = renderSeasonContent(data.season, { headingTag: 'h3' });
+  container.innerHTML = '<div class="card card-tight">' + raw + '</div>';
 }
 
 function renderProfileCareer(data) {
@@ -1618,8 +1646,8 @@ function renderProfileCareer(data) {
 
   const wdll = c.totalWDLL;
   const recordHtml = `
-    <div class="card" style="padding:14px; margin-bottom:10px;">
-      <div style="font-family:'Orbitron',sans-serif; font-size:0.95rem; color:#38bdf8; margin-bottom:8px;">Career Record</div>
+    <div class="card card-tight">
+      <div class="section-heading">Career Record</div>
       <div class="career-record-grid">
         <div><span style="color:#94a3b8;">Nights</span><br><strong style="color:#f8fafc;">${escapeHtml(c.nightsPlayed)}</strong></div>
         <div><span style="color:#94a3b8;">W-D-L</span><br><strong style="color:#f8fafc;">${escapeHtml(wdll.won)}-${escapeHtml(wdll.drawn)}-${escapeHtml(wdll.lost)}</strong></div>
@@ -1631,8 +1659,8 @@ function renderProfileCareer(data) {
   let progHtml = '';
   if (c.progression && c.progression.length > 0) {
     const peak = c.peak;
-    progHtml = '<div class="card" style="padding:14px; margin-bottom:10px;">';
-    progHtml += '<div style="font-family:\'Orbitron\',sans-serif; font-size:0.95rem; color:#38bdf8; margin-bottom:8px;">Season Progression</div>';
+    progHtml = '<div class="card card-tight">';
+    progHtml += '<div class="section-heading">Season Progression</div>';
     if (peak && peak.length > 0) {
       const peakStr = peak.map(p => 'Season ' + p.seasonId).join(', ');
       progHtml += `<div style="margin-bottom:8px;"><span style="color:#fbbf24;">Peak:</span> <span style="color:#f8fafc;">#${escapeHtml(peak[0].rank)} (${escapeHtml(peakStr)})</span></div>`;
@@ -1641,7 +1669,7 @@ function renderProfileCareer(data) {
       if (p.rank == null && !p.isCurrent) return null;
       const rank = p.rank != null ? '#' + p.rank : '—';
       const pts = p.points != null ? p.points + ' pts' : '';
-      const currentMark = p.isCurrent ? ' ★' : '';
+      const currentMark = p.isCurrent ? ' (current)' : '';
       const detail = [pts].filter(Boolean).join(', ');
       return `<span style="color:${p.isCurrent ? '#38bdf8' : '#94a3b8'}; font-size:0.85rem;">Season ${escapeHtml(p.seasonId)} ${escapeHtml(rank)}${detail ? ' · ' + escapeHtml(detail) : ''}${currentMark}</span>`;
     }).filter(Boolean).join('<span style="color:#475569; margin:0 6px;">→</span>');
@@ -1650,7 +1678,7 @@ function renderProfileCareer(data) {
 
   let badgesHtml = '';
   if (c.badges && c.badges.length > 0) {
-    badgesHtml = '<div style="font-family:\'Orbitron\',sans-serif; font-size:0.95rem; color:#38bdf8; margin:16px 0 8px;">Badges</div>' +
+    badgesHtml = '<div class="section-heading">Badges</div>' +
       '<div class="badges-grid">' +
       c.badges.map(b => {
         const iconPath = 'icons/' + b.icon + '.svg';

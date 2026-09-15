@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap" as="style">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="styles.css?v=4.8.4">
+  <link rel="stylesheet" href="styles.css?v=4.8.5">
 </head>
 <body>
   <script>document.body.classList.toggle('is-linked',!!localStorage.getItem('lt_token'))</script>
@@ -81,7 +81,7 @@
       </form>
 
       <div id="already-voted-card" class="card" style="display: none;">
-        <h3 style="margin-top:0; font-family:'Orbitron', sans-serif;">Votes Received!</h3>
+        <h3 class="section-heading">Votes Received!</h3>
         <p style="font-size: 0.9rem; color: #a7f3d0; margin-bottom:12px;">Your votes for this week are logged. Check back next week!</p>
         <button type="button" id="btn-change-vote" class="btn-ghost" onclick="changeVote()" style="display:none;">Change Vote</button>
       </div>
@@ -109,7 +109,7 @@
       <div id="standings-content" style="display: none;">
         <div class="card" style="padding:14px; margin-bottom:10px;">
           <div id="standings-table-section">
-            <h3 style="font-family:'Orbitron',sans-serif; font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Season Table</h3>
+            <h3 class="section-heading">Season Table</h3>
           <div class="standings-table-wrap" id="standings-table-wrap">
             <div style="overflow-x: auto;">
             <table id="standings-table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
@@ -132,7 +132,7 @@
         </div>
 
         <div id="round-results-section" style="margin-top: 24px;">
-          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Night Results</h3>
+          <h3 class="section-heading">Night Results</h3>
           <div id="round-results-container"></div>
         </div>
       </div>
@@ -151,37 +151,37 @@
 
       <div id="leaderboard-content" style="display: none;">
         <div id="champion-section" style="margin-top: 16px;">
-          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Champion</h3>
+          <h3 class="section-heading">Galactic Champion</h3>
           <div id="champion-container"></div>
         </div>
 
         <div id="ruler-section" style="margin-top: 20px;">
-          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Ruler</h3>
+          <h3 class="section-heading">Galactic Ruler</h3>
           <div id="ruler-container"></div>
         </div>
 
         <div id="schemer-section" style="margin-top: 20px;">
-          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Schemer</h3>
+          <h3 class="section-heading">Galactic Schemer</h3>
           <div id="schemer-container"></div>
         </div>
 
         <div id="ambassador-section" style="margin-top: 20px;">
-          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Galactic Ambassador</h3>
+          <h3 class="section-heading">Galactic Ambassador</h3>
           <div id="ambassador-container"></div>
         </div>
 
         <div id="new-hope-section" style="margin-top: 20px;">
-          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">A New Hope</h3>
+          <h3 class="section-heading">A New Hope</h3>
           <div id="new-hope-container"></div>
         </div>
 
         <div id="bounty-hunter-section" style="margin-top: 20px;">
-          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Bounty Hunter</h3>
+          <h3 class="section-heading">Bounty Hunter</h3>
           <div id="bounty-hunter-container"></div>
         </div>
 
         <div style="margin-top: 20px;">
-          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Most Played Leaders</h3>
+          <h3 class="section-heading">Most Played Leaders</h3>
           <div id="most-played-container"></div>
         </div>
       </div>
@@ -190,7 +190,7 @@
     <!-- PLAYER PROFILE PANEL -->
     <div id="player-profile-view" class="view-panel">
       <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:16px;">
-        <button type="button" class="link-back-text" onclick="switchTab(appState.lastView || 'standings-view')">&larr; Back to standings</button>
+        <button type="button" class="link-back-text" onclick="switchTab(appState.lastView || 'standings-view')">&larr; Back</button>
         <h2 id="profile-title" style="margin:0; font-size:1.1rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;"></h2>
       </div>
       <div id="profile-loading" class="player-modal-loading" style="display:none;">Loading profile...</div>
@@ -218,7 +218,7 @@
     <div id="link-view" class="view-panel" role="tabpanel" aria-label="Sign in">
       <button type="button" id="link-back" class="link-back-text" onclick="switchTab('standings-view')">&larr; Back to standings</button>
       <div class="card">
-        <h3 style="margin-top:0; font-family:'Orbitron', sans-serif;">Sign In</h3>
+        <h3 class="section-heading">Sign In</h3>
         <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 0;">Standings are open to everyone — sign in with your email to cast your weekly vote and see your stats.</p>
       </div>
       <div class="form-group">
@@ -267,7 +267,7 @@
 
         <div id="myseason-content" style="display: none;">
           <div id="myseason-gamification-section" style="margin-top: 0; display: none;">
-            <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Voting Milestone</h3>
+            <h3 class="section-heading">Voting Milestone</h3>
             <div id="myseason-milestone-container" class="card" style="padding: 14px; margin-bottom: 12px;">
               <div style="background: #1e293b; border-radius: 6px; height: 12px; overflow: hidden; margin-bottom: 10px;">
                 <div id="milestone-bar" style="background: linear-gradient(90deg, #38bdf8, #22d3ee); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 6px;"></div>
@@ -282,12 +282,12 @@
           </div>
 
           <div id="myseason-awards-section" style="margin-top: 16px; display: none;">
-            <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Awards Won</h3>
+            <h3 class="section-heading">Awards Won</h3>
             <div id="myseason-awards-container"></div>
           </div>
 
           <div style="margin-top: 16px;">
-            <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Leaders Played</h3>
+            <h3 class="section-heading">Leaders Played</h3>
             <div id="myseason-leaders-container"></div>
           </div>
         </div>
@@ -316,21 +316,21 @@
     </div>
   </div>
 
-  <div id="player-modal-overlay" class="modal-overlay" onclick="closePlayerModal(event)">
-    <div class="modal-box" style="max-width:480px; max-height:80vh; overflow-y:auto;">
-      <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:12px;">
+  <div id="player-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="player-modal-name" onclick="closePlayerModal(event)">
+    <div class="modal-box player-modal-box">
+      <div class="player-modal-head">
         <h3 id="player-modal-name" style="margin:0;"></h3>
-        <button type="button" class="btn-ghost" onclick="closePlayerModal()" style="padding:4px 8px;">&#10005;</button>
+        <button type="button" id="player-modal-close" class="btn-ghost player-modal-close" aria-label="Close player summary" onclick="closePlayerModal()">&#10005;</button>
       </div>
       <div id="player-modal-content"></div>
-      <div style="text-align:center; margin-top:16px; border-top:1px solid rgba(56, 189, 248, 0.2); padding-top:12px;">
+      <div class="player-modal-foot">
         <a href="#" id="player-modal-profile-link" onclick="openPlayerProfile(event)"
            class="hover-underline" style="color:#38bdf8; font-size:0.9rem; cursor:pointer;">View Full Profile &rarr;</a>
       </div>
     </div>
   </div>
 
-  <script src="app-core.js?v=4.8.4"></script>
-<script src="app.js?v=4.8.4"></script>
+  <script src="app-core.js?v=4.8.5"></script>
+<script src="app.js?v=4.8.5"></script>
 </body>
 </html>
