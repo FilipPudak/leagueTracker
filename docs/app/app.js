@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.9.2';
+const APP_VERSION = '4.9.3';
 
 const appState = {
   status: 'unlinked',
@@ -40,6 +40,7 @@ const appState = {
   careerInFlight: false,
   standingsInFlight: false,
   standingsInFlightSeason: null,
+  standingsRenderedSeason: null,
   lastView: 'standings-view'
 };
 
@@ -754,7 +755,8 @@ function loadStandingsData() {
   const sel = $('standings-season-filter');
   const roundSel = $('standings-round-filter');
   const selectedSeasonId = sel ? sel.value : '';
-  const asOfRound = roundSel ? roundSel.value : '';
+  const seasonChanged = String(appState.standingsRenderedSeason || '') !== String(selectedSeasonId);
+  const asOfRound = LeagueCore.resolveStandingsAsOf(seasonChanged, roundSel ? roundSel.value : '');
 
   if (isFreshCache(appState.standingsCache, selectedSeasonId + '-' + asOfRound)) {
     renderStandings(appState.standingsCache[selectedSeasonId + '-' + asOfRound].data);
@@ -794,6 +796,7 @@ function loadStandingsData() {
 
 function renderStandings(res) {
   standingsShowAll = false;
+  appState.standingsRenderedSeason = res.seasonId != null ? String(res.seasonId) : '';
   updateRoundFilter(res.allRegularRounds || res.rounds, res.asOfRound);
   renderStandingsTable(res.table);
   renderRoundResults(res.rounds);

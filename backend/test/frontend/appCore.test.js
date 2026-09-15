@@ -278,3 +278,19 @@ describe('frontend wiring', () => {
     assert.match(app, /linkMode === 'email' \? '' :/);
   });
 });
+
+describe('resolveStandingsAsOf', () => {
+  it('drops the stale round when the season changed', () => {
+    assert.equal(core.resolveStandingsAsOf(true, '5'), '');
+  });
+
+  it('keeps the picked round within a season', () => {
+    assert.equal(core.resolveStandingsAsOf(false, '5'), '5');
+  });
+
+  it('normalizes missing picker values to empty', () => {
+    assert.equal(core.resolveStandingsAsOf(false, null), '');
+    assert.equal(core.resolveStandingsAsOf(false, undefined), '');
+    assert.equal(core.resolveStandingsAsOf(false, ''), '');
+  });
+});

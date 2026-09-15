@@ -61,7 +61,14 @@ const LeagueCore = (() => {
     return !isRetry && typeof message === 'string' && message.includes('No vote to update');
   }
 
-  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, gamificationViewFor, leaderOptionLabel, visibleListSlice, listToggleLabel, voteSubmitAction, shouldRetryAsNewVote, CACHE_TTL_MS };
+  // Nights do not correlate across seasons: switching season must show that
+  // season's latest night, so the stale picker round is omitted on change.
+  function resolveStandingsAsOf(seasonChanged, selectValue) {
+    if (seasonChanged) return '';
+    return selectValue == null ? '' : String(selectValue);
+  }
+
+  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, gamificationViewFor, leaderOptionLabel, visibleListSlice, listToggleLabel, voteSubmitAction, shouldRetryAsNewVote, resolveStandingsAsOf, CACHE_TTL_MS };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.LeagueCore = LeagueCore;

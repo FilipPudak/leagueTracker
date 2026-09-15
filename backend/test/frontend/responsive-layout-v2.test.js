@@ -490,3 +490,12 @@ describe('v4.9.2: tooltip lifecycle and modal season context', () => {
     assert.ok(modalOpen, 'openPlayerModal must resolve the browsing season');
   });
 });
+
+describe('v4.9.3: season switch lands on the latest night', () => {
+  it('standings request drops the stale round on season change', () => {
+    const js = readJS();
+    assert.ok(js.includes('LeagueCore.resolveStandingsAsOf('), 'request must go through the as-of resolver');
+    assert.ok(js.includes('standingsRenderedSeason'), 'rendered season must be tracked');
+    assert.ok(js.includes('String(appState.standingsRenderedSeason'), 'season comparison must be normalized');
+  });
+});

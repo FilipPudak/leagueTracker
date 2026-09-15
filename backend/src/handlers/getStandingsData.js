@@ -32,7 +32,9 @@ export async function handleGetStandingsData(body, env) {
       latestRegularRound = t.round;
     }
   }
-  const effectiveAsOf = parsedAsOf || latestRegularRound;
+  const effectiveAsOf = parsedAsOf != null && latestRegularRound
+    ? Math.min(parsedAsOf, latestRegularRound)
+    : (parsedAsOf || latestRegularRound);
 
   const allStandings = await DB.prepare(
     'SELECT round, player_id, wins, losses, draws, match_points, rank FROM season_standings WHERE season_id = ?'
@@ -100,6 +102,7 @@ export async function handleGetStandingsData(body, env) {
     .sort((a, b) => b.round - a.round);
 
   return {
+    seasonId,
     table,
     rounds,
     allRegularRounds,

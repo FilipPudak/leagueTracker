@@ -13,6 +13,26 @@ function makeTables(overrides = {}) {
 }
 
 describe('handleGetStandingsData', () => {
+  it('clamps an asOfRound above the latest regular round and echoes seasonId', async () => {
+    const tables = makeTables({
+      melee_tournaments: [
+        { melee_id: 100, season_id: 6, round: 1, name: 'week 1', date: '2026-06-15', phase: 'regular' },
+        { melee_id: 101, season_id: 6, round: 2, name: 'week 2', date: '2026-06-22', phase: 'regular' },
+      ],
+      season_standings: [
+        { season_id: 6, round: 1, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+        { season_id: 6, round: 2, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+      ],
+    });
+    const db = createMockDb(tables);
+
+    const result = await handleGetStandingsData({ seasonId: 6, asOfRound: 9 }, { DB: db });
+
+    assert.equal(result.asOfRound, 2, 'echoed as-of must be clamped to the latest regular round');
+    assert.equal(result.seasonId, 6, 'response must carry its season for client state');
+    assert.equal(result.table[0].points, 18);
+  });
+
   it('returns season table with rankings', async () => {
     const tables = makeTables({
       melee_tournaments: [
