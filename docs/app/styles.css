@@ -366,6 +366,7 @@ details[open].section-block > summary::before { content: '\25BE '; }
   border: 6px solid transparent; border-top-color: #38bdf8;
 }
 .badge-tooltip.visible { opacity: 1; pointer-events: auto; }
+.badge-tooltip.below::after { top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: #38bdf8; }
 
 /* Grid layouts for JS-generated content */
 .career-record-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 0.85rem; }

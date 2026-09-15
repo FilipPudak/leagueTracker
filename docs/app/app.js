@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.9.0';
+const APP_VERSION = '4.9.1';
 
 const appState = {
   status: 'unlinked',
@@ -491,11 +491,13 @@ function openUnlinkConfirm(title, message) {
   if (tEl) tEl.textContent = title;
   if (msgEl) msgEl.textContent = message;
   if (overlay) overlay.style.display = 'flex';
+  updateBodyScrollLock();
 }
 
 function cancelUnlink() {
   const overlay = $('unlink-confirm');
   if (overlay) overlay.style.display = 'none';
+  updateBodyScrollLock();
 }
 
 function confirmUnlink() {
@@ -1365,15 +1367,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function initModalKeys() {
   document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    const pm = $('player-modal-overlay');
-    if (pm && pm.style.display === 'flex') {
-      closePlayerModal();
+    if (e.key === 'Escape') {
+      const pm = $('player-modal-overlay');
+      if (pm && pm.style.display === 'flex') {
+        closePlayerModal();
+        return;
+      }
+      const uc = $('unlink-confirm');
+      if (uc && uc.style.display === 'flex') cancelUnlink();
       return;
     }
-    const uc = $('unlink-confirm');
-    if (uc && uc.style.display === 'flex') cancelUnlink();
+    if (e.key === 'Tab') {
+      const pm = $('player-modal-overlay');
+      if (pm && pm.style.display === 'flex') trapFocus(e, pm);
+    }
   });
+}
+
+function trapFocus(e, overlay) {
+  const focusables = overlay.querySelectorAll('button, a[href], input, select, [tabindex]:not([tabindex="-1"])');
+  if (!focusables.length) return;
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
+function updateBodyScrollLock() {
+  const anyOpen = Array.prototype.some.call(
+    document.querySelectorAll('.modal-overlay'),
+    (o) => o.style.display === 'flex'
+  );
+  document.body.style.overflow = anyOpen ? 'hidden' : '';
 }
 
 function initCollapsibles() {
@@ -1411,9 +1441,17 @@ function initBadgeTooltips() {
     if (left + tw > window.innerWidth - 8) left = window.innerWidth - tw - 8;
     tooltip.style.left = left + 'px';
     tooltip.style.width = tw + 'px';
-    tooltip.style.bottom = 'auto';
-    tooltip.style.top = (r.top - 8) + 'px';
-    tooltip.style.transform = 'translateY(-100%)';
+    const th = tooltip.offsetHeight;
+    const placeBelow = r.top - 8 - th < 8;
+    if (placeBelow) {
+      tooltip.style.top = (r.bottom + 8) + 'px';
+      tooltip.style.transform = 'none';
+      tooltip.classList.add('below');
+    } else {
+      tooltip.style.top = (r.top - 8) + 'px';
+      tooltip.style.transform = 'translateY(-100%)';
+      tooltip.classList.remove('below');
+    }
   }
   grid.addEventListener('mouseover', (e) => {
     const medal = e.target.closest('.badge-medal');
@@ -1456,11 +1494,15 @@ function initBadgeTooltips() {
       const dy = Math.abs(ev.touches[0].clientY - startY);
       if (dx > 10 || dy > 10) moved = true;
     }
-    function onTouchEnd() {
+    function detachTouch() {
       grid.removeEventListener('touchmove', onTouchMove);
       grid.removeEventListener('touchend', onTouchEnd);
+      grid.removeEventListener('touchcancel', onTouchCancel);
+    }
+    function onTouchEnd(ev) {
+      detachTouch();
       if (moved) return;
-      e.preventDefault();
+      ev.preventDefault();
       const tooltip = medal.querySelector('.badge-tooltip');
       if (!tooltip) return;
       const wasVisible = tooltip.classList.contains('visible');
@@ -1470,8 +1512,12 @@ function initBadgeTooltips() {
         tooltip.classList.add('visible');
       }
     }
+    function onTouchCancel() {
+      detachTouch();
+    }
     grid.addEventListener('touchmove', onTouchMove, { passive: true });
     grid.addEventListener('touchend', onTouchEnd, { passive: false });
+    grid.addEventListener('touchcancel', onTouchCancel, { passive: true });
   }, { passive: true });
   grid.addEventListener('contextmenu', (e) => {
     if (e.target.closest('.badge-medal')) e.preventDefault();
@@ -1514,6 +1560,7 @@ async function openPlayerModal(playerId) {
   nameEl.textContent = 'Loading…';
   content.innerHTML = '<div class="player-modal-loading">Loading stats…</div>';
   overlay.style.display = 'flex';
+  updateBodyScrollLock();
   const closeBtn = $('player-modal-close');
   if (closeBtn) closeBtn.focus();
 
@@ -1533,6 +1580,7 @@ function closePlayerModal(event) {
   if (event && event.target !== event.currentTarget) return;
   const overlay = $('player-modal-overlay');
   if (overlay) overlay.style.display = 'none';
+  updateBodyScrollLock();
   modalRequestToken++;
   playerModalData = null;
   if (modalReturnFocus && typeof modalReturnFocus.focus === 'function') modalReturnFocus.focus();

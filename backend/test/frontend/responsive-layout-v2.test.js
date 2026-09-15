@@ -375,7 +375,7 @@ describe('v4.8.5: modal and profile UX guards', () => {
 
   it('Escape closes the player modal', () => {
     const js = readJS();
-    assert.ok(js.includes("e.key !== 'Escape'"), 'a global Escape handler must exist');
+    assert.ok(js.includes("e.key === 'Escape'"), 'a global Escape handler must exist');
     assert.ok(js.includes('function initModalKeys'), 'Escape wiring must live in initModalKeys');
   });
 
@@ -442,5 +442,29 @@ describe('v4.9.0: flow and accessibility guards', () => {
     assert.ok(js.includes('function renderLinkPicker'), 'row renderer must exist');
     assert.ok(!js.includes('select.value = prefill.playerId'), 'legacy select wiring must be gone');
     assert.ok(css.includes('.picker-row'), 'picker row styling must exist');
+  });
+});
+
+describe('v4.9.1: badge tap fix and modal a11y finishing', () => {
+  it('badge tap suppresses the synthetic click that used to re-toggle the tooltip', () => {
+    const js = readJS();
+    assert.match(js, /function onTouchEnd\(ev\)/, 'touchend handler must receive its own event');
+    assert.ok(js.includes('ev.preventDefault();'), 'preventDefault must run on the touchend event');
+    assert.ok(js.includes("grid.removeEventListener('touchcancel', onTouchCancel)"), 'touchcancel must detach listeners');
+  });
+
+  it('badge tooltip flips below when near the viewport top', () => {
+    const js = readJS();
+    const css = readCSS();
+    assert.ok(js.includes('placeBelow'), 'tooltip must support below placement');
+    assert.ok(css.includes('.badge-tooltip.below::after'), 'arrow must flip for below placement');
+  });
+
+  it('open modals lock body scroll and trap tab focus', () => {
+    const js = readJS();
+    assert.ok(js.includes('function updateBodyScrollLock'), 'scroll lock helper must exist');
+    assert.equal((js.match(/updateBodyScrollLock\(\);/g) || []).length, 4, 'all four open/close sites must call it');
+    assert.ok(js.includes('function trapFocus'), 'focus trap must exist');
+    assert.ok(js.includes("trapFocus(e, pm)"), 'Tab must be routed through the trap');
   });
 });
