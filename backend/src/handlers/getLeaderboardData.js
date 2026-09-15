@@ -178,10 +178,13 @@ export async function handleGetLeaderboardData(body, env) {
   newHope = resolveNames(newHope, nameMap);
   const bountyHunterNamed = resolveNames(bountyHunter, nameMap);
 
-  // Mask Ambassador names with callsigns while voting is live (privacy)
+  // Mask Ambassador names with callsigns while voting is live (privacy).
+  // Names are already resolved from playerId above, so the masked rows drop the
+  // id entirely — shipping it would let anyone re-identify the callsigns.
   if (isLive && ambassador) {
     ambassador.forEach((entry, i) => {
       entry.name = AMBASSADOR_CALLSIGNS[i] || `Vanguard-${i + 1}`;
+      delete entry.playerId;
     });
   }
 

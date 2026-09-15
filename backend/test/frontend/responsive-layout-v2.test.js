@@ -468,3 +468,25 @@ describe('v4.9.1: badge tap fix and modal a11y finishing', () => {
     assert.ok(js.includes("trapFocus(e, pm)"), 'Tab must be routed through the trap');
   });
 });
+
+describe('v4.9.2: tooltip lifecycle and modal season context', () => {
+  it('badge tooltips dismiss on scroll or resize', () => {
+    const js = readJS();
+    assert.ok(js.includes("window.addEventListener('scroll', dismissTooltips"), 'scroll must dismiss tooltips');
+    assert.ok(js.includes("window.addEventListener('resize', dismissTooltips"), 'resize must dismiss tooltips');
+  });
+
+  it('player modal shows which season it is summarizing', () => {
+    const html = readHTML();
+    const js = readJS();
+    assert.ok(html.includes('id="player-modal-season"'), 'modal must have a season context element');
+    assert.ok(js.includes('function seasonContextLabel'), 'season context formatter must exist');
+    assert.ok(js.includes("' · as of Night '"), 'active season context must show the week marker');
+  });
+
+  it('player modal follows the browsed season, not just the active one', () => {
+    const js = readJS();
+    const modalOpen = js.match(/async function openPlayerModal[\s\S]*?seasonForBrowsing\(\);/);
+    assert.ok(modalOpen, 'openPlayerModal must resolve the browsing season');
+  });
+});

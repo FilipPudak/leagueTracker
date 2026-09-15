@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.9.1';
+const APP_VERSION = '4.9.2';
 
 const appState = {
   status: 'unlinked',
@@ -342,6 +342,16 @@ const SEASON_SELECTORS = ['season-filter', 'myseason-season-filter', 'standings-
 
 function seasonForBrowsing() {
   return appState.browsingSeasonId || appState.activeSeasonId || appState.seasonId;
+}
+
+function seasonContextLabel(sid) {
+  if (sid == null || sid === '') return '';
+  const s = (appState.seasons || []).find((x) => String(x.id) === String(sid));
+  const name = s ? s.name : 'Season ' + sid;
+  if (String(sid) === String(appState.activeSeasonId)) {
+    return appState.week == null ? name + ' · Final' : name + ' · as of Night ' + appState.week;
+  }
+  return name + ' · Final';
 }
 
 function onSeasonFilterChange(sourceId) {
@@ -1527,6 +1537,13 @@ function initBadgeTooltips() {
       grid.querySelectorAll('.badge-tooltip.visible').forEach(t => t.classList.remove('visible'));
     }
   });
+  function dismissTooltips() {
+    const visible = grid.querySelectorAll('.badge-tooltip.visible');
+    if (!visible.length) return;
+    visible.forEach(t => t.classList.remove('visible'));
+  }
+  window.addEventListener('scroll', dismissTooltips, { passive: true });
+  window.addEventListener('resize', dismissTooltips, { passive: true });
 }
 
 /* --------------------------------------------------------- player profile -- */
@@ -1557,7 +1574,10 @@ async function openPlayerModal(playerId) {
 
   modalReturnFocus = document.activeElement;
   const token = ++modalRequestToken;
+  const seasonId = seasonForBrowsing();
   nameEl.textContent = 'Loading…';
+  const seasonEl = $('player-modal-season');
+  if (seasonEl) seasonEl.textContent = seasonContextLabel(seasonId);
   content.innerHTML = '<div class="player-modal-loading">Loading stats…</div>';
   overlay.style.display = 'flex';
   updateBodyScrollLock();
@@ -1565,7 +1585,6 @@ async function openPlayerModal(playerId) {
   if (closeBtn) closeBtn.focus();
 
   try {
-    const seasonId = appState.activeSeasonId || appState.seasonId;
     const data = await callApi('getPlayerProfile', { playerId, seasonId });
     if (token !== modalRequestToken) return;
     playerModalData = data;
@@ -1663,7 +1682,7 @@ function openPlayerProfile(event) {
   const playerId = playerModalData && playerModalData.playerId;
   if (!playerId) return;
   profileData = playerModalData;
-  profileCurrentSeasonId = appState.activeSeasonId || appState.seasonId;
+  profileCurrentSeasonId = seasonForBrowsing();
   closePlayerModal();
   if (window.location.hash === '#player/' + playerId) {
     handleHashRoute();

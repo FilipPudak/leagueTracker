@@ -211,9 +211,11 @@ describe('handleGetLeaderboardData', () => {
     const tables = tablesWithoutAwards();
     const db = createMockDb(tables);
     const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
-    if (result.ambassador && result.ambassador.length > 0) {
-      const callsigns = ['Gold Leader', 'Green Leader', 'Red Leader', 'Blade Eleven', 'Rogue One', 'Phoenix Leader'];
-      assert.ok(callsigns.includes(result.ambassador[0].name), `ambassador name "${result.ambassador[0].name}" is a callsign`);
+    assert.ok(result.ambassador && result.ambassador.length > 0, 'live ambassador podium must be present');
+    const callsigns = ['Gold Leader', 'Green Leader', 'Red Leader', 'Blade Eleven', 'Rogue One', 'Phoenix Leader'];
+    for (const entry of result.ambassador) {
+      assert.ok(callsigns.includes(entry.name) || /^Vanguard-\d+$/.test(entry.name), `ambassador name "${entry.name}" is a callsign`);
+      assert.equal(entry.playerId, undefined, 'masked ambassador rows must not leak playerId');
     }
   });
 
