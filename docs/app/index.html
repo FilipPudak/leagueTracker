@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap" as="style">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="styles.css?v=4.8.5">
+  <link rel="stylesheet" href="styles.css?v=4.9.0">
 </head>
 <body>
   <script>document.body.classList.toggle('is-linked',!!localStorage.getItem('lt_token'))</script>
@@ -56,11 +56,11 @@
       </button>
     </div>
 
-    <div id="status-box" class="status-msg"></div>
+    <div id="status-box" class="status-msg" role="status" aria-live="polite"></div>
     <div id="retry-load" style="display:none; text-align:center; margin-bottom:16px;">
       <button type="button" class="btn-submit" style="width:auto; padding:0 24px; margin-top:0;" onclick="fetchInitialAppData()">Retry</button>
     </div>
-    <div id="loading-spinner" class="loader"></div>
+    <div id="loading-spinner" class="loader" role="status" aria-label="Loading data"></div>
 
     <!-- VOTE PANEL -->
     <div id="vote-view" class="view-panel" role="tabpanel" aria-labelledby="tab-vote">
@@ -75,7 +75,7 @@
         <div class="form-group">
           <label for="favorite-opponent">Favorite Opponent</label>
           <select id="favorite-opponent" required><option value="">-- Select Favorite Opponent --</option></select>
-          <div style="font-size:0.78rem; color:#64748b; margin-top:4px;">Can't find who you're looking for? Pick the opponent you faced last Wednesday.</div>
+          <div id="opponent-hint" style="font-size:0.78rem; color:#64748b; margin-top:4px;">Can't find who you're looking for? Pick the opponent you faced last Wednesday.</div>
         </div>
         <button type="submit" id="btn-vote-submit" class="btn-submit">Submit Votes</button>
       </form>
@@ -98,7 +98,7 @@
       </div>
       <div class="form-group">
         <label for="standings-season-filter">Select Season</label>
-        <select id="standings-season-filter" onchange="loadStandingsData()"></select>
+        <select id="standings-season-filter" onchange="onSeasonFilterChange('standings-season-filter'); loadStandingsData()"></select>
       </div>
       <div class="form-group">
         <label for="standings-round-filter">Up to Night</label>
@@ -142,7 +142,7 @@
     <div id="leaderboard-view" class="view-panel" role="tabpanel" aria-labelledby="tab-leaderboard">
       <div class="form-group">
         <label for="season-filter">Select Season</label>
-        <select id="season-filter" onchange="loadLeaderboardData()"></select>
+        <select id="season-filter" onchange="onSeasonFilterChange('season-filter'); loadLeaderboardData()"></select>
       </div>
 
       <div id="leaderboard-participation-card" class="card" style="display: none; margin-bottom: 16px; padding: 10px 14px; font-size: 0.85rem; color: #94a3b8;">
@@ -195,18 +195,18 @@
       </div>
       <div id="profile-loading" class="player-modal-loading" style="display:none;">Loading profile...</div>
       <div id="profile-content" style="display:none;">
-        <div class="profile-tabs">
-          <button type="button" class="profile-tab active" onclick="switchProfileTab('season')">Season</button>
-          <button type="button" class="profile-tab" onclick="switchProfileTab('career')">Career</button>
+        <div class="profile-tabs" role="tablist" aria-label="Profile sections">
+          <button type="button" class="profile-tab active" role="tab" aria-selected="true" aria-controls="profile-tab-season" onclick="switchProfileTab('season')">Season</button>
+          <button type="button" class="profile-tab" role="tab" aria-selected="false" aria-controls="profile-tab-career" onclick="switchProfileTab('career')">Career</button>
         </div>
-        <div id="profile-tab-season" class="profile-panel active">
+        <div id="profile-tab-season" class="profile-panel active" role="tabpanel">
           <div class="form-group">
             <label for="profile-season-filter">Select Season</label>
-            <select id="profile-season-filter" onchange="loadProfileSeason()"></select>
+            <select id="profile-season-filter" onchange="onSeasonFilterChange('profile-season-filter'); loadProfileSeason()"></select>
           </div>
           <div id="profile-season-content"></div>
         </div>
-        <div id="profile-tab-career" class="profile-panel">
+        <div id="profile-tab-career" class="profile-panel" role="tabpanel">
           <div id="profile-career-content"></div>
         </div>
       </div>
@@ -226,9 +226,10 @@
         <input type="email" id="link-email" class="text-input" placeholder="you@example.com" autocomplete="email" required>
       </div>
       <div class="form-group" id="link-picker-group" style="display:none;">
-        <label for="link-player-select">Select Your Name</label>
+        <label for="link-player-search">Select Your Name</label>
         <input type="text" id="link-player-search" class="text-input" placeholder="Type to search..." oninput="filterLinkPicker()" autocomplete="off">
-        <select id="link-player-select" size="6" style="margin-top: 8px;"><option value="">-- Choose Your Name --</option></select>
+        <div id="link-player-select" class="picker-list" role="group" aria-label="Player names" style="margin-top: 8px;"></div>
+        <div id="link-picker-empty" class="picker-empty" style="display:none;">No match — names appear exactly as registered at the table. Sign in with your email instead, or ask on Discord.</div>
       </div>
       <p id="link-email-hint" style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 12px;">We'll find your player profile using this email.</p>
       <button type="button" id="link-mode-toggle" class="not-you" onclick="toggleLinkMode()" style="display:block; margin-bottom:12px;">First time here? Pick your name from the player list</button>
@@ -241,19 +242,19 @@
       <details id="career-details" class="section-block">
         <summary>Career</summary>
         <div id="career-empty" style="text-align:center; color:#94a3b8; padding:12px; font-size:0.85rem; display:none;">No career history yet — your stats appear after you play your first league night.</div>
-        <div class="career-tabs">
-          <button type="button" class="career-tab active" onclick="switchCareerTab('record')">Record</button>
-          <button type="button" class="career-tab" onclick="switchCareerTab('versus')">Versus</button>
-          <button type="button" class="career-tab" onclick="switchCareerTab('badges')">Badges</button>
+        <div class="career-tabs" role="tablist" aria-label="Career sections">
+          <button type="button" class="career-tab active" role="tab" aria-selected="true" aria-controls="career-tab-record" onclick="switchCareerTab('record')">Record</button>
+          <button type="button" class="career-tab" role="tab" aria-selected="false" aria-controls="career-tab-versus" onclick="switchCareerTab('versus')">Versus</button>
+          <button type="button" class="career-tab" role="tab" aria-selected="false" aria-controls="career-tab-badges" onclick="switchCareerTab('badges')">Badges</button>
         </div>
-        <div id="career-tab-record" class="career-panel active">
+        <div id="career-tab-record" class="career-panel active" role="tabpanel">
           <div id="career-record-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
           <div id="career-progression-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
         </div>
-        <div id="career-tab-versus" class="career-panel">
+        <div id="career-tab-versus" class="career-panel" role="tabpanel">
           <div id="career-rivalry-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
         </div>
-        <div id="career-tab-badges" class="career-panel">
+        <div id="career-tab-badges" class="career-panel" role="tabpanel">
           <div id="career-badges-container" class="badges-grid"></div>
         </div>
       </details>
@@ -262,7 +263,7 @@
         <summary id="season-summary">Season</summary>
         <div class="form-group">
           <label for="myseason-season-filter">Select Season</label>
-          <select id="myseason-season-filter" onchange="loadMySeasonStats()"></select>
+          <select id="myseason-season-filter" onchange="onSeasonFilterChange('myseason-season-filter'); loadMySeasonStats()"></select>
         </div>
 
         <div id="myseason-content" style="display: none;">
@@ -330,7 +331,7 @@
     </div>
   </div>
 
-  <script src="app-core.js?v=4.8.5"></script>
-<script src="app.js?v=4.8.5"></script>
+  <script src="app-core.js?v=4.9.0"></script>
+<script src="app.js?v=4.9.0"></script>
 </body>
 </html>

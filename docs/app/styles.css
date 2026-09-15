@@ -120,7 +120,8 @@ body {
 
 .signin-cta {
   display: none;
-  padding: 4px 12px; border-radius: 4px;
+  min-height: var(--touch-target-min);
+  padding: 8px 14px; border-radius: 4px;
   font-family: 'Orbitron', sans-serif; font-size: var(--font-size-badge); font-weight: 700;
   letter-spacing: 1px; text-transform: uppercase;
   background: transparent; color: #38bdf8; border: 1px solid #38bdf8;
@@ -186,6 +187,12 @@ select[size] option { padding: 6px 8px; }
 }
 .text-input:focus { border-color: #38bdf8; box-shadow: 0 0 8px rgba(56, 189, 248, 0.3); }
 .text-input::placeholder { color: #64748b; font-weight: 500; }
+
+.picker-list { max-height: 220px; overflow-y: auto; background: #090d16; border: 1px solid #334155; border-radius: 6px; }
+.picker-row { display: block; width: 100%; text-align: left; min-height: 44px; padding: 10px 12px; background: none; border: none; border-bottom: 1px solid rgba(56, 189, 248, 0.08); color: #f8fafc; font-family: 'Rajdhani', sans-serif; font-size: 1rem; font-weight: 600; cursor: pointer; }
+.picker-row:last-child { border-bottom: none; }
+.picker-row.selected { background: rgba(56, 189, 248, 0.15); color: #38bdf8; box-shadow: inset 3px 0 0 #38bdf8; }
+.picker-empty { font-size: 0.85rem; color: #94a3b8; padding: 10px 2px; }
 
 .btn-submit {
   width: 100%; min-height: 50px; font-family: 'Orbitron', sans-serif; font-size: 0.95rem; font-weight: 900; letter-spacing: 1px;
@@ -373,6 +380,7 @@ details[open].section-block > summary::before { content: '\25BE '; }
 .btn-ghost:focus-visible,
 .btn-danger:focus-visible,
 .name-btn:focus-visible,
+.picker-row:focus-visible,
 .not-you:focus-visible,
 .show-more-btn:focus-visible,
 .round-header:focus-visible,
@@ -395,6 +403,7 @@ details[open].section-block > summary::before { content: '\25BE '; }
   .badge-medal:hover { box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15); }
   .hover-underline:hover { text-decoration: underline; }
   .name-btn:hover { text-decoration: underline; }
+  .picker-row:hover { background: rgba(56, 189, 248, 0.08); }
   .footer-discord:hover { color: #7983f5; }
   .not-you:hover { color: #f87171; text-decoration: underline; }
   .signin-cta:hover { border-color: #7dd3fc; color: #7dd3fc; }
@@ -495,6 +504,24 @@ details[open].section-block > summary::before { content: '\25BE '; }
 
   .app-container {
     padding-bottom: 80px;
+  }
+}
+
+/* Phones (<768px): same fixed bottom tab bar for thumb reach */
+@media (max-width: 767px) {
+  .nav-tabs {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin-bottom: 0;
+    border-radius: 0;
+    z-index: 50;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .app-container {
+    padding-bottom: 84px;
   }
 }
 

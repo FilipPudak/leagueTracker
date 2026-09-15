@@ -141,6 +141,23 @@ describe('handleLinkAccount', () => {
     assert.equal(typeof result.votingOpen, 'boolean');
   });
 
+  it('narrows opponent list to faced players when match data exists', async () => {
+    const tables = linkTables();
+    tables.match_results = [
+      { season_id: 6, round: 3, melee_match_id: 'mm1', player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: 'P001 won 2-0-0', is_bye: 0 },
+      { season_id: 6, round: 3, melee_match_id: 'mm2', player1_id: 'P003', player2_id: 'P004', winner_id: 'P003', result: 'P003 won 2-1-0', is_bye: 0 },
+    ];
+    env = { DB: createMockDb(tables) };
+
+    const result = await handleLinkAccount(
+      { playerId: 'P001', email: 'alice@test.com', deviceId: 'dev-facelink' },
+      env
+    );
+    assert.equal(result.facedOnly, true);
+    assert.deepEqual(result.players.map(p => p.id), ['P002']);
+    assert.ok(result.roster.length > result.players.length, 'roster keeps full list');
+  });
+
   it('different device creates new session for same player', async () => {
     const result = await handleLinkAccount(
       { playerId: 'P001', email: 'alice@test.com', deviceId: 'dev-different' },

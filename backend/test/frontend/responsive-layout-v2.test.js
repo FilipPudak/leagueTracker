@@ -400,3 +400,47 @@ describe('v4.8.5: modal and profile UX guards', () => {
     assert.ok(!js.includes('headingStyle'), 'heading-style opts machinery must be gone');
   });
 });
+
+describe('v4.9.0: flow and accessibility guards', () => {
+  it('vote opponent hint reflects faced-only filtering', () => {
+    const html = readHTML();
+    const js = readJS();
+    assert.ok(html.includes('id="opponent-hint"'), 'hint must have a stable id');
+    assert.ok(js.includes('appState.playersFiltered'), 'client must track the facedOnly flag');
+    assert.ok(js.includes('Showing only the opponents you faced on Night'), 'filtered hint copy must exist');
+  });
+
+  it('season selectors share one browsing state', () => {
+    const html = readHTML();
+    const js = readJS();
+    assert.equal((html.match(/onSeasonFilterChange/g) || []).length, 4, 'all four season selects must sync');
+    assert.ok(js.includes("localStorage.setItem(KEY_BROWSING_SEASON"), 'browsing season must persist');
+    assert.ok(js.includes('function seasonForBrowsing'), 'shared season getter must exist');
+  });
+
+  it('tab state and async feedback are announced', () => {
+    const html = readHTML();
+    const js = readJS();
+    assert.ok(js.includes("setAttribute('aria-selected', 'true')"), 'aria-selected must track activation');
+    assert.ok(html.includes('id="status-box" class="status-msg" role="status" aria-live="polite"'), 'status box must be a live region');
+    assert.ok(html.includes('<div class="career-tabs" role="tablist"'), 'career segments must expose tablist semantics');
+    assert.ok(html.includes('<div class="profile-tabs" role="tablist"'), 'profile segments must expose tablist semantics');
+  });
+
+  it('phones get the fixed bottom tab bar too', () => {
+    const css = readCSS();
+    const phone = css.match(/@media \(max-width: 767px\)\s*\{[\s\S]*?\n\}/);
+    assert.ok(phone && phone[0].includes('.nav-tabs') && phone[0].includes('position: fixed'), 'nav must be fixed at bottom below 768px');
+  });
+
+  it('link picker renders accessible rows with an empty state', () => {
+    const html = readHTML();
+    const js = readJS();
+    const css = readCSS();
+    assert.ok(html.includes('role="group"'), 'picker must expose group semantics');
+    assert.ok(html.includes('id="link-picker-empty"'), 'no-match state must exist');
+    assert.ok(js.includes('function renderLinkPicker'), 'row renderer must exist');
+    assert.ok(!js.includes('select.value = prefill.playerId'), 'legacy select wiring must be gone');
+    assert.ok(css.includes('.picker-row'), 'picker row styling must exist');
+  });
+});

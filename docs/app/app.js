@@ -14,10 +14,11 @@ const KEY_TOKEN = 'lt_token';
 const KEY_DEVICE = 'lt_deviceId';
 const KEY_EMAIL = 'lt_email';
 const KEY_PLAYER = 'lt_playerId';
+const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.8.5';
+const APP_VERSION = '4.9.0';
 
 const appState = {
   status: 'unlinked',
@@ -172,11 +173,17 @@ function applyVersion() {
 
 function setActiveView(viewId) {
   document.querySelectorAll('.view-panel').forEach((v) => v.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach((b) => {
+    b.classList.remove('active');
+    b.setAttribute('aria-selected', 'false');
+  });
   const viewEl = $(viewId);
   if (viewEl) viewEl.classList.add('active');
   const activeTab = document.querySelector(`.tab-btn[aria-controls="${viewId}"]`);
-  if (activeTab) activeTab.classList.add('active');
+  if (activeTab) {
+    activeTab.classList.add('active');
+    activeTab.setAttribute('aria-selected', 'true');
+  }
   document.querySelectorAll('.tab-btn').forEach((b) => b.setAttribute('tabindex', '-1'));
   const rovingTarget = activeTab || document.querySelector('.tab-btn');
   if (rovingTarget) rovingTarget.setAttribute('tabindex', '0');
@@ -199,6 +206,7 @@ function applyBoot(boot) {
   appState.seasons = boot.seasons || [];
   appState.players = boot.players || [];
   appState.roster = boot.roster || boot.players || [];
+  appState.playersFiltered = Boolean(boot.facedOnly);
   appState.currentVote = boot.currentVote || null;
   appState.seasonName = boot.seasonName;
   appState.week = boot.week;
@@ -220,6 +228,11 @@ function applyBoot(boot) {
     }
   }
 
+  const seasonIds = (boot.seasons || []).map((s) => String(s.id));
+  const storedBrowsing = localStorage.getItem(KEY_BROWSING_SEASON) || '';
+  const defaultSeasonId = String(seasonIds.includes(storedBrowsing) ? storedBrowsing : (boot.seasonId || appState.settings.activeSeasonId || ''));
+  appState.browsingSeasonId = defaultSeasonId;
+
   ['season-filter', 'myseason-season-filter', 'standings-season-filter'].forEach((id) => {
     const sel = $(id);
     if (!sel) return;
@@ -228,7 +241,7 @@ function applyBoot(boot) {
       const opt = document.createElement('option');
       opt.value = s.id;
       opt.textContent = s.name;
-      if (String(s.id) === String(boot.seasonId || appState.settings.activeSeasonId)) opt.selected = true;
+      if (String(s.id) === defaultSeasonId) opt.selected = true;
       sel.appendChild(opt);
     });
   });
@@ -325,6 +338,26 @@ function showTabs(show) {
   if (tabs) tabs.style.display = show ? 'flex' : 'none';
 }
 
+const SEASON_SELECTORS = ['season-filter', 'myseason-season-filter', 'standings-season-filter', 'profile-season-filter'];
+
+function seasonForBrowsing() {
+  return appState.browsingSeasonId || appState.activeSeasonId || appState.seasonId;
+}
+
+function onSeasonFilterChange(sourceId) {
+  const sel = $(sourceId);
+  if (!sel || !sel.value) return;
+  appState.browsingSeasonId = String(sel.value);
+  localStorage.setItem(KEY_BROWSING_SEASON, appState.browsingSeasonId);
+  SEASON_SELECTORS.forEach((id) => {
+    if (id === sourceId) return;
+    const other = $(id);
+    if (other && Array.prototype.some.call(other.options, (o) => o.value === appState.browsingSeasonId)) {
+      other.value = appState.browsingSeasonId;
+    }
+  });
+}
+
 function showLinkedPresence(player) {
   const chip = $('identity-chip');
   if (!chip) return;
@@ -337,33 +370,44 @@ function showLinkedPresence(player) {
   chip.style.display = 'flex';
 }
 
+let linkPickerPlayers = [];
+let linkPickerSelection = '';
+
 function populateLinkPicker(players) {
-  const select = $('link-player-select');
-  if (!select) return;
-  select.innerHTML = '<option value="">-- Choose Your Name --</option>';
-  (players || []).forEach((p) => {
-    const opt = new Option(p.name, p.id);
-    opt.dataset.name = (p.name || '').toLowerCase();
-    select.appendChild(opt);
-  });
+  linkPickerPlayers = (players || []).filter((p) => p && p.id);
+  linkPickerSelection = '';
   const prefill = readPrefill();
-  if (prefill.playerId) select.value = prefill.playerId;
+  if (prefill.playerId && linkPickerPlayers.some((p) => String(p.id) === String(prefill.playerId))) {
+    linkPickerSelection = String(prefill.playerId);
+  }
+  renderLinkPicker('');
   const emailEl = $('link-email');
   if (prefill.email && emailEl) emailEl.value = prefill.email;
 }
 
+function renderLinkPicker(query) {
+  const list = $('link-player-select');
+  if (!list) return;
+  const q = (query || '').toLowerCase().trim();
+  const matches = linkPickerPlayers.filter((p) => (p.name || '').toLowerCase().includes(q));
+  list.innerHTML = matches.map((p) => {
+    const selected = String(p.id) === linkPickerSelection;
+    return `<button type="button" aria-pressed="${selected ? 'true' : 'false'}" class="picker-row${selected ? ' selected' : ''}" onclick="selectLinkPlayer('${escapeHtml(String(p.id))}')">${escapeHtml(p.name || p.id)}</button>`;
+  }).join('');
+  const empty = $('link-picker-empty');
+  if (empty) empty.style.display = matches.length > 0 ? 'none' : 'block';
+}
+
+function selectLinkPlayer(id) {
+  linkPickerSelection = String(id);
+  const searchEl = $('link-player-search');
+  renderLinkPicker(searchEl ? searchEl.value : '');
+}
+
 function filterLinkPicker() {
   const searchEl = $('link-player-search');
-  const select = $('link-player-select');
-  if (!searchEl || !select) return;
-  const query = searchEl.value.toLowerCase().trim();
-  const options = select.options;
-  for (let i = 0; i < options.length; i++) {
-    const opt = options[i];
-    if (!opt.value) { opt.style.display = ''; continue; }
-    const name = opt.dataset.name || opt.textContent.toLowerCase();
-    opt.style.display = name.includes(query) ? '' : 'none';
-  }
+  if (!searchEl) return;
+  renderLinkPicker(searchEl.value);
 }
 
 /* ---------------------------------------------------------------- intents -- */
@@ -390,8 +434,7 @@ function submitAccountLink() {
   if (linkInFlight) return;
   const emailEl = $('link-email');
   const email = emailEl ? emailEl.value.trim() : '';
-  const selectEl = $('link-player-select');
-  const playerId = linkMode === 'email' ? '' : (selectEl ? selectEl.value : '');
+  const playerId = linkMode === 'email' ? '' : linkPickerSelection;
 
   if (!email) { showStatus('Please enter your email address.', false); return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showStatus('Please enter a valid email address.', false); return; }
@@ -412,6 +455,8 @@ function submitAccountLink() {
         linkedPlayer: res.linkedPlayer || res.player,
         leaders: res.leaders,
         players: res.players,
+        roster: res.roster || res.players,
+        facedOnly: res.facedOnly,
         settings: appState.settings,
         seasons: appState.seasons,
         seasonName: appState.seasonName,
@@ -493,11 +538,17 @@ function confirmUnlink() {
 const CAREER_TAB_INDEX = { record: 0, versus: 1, badges: 2 };
 
 function switchCareerTab(tabId) {
-  document.querySelectorAll('.career-tab').forEach((b) => b.classList.remove('active'));
+  document.querySelectorAll('.career-tab').forEach((b) => {
+    b.classList.remove('active');
+    b.setAttribute('aria-selected', 'false');
+  });
   document.querySelectorAll('.career-panel').forEach((p) => p.classList.remove('active'));
   const idx = CAREER_TAB_INDEX[tabId];
   const tabs = document.querySelectorAll('.career-tab');
-  if (tabs[idx]) tabs[idx].classList.add('active');
+  if (tabs[idx]) {
+    tabs[idx].classList.add('active');
+    tabs[idx].setAttribute('aria-selected', 'true');
+  }
   const panel = $('career-tab-' + tabId);
   if (panel) panel.classList.add('active');
 }
@@ -505,11 +556,17 @@ function switchCareerTab(tabId) {
 const PROFILE_TAB_INDEX = { season: 0, career: 1 };
 
 function switchProfileTab(tabId) {
-  document.querySelectorAll('.profile-tab').forEach((b) => b.classList.remove('active'));
+  document.querySelectorAll('.profile-tab').forEach((b) => {
+    b.classList.remove('active');
+    b.setAttribute('aria-selected', 'false');
+  });
   document.querySelectorAll('.profile-panel').forEach((p) => p.classList.remove('active'));
   const idx = PROFILE_TAB_INDEX[tabId];
   const tabs = document.querySelectorAll('.profile-tab');
-  if (tabs[idx]) tabs[idx].classList.add('active');
+  if (tabs[idx]) {
+    tabs[idx].classList.add('active');
+    tabs[idx].setAttribute('aria-selected', 'true');
+  }
   const panel = $('profile-tab-' + tabId);
   if (panel) panel.classList.add('active');
 }
@@ -551,10 +608,7 @@ function switchTab(tabId) {
         showStatus('Voting is currently closed for this week.', false);
       }
     } else {
-      document.querySelectorAll('.view-panel').forEach((v) => v.classList.remove('active'));
-      document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
-      const linkView = $('link-view');
-      if (linkView) linkView.classList.add('active');
+      setActiveView('link-view');
     }
   } else if (tabId === 'standings-view') {
     clearStatus();
@@ -594,6 +648,12 @@ function populateVotingDropdowns(leaders, players, currentUserId) {
   (players || []).forEach((p) => {
     if (String(p.id) !== String(currentUserId)) opp.appendChild(new Option(p.name, p.id));
   });
+  const hint = $('opponent-hint');
+  if (hint) {
+    hint.textContent = (appState.playersFiltered && appState.week)
+      ? `Showing only the opponents you faced on Night ${appState.week}.`
+      : "Can't find who you're looking for? Pick the opponent you faced last Wednesday.";
+  }
 }
 
 function ensureOption(selectId, value, label) {
@@ -1465,7 +1525,7 @@ async function openPlayerModal(playerId) {
     renderPlayerModal(data);
   } catch {
     if (token !== modalRequestToken) return;
-    content.innerHTML = '<div class="player-modal-empty" style="color:#ef4444;">Could not load player.</div>';
+    content.innerHTML = '<div class="player-modal-empty" style="color:#f87171;">Could not load player.</div>';
   }
 }
 
@@ -1570,15 +1630,13 @@ async function loadPlayerProfile(playerId) {
   const contentEl = $('profile-content');
   if (!viewEl) return;
 
-  document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  viewEl.classList.add('active');
+  setActiveView('player-profile-view');
 
   if (loadingEl) loadingEl.style.display = 'block';
   if (contentEl) contentEl.style.display = 'none';
 
   try {
-    const seasonId = appState.activeSeasonId || appState.seasonId;
+    const seasonId = seasonForBrowsing();
     if (!(profileData && profileData.playerId === playerId && String(profileCurrentSeasonId) === String(seasonId))) {
       profileData = await callApi('getPlayerProfile', { playerId, seasonId });
       profileCurrentSeasonId = seasonId;
@@ -1605,7 +1663,7 @@ async function loadPlayerProfile(playerId) {
     if (loadingEl) loadingEl.style.display = 'none';
     if (contentEl) contentEl.style.display = 'block';
   } catch {
-    if (loadingEl) loadingEl.innerHTML = '<div style="color:#ef4444;">Could not load profile.</div>';
+    if (loadingEl) loadingEl.innerHTML = '<div style="color:#f87171;">Could not load profile.</div>';
   }
 }
 
@@ -1613,7 +1671,7 @@ async function loadProfileSeason() {
   const sel = $('profile-season-filter');
   if (!sel || !profileData) return;
   const seasonId = Number(sel.value);
-  if (seasonId === profileCurrentSeasonId) return;
+  if (String(seasonId) === String(profileCurrentSeasonId)) return;
 
   const container = $('profile-season-content');
   if (container) container.innerHTML = '<div class="player-modal-loading">Loading…</div>';
@@ -1623,7 +1681,7 @@ async function loadProfileSeason() {
     profileCurrentSeasonId = seasonId;
     renderProfileSeason(profileData);
   } catch {
-    if (container) container.innerHTML = '<div class="player-modal-empty" style="color:#ef4444;">Could not load season data.</div>';
+    if (container) container.innerHTML = '<div class="player-modal-empty" style="color:#f87171;">Could not load season data.</div>';
   }
 }
 

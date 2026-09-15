@@ -18,6 +18,7 @@ export async function handleGetAppData(body, env, session) {
   const leaders = await getAllActiveLeaders(DB);
 
   let players = allPlayers;
+  let facedOnly = false;
 
   if (votingOpen && session && activeSeasonId && currentWeek) {
     const faced = await getFacedOpponents(DB, activeSeasonId, currentWeek, session.player_id);
@@ -25,6 +26,7 @@ export async function handleGetAppData(body, env, session) {
       const filtered = allPlayers.filter(p => faced.has(String(p.id)));
       if (filtered.length > 0) {
         players = filtered;
+        facedOnly = true;
       }
     }
   }
@@ -89,6 +91,7 @@ export async function handleGetAppData(body, env, session) {
     seasons: seasons.results || [],
     players: players.map(p => ({ id: p.id, name: p.name })),
     roster: allPlayers.map(p => ({ id: p.id, name: p.name })),
+    facedOnly,
     unlinkedPlayers,
     leaders: (leaders.results || []).map(l => ({ id: l.id, name: l.name, set: l.set })),
     activeSeasonId,

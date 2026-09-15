@@ -1,6 +1,7 @@
-import { getPlayerById, getPlayerByEmail, getAllSeasons, getSettings, isVotingOpen, parseWeek, parseSeasonId } from '../db/queries.js';
+import { getPlayerById, getPlayerByEmail, getAllSeasons, getSettings, isVotingOpen, isSeasonPaused, parseWeek, parseSeasonId } from '../db/queries.js';
 import { createSession, findSessionByPlayerAndDevice } from '../lib/auth.js';
 import { getWeeklyParticipation } from '../lib/participation.js';
+import { getFacedOpponents } from '../lib/voteValidation.js';
 
 export async function handleLinkAccount(body, env) {
   const { DB } = env;
@@ -70,7 +71,7 @@ export async function handleLinkAccount(body, env) {
 
   // Get current state
   const allSettings = await getSettings(DB);
-  const votingOpen = isVotingOpen(allSettings.VOTING_OPEN);
+  const votingOpen = isVotingOpen(allSettings.VOTING_OPEN) && !isSeasonPaused(allSettings.SEASON_PAUSED);
   const activeSeasonId = parseSeasonId(allSettings.ACTIVE_SEASON_ID);
   const currentWeek = allSettings.CURRENT_WEEK;
   const weekNum = parseWeek(currentWeek);
@@ -84,9 +85,24 @@ export async function handleLinkAccount(body, env) {
     alreadyVoted = !!row;
   }
 
-  // Get leaders and players for the response
+  // Get leaders and players for the response. The opponent picker is narrowed to
+  // the players actually faced this week (mirrors getAppData + submitVote validation);
+  // full roster ships separately for labels and for the fallback case.
   const leaders = await DB.prepare('SELECT * FROM leaders WHERE active = 1 ORDER BY name').all();
-  const players = await DB.prepare('SELECT id, name FROM players WHERE active = 1 ORDER BY name').all();
+  const rosterResult = await DB.prepare('SELECT id, name FROM players WHERE active = 1 ORDER BY name').all();
+  const roster = rosterResult.results || [];
+  let players = roster;
+  let facedOnly = false;
+  if (votingOpen && activeSeasonId && weekNum) {
+    const faced = await getFacedOpponents(DB, activeSeasonId, weekNum, playerId);
+    if (faced && faced.size > 0) {
+      const filtered = roster.filter(p => faced.has(String(p.id)));
+      if (filtered.length > 0) {
+        players = filtered;
+        facedOnly = true;
+      }
+    }
+  }
   const seasons = await getAllSeasons(DB);
 
   // Weekly participation
@@ -101,7 +117,9 @@ export async function handleLinkAccount(body, env) {
     votingOpen,
     alreadyVoted,
     leaders: (leaders.results || []).map(l => ({ id: l.id, name: l.name, set: l.set })),
-    players: (players.results || []).map(p => ({ id: p.id, name: p.name })),
+    players: players.map(p => ({ id: p.id, name: p.name })),
+    roster: roster.map(p => ({ id: p.id, name: p.name })),
+    facedOnly,
     seasons: seasons.results || [],
     seasonName: seasons.results?.find(s => s.id === activeSeasonId)?.name,
     week: weekNum,
