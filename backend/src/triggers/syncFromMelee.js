@@ -7,17 +7,21 @@ import { auditVotesForWeek } from '../lib/voteAudit.js';
 
 export function shouldAdvance(isoNow, marker) {
   const date = new Date(isoNow);
-  const stockholmTime = new Intl.DateTimeFormat('en-GB', {
+  const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/Stockholm',
+    weekday: 'short',
     hour: 'numeric',
     minute: 'numeric',
     hour12: false,
-  }).format(date);
-  const [hours, minutes] = stockholmTime.split(':').map(Number);
+  }).formatToParts(date);
+  const part = type => parts.find(p => p.type === type)?.value ?? '';
+  const isLeagueNight = part('weekday') === 'Wed';
+  const hours = Number(part('hour'));
+  const minutes = Number(part('minute'));
   const isLateEnough = hours > 22 || (hours === 22 && minutes >= 10);
   const today = isoNow.split('T')[0];
   const notYetAdvanced = marker !== today;
-  return isLateEnough && notYetAdvanced;
+  return isLeagueNight && isLateEnough && notYetAdvanced;
 }
 
 export async function syncFromMelee(env, deps = {}) {

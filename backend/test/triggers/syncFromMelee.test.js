@@ -2,7 +2,7 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables } from '../helpers/fixtures.js';
-import { syncFromMelee } from '../../src/triggers/syncFromMelee.js';
+import { syncFromMelee, shouldAdvance } from '../../src/triggers/syncFromMelee.js';
 import { getSettings } from '../../src/db/queries.js';
 
 function makeTables(overrides = {}) {
@@ -418,6 +418,42 @@ describe('triggers/syncFromMelee', () => {
 
     const settings = await getSettings(db);
     assert.equal(settings.CURRENT_WEEK, 'Week 2', 'Week not advanced when LAST_ADVANCED matches today');
+  });
+
+  it('does not advance on a non-league night even after 22:10 (manual syncNow guard)', async () => {
+    const tables = withSeasonStarted(makeTables());
+    tables.settings = tables.settings.map(s =>
+      s.key === 'CURRENT_WEEK' ? { ...s, value: 'Week 2' } : s
+    );
+    tables.settings.push({ key: 'LAST_ADVANCED', value: '2026-09-09' });
+    db = createMockDb(tables);
+    const { mockFetch } = buildMockFetch({ tournaments: TOURNAMENTS.slice(0, 1) });
+    globalThis.fetch = mockFetch;
+
+    const tuesdayNight = '2026-09-15T20:15:00Z';
+    await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch), now: tuesdayNight });
+
+    const settings = await getSettings(db);
+    assert.equal(settings.CURRENT_WEEK, 'Week 2', 'Week must not advance on a Tuesday, only after a league night');
+    assert.equal(settings.LAST_ADVANCED, '2026-09-09', 'LAST_ADVANCED marker untouched by non-league-night run');
+  });
+
+  describe('shouldAdvance league-night gate', () => {
+    it('advances on Wednesday after 22:10 Stockholm with stale marker', () => {
+      assert.equal(shouldAdvance('2026-09-16T20:15:00Z', '2026-09-09'), true);
+    });
+    it('rejects Tuesday night (S7 week-2 premature-advance incident)', () => {
+      assert.equal(shouldAdvance('2026-09-15T20:15:00Z', '2026-09-09'), false);
+    });
+    it('rejects Thursday even after 22:10', () => {
+      assert.equal(shouldAdvance('2026-09-17T20:15:00Z', '2026-09-09'), false);
+    });
+    it('rejects Wednesday before 22:10', () => {
+      assert.equal(shouldAdvance('2026-09-16T19:00:00Z', '2026-09-09'), false);
+    });
+    it('rejects same-day double advance', () => {
+      assert.equal(shouldAdvance('2026-09-16T21:15:00Z', '2026-09-16'), false);
+    });
   });
 
   describe('award lifecycle (fully-synced season)', () => {
