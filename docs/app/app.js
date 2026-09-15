@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.9.3';
+const APP_VERSION = '4.10.0';
 
 const appState = {
   status: 'unlinked',
@@ -235,17 +235,14 @@ function openSignIn() {
   showSpinner(false);
   sessionStorage.setItem('lt_signin_engaged', '1');
   updateGuestBanner();
-  overlay.style.display = 'flex';
-  updateBodyScrollLock();
+  openOverlay('link-modal-overlay');
   const email = $('link-email');
   if (email) email.focus();
 }
 
 function closeSignIn(event) {
   if (event && event.target !== event.currentTarget) return;
-  const overlay = $('link-modal-overlay');
-  if (overlay) overlay.style.display = 'none';
-  updateBodyScrollLock();
+  closeOverlay('link-modal-overlay');
 }
 
 /* -------------------------------------------------------------- boot state -- */
@@ -346,7 +343,7 @@ function applyBoot(boot) {
       landedOnVote = true;
       switchTab('vote-view');
     } else {
-      switchTab('standings-view');
+      normalizeBootHash();
     }
 
     if (window.innerWidth >= 1024 && appState.linkedPlayer) {
@@ -373,7 +370,7 @@ function applyBoot(boot) {
     showTabs(false);
     populateLinkPicker(LeagueCore.resolvePlayerChoices(boot));
     setLinkMode('email');
-    switchTab('standings-view');
+    normalizeBootHash();
     updateGuestBanner();
     if (boot.status === 'invalid-token') {
       showLinkStatus('Your session expired. Please sign in again.');
@@ -554,17 +551,13 @@ function unlinkCurrentDevice() {
 function openUnlinkConfirm(title, message) {
   const tEl = $('unlink-confirm-title');
   const msgEl = $('unlink-confirm-text');
-  const overlay = $('unlink-confirm');
   if (tEl) tEl.textContent = title;
   if (msgEl) msgEl.textContent = message;
-  if (overlay) overlay.style.display = 'flex';
-  updateBodyScrollLock();
+  openOverlay('unlink-confirm');
 }
 
 function cancelUnlink() {
-  const overlay = $('unlink-confirm');
-  if (overlay) overlay.style.display = 'none';
-  updateBodyScrollLock();
+  closeOverlay('unlink-confirm');
 }
 
 function confirmUnlink() {
@@ -592,14 +585,14 @@ function confirmUnlink() {
     .catch((err) => {
       showSpinner(false);
       unlinkInFlight = false;
-      showStatus(err.userMessage || err.message || 'Failed to unlink.', false);
+      showStatus(err.userMessage || err.message || 'Could not sign out.', false);
       if (appState.linkedPlayer) {
         showTabs(true);
         showLinkedPresence(appState.linkedPlayer);
         setActiveView(lastView);
       } else {
         showTabs(false);
-        setActiveView('link-view');
+        switchTab(appState.lastView || 'standings-view');
       }
     });
 }
@@ -663,8 +656,10 @@ function switchTab(tabId) {
   if (window.innerWidth >= 1024 && tabId === 'myseason-view') {
     tabId = 'standings-view';
   }
-  if (window.location.hash.startsWith('#player/')) {
-    history.replaceState(null, '', window.location.pathname + window.location.search);
+
+  const targetHash = VIEW_HASHES[tabId];
+  if (!routingFromHash && targetHash && window.location.hash.slice(1) !== targetHash) {
+    window.location.hash = targetHash;
   }
 
   if (tabId === 'vote-view') {
@@ -686,6 +681,10 @@ function switchTab(tabId) {
     appState.lastView = 'standings-view';
     loadStandingsData();
   } else if (tabId === 'leaderboard-view') {
+    if (!appState.linkedPlayer) {
+      openSignIn();
+      return;
+    }
     clearStatus();
     showSpinner(false);
     setActiveView('leaderboard-view');
@@ -1614,6 +1613,68 @@ function initBadgeTooltips() {
   window.addEventListener('resize', dismissTooltips, { passive: true });
 }
 
+/* --------------------------------------------------------- routing/hash -- */
+
+const VIEW_HASHES = { 'vote-view': 'vote', 'standings-view': 'standings', 'leaderboard-view': 'awards', 'myseason-view': 'mystats' };
+const HASH_VIEWS = { vote: 'vote-view', standings: 'standings-view', awards: 'leaderboard-view', mystats: 'myseason-view' };
+const OVERLAY_IDS = ['player-modal-overlay', 'link-modal-overlay', 'unlink-confirm'];
+let routingFromHash = false;
+let overlayProgrammaticPop = false;
+
+function normalizeBootHash() {
+  const h = window.location.hash.slice(1);
+  if (!h || (!HASH_VIEWS[h] && !h.startsWith('player/'))) {
+    history.replaceState(null, '', '#standings');
+  }
+}
+
+function openOverlay(id) {
+  const el = $(id);
+  if (el) el.style.display = 'flex';
+  history.pushState({ ...(history.state || {}), overlay: id }, '');
+  updateBodyScrollLock();
+}
+
+function forceCloseOverlay(id) {
+  const el = $(id);
+  if (el) el.style.display = 'none';
+  updateBodyScrollLock();
+  if (id === 'player-modal-overlay') {
+    playerModalData = null;
+    modalRequestToken++;
+    if (modalReturnFocus && typeof modalReturnFocus.focus === 'function') modalReturnFocus.focus();
+    modalReturnFocus = null;
+  }
+}
+
+function closeOverlay(id) {
+  forceCloseOverlay(id);
+  if (history.state && history.state.overlay === id) {
+    overlayProgrammaticPop = true;
+    history.back();
+  }
+}
+
+function topOpenOverlay() {
+  const open = OVERLAY_IDS.filter((id) => {
+    const el = $(id);
+    return el && el.style.display === 'flex';
+  });
+  return open[open.length - 1] || null;
+}
+
+window.addEventListener('popstate', (e) => {
+  if (overlayProgrammaticPop) {
+    overlayProgrammaticPop = false;
+    return;
+  }
+  const top = topOpenOverlay();
+  if (top && (e.state || {}).overlay !== top) {
+    forceCloseOverlay(top);
+  }
+  handleHashRoute();
+});
+
 /* --------------------------------------------------------- player profile -- */
 
 let playerModalData = null;
@@ -1629,7 +1690,32 @@ function handleHashRoute() {
     if (playerId) {
       loadPlayerProfile(playerId);
     }
-  } else if ($('player-profile-view') && $('player-profile-view').classList.contains('active')) {
+    return;
+  }
+  if (HASH_VIEWS[hash]) {
+    const view = HASH_VIEWS[hash];
+    if (view !== 'standings-view' && !appState.linkedPlayer) {
+      history.replaceState(null, '', '#standings');
+      routingFromHash = true;
+      try {
+        switchTab('standings-view');
+      } finally {
+        routingFromHash = false;
+      }
+      return;
+    }
+    const viewEl = $(view);
+    if (!viewEl || !viewEl.classList.contains('active')) {
+      routingFromHash = true;
+      try {
+        switchTab(view);
+      } finally {
+        routingFromHash = false;
+      }
+    }
+    return;
+  }
+  if ($('player-profile-view') && $('player-profile-view').classList.contains('active')) {
     switchTab(appState.lastView || 'standings-view');
   }
 }
@@ -1647,8 +1733,7 @@ async function openPlayerModal(playerId) {
   const seasonEl = $('player-modal-season');
   if (seasonEl) seasonEl.textContent = seasonContextLabel(seasonId);
   content.innerHTML = '<div class="player-modal-loading">Loading stats…</div>';
-  overlay.style.display = 'flex';
-  updateBodyScrollLock();
+  openOverlay('player-modal-overlay');
   const closeBtn = $('player-modal-close');
   if (closeBtn) closeBtn.focus();
 
@@ -1665,13 +1750,7 @@ async function openPlayerModal(playerId) {
 
 function closePlayerModal(event) {
   if (event && event.target !== event.currentTarget) return;
-  const overlay = $('player-modal-overlay');
-  if (overlay) overlay.style.display = 'none';
-  updateBodyScrollLock();
-  modalRequestToken++;
-  playerModalData = null;
-  if (modalReturnFocus && typeof modalReturnFocus.focus === 'function') modalReturnFocus.focus();
-  modalReturnFocus = null;
+  closeOverlay('player-modal-overlay');
 }
 
 function renderSeasonContent(s, opts = {}) {
@@ -1750,12 +1829,14 @@ function openPlayerProfile(event) {
   const playerId = playerModalData && playerModalData.playerId;
   if (!playerId) return;
   profileData = playerModalData;
-  profileCurrentSeasonId = seasonForBrowsing();
-  closePlayerModal();
-  if (window.location.hash === '#player/' + playerId) {
+  profileCurrentSeasonId = appState.activeSeasonId || appState.seasonId;
+  forceCloseOverlay('player-modal-overlay');
+  const target = '#player/' + playerId;
+  if (window.location.hash === target) {
     handleHashRoute();
   } else {
-    window.location.hash = 'player/' + playerId;
+    history.replaceState(null, '', target);
+    handleHashRoute();
   }
 }
 

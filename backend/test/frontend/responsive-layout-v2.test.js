@@ -128,8 +128,8 @@ describe('Layout v3: Boot flow', () => {
   it('standings loads via switchTab (fetches data), not bare setActiveView', () => {
     const js = readJS();
     assert.ok(
-      js.includes("switchTab('standings-view')"),
-      'applyBoot must call switchTab(standings-view) so standings data loads'
+      js.includes('normalizeBootHash()') && js.includes('function handleHashRoute'),
+      'applyBoot must normalize the hash and route through handleHashRoute so standings data loads'
     );
     assert.ok(
       js.includes("sessionStorage.getItem('firstLogin')"),
@@ -246,7 +246,7 @@ describe('Layout v3: Unlinked desktop', () => {
     const unlinkedBranch = js.match(/\} else \{[\s\S]*?\n {2}\}\n\n {2}handleHashRoute/);
     assert.ok(unlinkedBranch, 'applyBoot unlinked branch must exist');
     assert.ok(unlinkedBranch[0].includes('showTabs(false)'), 'guests never see the tab bar');
-    assert.ok(unlinkedBranch[0].includes("switchTab('standings-view')"), 'guest default view is standings');
+    assert.ok(unlinkedBranch[0].includes('normalizeBootHash()'), 'guest boot normalizes the hash so the default view routes and loads');
     assert.ok(unlinkedBranch[0].includes('openSignIn()'), 'invalid-token opens the sign-in modal on every viewport');
     assert.ok(!unlinkedBranch[0].includes("setActiveView('link-view')"), 'legacy link view routing must be gone');
   });
@@ -458,7 +458,8 @@ describe('v4.9.1: badge tap fix and modal a11y finishing', () => {
   it('open modals lock body scroll and trap tab focus', () => {
     const js = readJS();
     assert.ok(js.includes('function updateBodyScrollLock'), 'scroll lock helper must exist');
-    assert.ok((js.match(/updateBodyScrollLock\(\);/g) || []).length >= 6, 'every overlay open/close site must lock/unlock');
+    assert.match(js, /function openOverlay\([\s\S]*?updateBodyScrollLock\(\);/, 'openOverlay must lock scroll');
+    assert.match(js, /function forceCloseOverlay\([\s\S]*?updateBodyScrollLock\(\);/, 'force-close path must unlock scroll');
     assert.ok(js.includes('function trapFocus'), 'focus trap must exist');
     assert.ok(js.includes('trapFocus(e, el)'), 'Tab must be routed through the trap');
   });
@@ -534,5 +535,41 @@ describe('v4.10.0: sign-in modal, guest banner, header sizing', () => {
     assert.ok(css.includes('.signin-cta::after'), 'invisible hit-area extension must exist');
     assert.ok(css.match(/\.signin-cta::after\s*\{[^}]*inset:\s*-10px/), 'hit area must extend at least 10px');
     assert.ok(!css.match(/\.signin-cta\s*\{[^}]*min-height:\s*var\(--touch-target-min\)/), 'cta must not grow a tall visual box again');
+  });
+
+  it('tabs are hash routes so the phone back gesture walks views', () => {
+    const js = readJS();
+    assert.ok(js.includes("'standings-view': 'standings'"), 'view-hash route table must exist');
+    assert.ok(js.includes("'leaderboard-view': 'awards'"), 'awards must be addressable');
+    assert.ok(js.includes('function normalizeBootHash'), 'boot must seed the hash entry');
+    assert.ok(js.includes('routingFromHash'), 'hash-driven switchTab must be loop-guarded');
+  });
+
+  it('deep links cannot bypass the guest wall (CONTEXT: Awards requires linking)', () => {
+    const js = readJS();
+    assert.ok(
+      js.includes("if (view !== 'standings-view' && !appState.linkedPlayer)"),
+      'gated deep links must fall back to standings for guests'
+    );
+    const lb = js.match(/else if \(tabId === 'leaderboard-view'\)\s*\{[\s\S]{0,90}/);
+    assert.ok(lb && lb[0].includes('openSignIn'), 'leaderboard route must gate guests to sign-in');
+    const ms = js.match(/else if \(tabId === 'myseason-view'\)\s*\{[\s\S]{0,90}/);
+    assert.ok(ms && ms[0].includes('linkedPlayer'), 'myseason route must stay guarded');
+  });
+
+  it('View Full Profile replaces the modal history entry so back never reopens the modal', () => {
+    const js = readJS();
+    const opp = js.match(/function openPlayerProfile[\s\S]*?\n\}/);
+    assert.ok(opp && opp[0].includes("history.replaceState(null, '', target)"), 'profile nav must replace the overlay sentinel');
+    assert.ok(opp && !opp[0].includes('window.location.hash = '), 'no push-style hash write from the modal');
+  });
+
+  it('back closes any open overlay before it leaves the site', () => {
+    const js = readJS();
+    assert.ok(js.includes("history.pushState({ ...(history.state || {}), overlay: id }"), 'overlay opens must push a sentinel entry');
+    assert.ok(js.includes("overlayProgrammaticPop = true"), 'explicit closes must consume the sentinel');
+    assert.ok(js.includes("window.addEventListener('popstate'"), 'popstate must intercept the back gesture');
+    assert.equal((js.match(/openOverlay\('/g) || []).length, 3, 'all three overlays route through openOverlay');
+    assert.ok((js.match(/closeOverlay\('/g) || []).length >= 3, 'all three overlays route through closeOverlay');
   });
 });

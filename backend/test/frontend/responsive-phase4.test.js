@@ -38,11 +38,11 @@ describe('Phase 4: Desktop 2-panel CSS Grid', () => {
 });
 
 describe('Phase 4: boot view routing', () => {
-  it('applyBoot routes linked users through switchTab', () => {
+  it('applyBoot routes linked users through the hash router', () => {
     const js = readJS();
     assert.ok(
-      js.includes("switchTab('standings-view')") && js.includes("switchTab('vote-view')"),
-      'applyBoot must route via switchTab so the shown view loads its data'
+      js.includes('normalizeBootHash()') && js.includes("switchTab('vote-view')"),
+      'applyBoot must route via the hash router/switchTab so the shown view loads its data'
     );
   });
 

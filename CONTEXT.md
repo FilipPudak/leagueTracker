@@ -190,7 +190,15 @@ never per-player rankings.
 
 - **Guest browsing:** the **standings view** (season table + per-night results) is readable without
   linking — Melee-derived data is public. Linking is required for voting, My Stats, and Awards; guests
-  see the sign-in panel instead of tabs (welcome blurb + email claim). No new data crosses the boundary.
+  see onboarding guidance instead of tabs (pitch surfaces below + email claim in a dialog). No new
+  data crosses the boundary.
+- **Guest onboarding surfaces:** the canonical pitch sentence lives once (`LeagueCore.GUEST_PITCH`)
+  and renders into the desktop left-column pitch card and the sub-1024px tappable guest banner. The
+  banner hides per session after dismissal or once sign-in is engaged — never permanently. Sign-in
+  itself is a dialog like every other overlay.
+- **Views are addressable:** the four tabs and the profile are hash routes (`#vote`, `#standings`,
+  `#awards`, `#mystats`, `#player/<id>`). The browser/phone back gesture closes any open overlay
+  first, then walks view history; deep links open the addressed view directly.
 - **Weekly participation card:** X voted ÷ Y where Y = players **who attended the current
   voting week's night** (not the whole roster — 77 historical names make "3 of 77" read like
   failure). Denominator 0 → hide the card.
