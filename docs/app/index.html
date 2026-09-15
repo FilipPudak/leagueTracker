@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap" as="style">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="styles.css?v=4.8.1">
+  <link rel="stylesheet" href="styles.css?v=4.8.2">
 </head>
 <body>
   <script>document.body.classList.toggle('is-linked',!!sessionStorage.getItem('token'))</script>
@@ -107,8 +107,9 @@
       </div>
 
       <div id="standings-content" style="display: none;">
-        <div id="standings-table-section">
-          <h3 style="font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Season Table</h3>
+        <div class="card" style="padding:14px; margin-bottom:10px;">
+          <div id="standings-table-section">
+            <h3 style="font-family:'Orbitron',sans-serif; font-size: 0.95rem; color: #38bdf8; margin-bottom: 8px;">Season Table</h3>
           <div class="standings-table-wrap" id="standings-table-wrap">
             <div style="overflow-x: auto;">
             <table id="standings-table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
@@ -124,8 +125,9 @@
                 </tr>
               </thead>
               <tbody id="standings-table-body"></tbody>
-            </table>
+             </table>
           </div>
+        </div>
         </div>
         </div>
 
@@ -188,7 +190,7 @@
     <!-- PLAYER PROFILE PANEL -->
     <div id="player-profile-view" class="view-panel">
       <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:16px;">
-        <button class="btn-ghost" onclick="switchTab(appState.lastView || 'standings-view')" style="padding:4px 8px;">&larr; Back</button>
+        <button class="link-back-text" onclick="switchTab(appState.lastView || 'standings-view')">&larr; Back to standings</button>
         <h2 id="profile-title" style="margin:0; font-size:1.1rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;"></h2>
       </div>
       <div id="profile-loading" class="player-modal-loading" style="display:none;">Loading profile...</div>
@@ -214,7 +216,7 @@
     <div class="col-left">
     <!-- LINK PANEL (guests: welcome + sign-in; side panel on desktop, switched-in content on mobile) -->
     <div id="link-view" class="view-panel" role="tabpanel" aria-label="Sign in">
-      <button type="button" id="link-back" class="btn-ghost" onclick="switchTab('standings-view')" style="padding:4px 8px;">&larr; Back to standings</button>
+      <button type="button" id="link-back" class="link-back-text" onclick="switchTab('standings-view')">&larr; Back to standings</button>
       <div class="card">
         <h3 style="margin-top:0; font-family:'Orbitron', sans-serif;">Sign In</h3>
         <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 0;">Standings are open to everyone — sign in with your email to cast your weekly vote and see your stats.</p>
@@ -328,7 +330,7 @@
     </div>
   </div>
 
-  <script src="app-core.js?v=4.8.1"></script>
-<script src="app.js?v=4.8.1"></script>
+  <script src="app-core.js?v=4.8.2"></script>
+<script src="app.js?v=4.8.2"></script>
 </body>
 </html>

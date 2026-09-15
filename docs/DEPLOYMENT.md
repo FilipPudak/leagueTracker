@@ -56,8 +56,9 @@ The Worker is live at `https://league-tracker.filip-pudak.workers.dev`.
 
 ## Updating the frontend API URL
 
-The Worker URL is hardcoded in `docs/app/app.js` as the `API_URL` constant. If you
-change the Worker name or deploy to a different domain, update this value:
+The Worker URL is in `docs/app/app.js` as the `API_URL` constant. It auto-detects
+`localhost` and points to the local dev server — no flag needed for local development.
+For production, it uses the deployed Worker URL:
 
 ```js
 const API_URL = 'https://league-tracker.filip-pudak.workers.dev';

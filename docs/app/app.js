@@ -17,7 +17,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.8.1';
+const APP_VERSION = '4.8.2';
 
 let appState = {
   status: 'unlinked',
@@ -416,7 +416,8 @@ function submitAccountLink() {
         seasons: appState.seasons,
         seasonName: appState.seasonName,
         week: appState.week,
-        seasonId: appState.seasonId
+        seasonId: appState.seasonId,
+        weeklyParticipation: res.weeklyParticipation
       };
       showSpinner(false);
       linkInFlight = false;
@@ -1373,16 +1374,31 @@ function initBadgeTooltips() {
   grid.addEventListener('touchstart', (e) => {
     const medal = e.target.closest('.badge-medal');
     if (!medal) return;
-    e.preventDefault();
-    const tooltip = medal.querySelector('.badge-tooltip');
-    if (!tooltip) return;
-    const wasVisible = tooltip.classList.contains('visible');
-    grid.querySelectorAll('.badge-tooltip.visible').forEach(t => t.classList.remove('visible'));
-    if (!wasVisible) {
-      positionTooltip(tooltip, medal);
-      tooltip.classList.add('visible');
+    const startX = e.touches[0].clientX;
+    const startY = e.touches[0].clientY;
+    let moved = false;
+    function onTouchMove(ev) {
+      const dx = Math.abs(ev.touches[0].clientX - startX);
+      const dy = Math.abs(ev.touches[0].clientY - startY);
+      if (dx > 10 || dy > 10) moved = true;
     }
-  }, { passive: false });
+    function onTouchEnd() {
+      grid.removeEventListener('touchmove', onTouchMove);
+      grid.removeEventListener('touchend', onTouchEnd);
+      if (moved) return;
+      e.preventDefault();
+      const tooltip = medal.querySelector('.badge-tooltip');
+      if (!tooltip) return;
+      const wasVisible = tooltip.classList.contains('visible');
+      grid.querySelectorAll('.badge-tooltip.visible').forEach(t => t.classList.remove('visible'));
+      if (!wasVisible) {
+        positionTooltip(tooltip, medal);
+        tooltip.classList.add('visible');
+      }
+    }
+    grid.addEventListener('touchmove', onTouchMove, { passive: true });
+    grid.addEventListener('touchend', onTouchEnd, { passive: false });
+  }, { passive: true });
   grid.addEventListener('contextmenu', (e) => {
     if (e.target.closest('.badge-medal')) e.preventDefault();
   });
