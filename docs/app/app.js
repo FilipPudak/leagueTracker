@@ -17,7 +17,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.8.2';
+const APP_VERSION = '4.8.3';
 
 let appState = {
   status: 'unlinked',
@@ -1484,24 +1484,28 @@ function renderSeasonContent(s, opts = {}) {
   let nightsHtml = '';
   if (s.nights && s.nights.length > 0) {
     nightsHtml = `<${headingTag} class="${headingClass}"${headingOpen}>Night-by-night${headingClose}` +
+      '<div class="player-modal-items">' +
       s.nights.sort((a, b) => a.round - b.round).map(n =>
         `<div class="player-modal-item">
           <span>Night ${escapeHtml(n.round)}</span>
           <span>${escapeHtml(n.wins)}W ${escapeHtml(n.draws)}D ${escapeHtml(n.losses)}L · ${escapeHtml(n.points)} pts · #${escapeHtml(n.rank)}</span>
         </div>`
-      ).join('');
+      ).join('') +
+      '</div>';
   }
 
   let leadersHtml = '';
   if (s.leaders && s.leaders.length > 0) {
     leadersHtml = `<${headingTag} class="${headingClass}"${headingOpen}>Leaders Played${headingClose}` +
+      '<div class="player-modal-items">' +
       s.leaders.map(l => {
         const wp = l.winPct != null ? l.winPct + '%' : '—';
         return `<div class="player-modal-item">
           <span>${escapeHtml(l.name)}</span>
           <span>${escapeHtml(l.plays)} plays · ${escapeHtml(l.wins)}W ${escapeHtml(l.draws)}D ${escapeHtml(l.losses)}L · ${wp}</span>
         </div>`;
-      }).join('');
+      }).join('') +
+      '</div>';
   }
 
   let awardsHtml = '';
@@ -1595,10 +1599,11 @@ async function loadProfileSeason() {
 function renderProfileSeason(data) {
   const container = $('profile-season-content');
   if (!container) return;
-  container.innerHTML = renderSeasonContent(data.season, {
+  const raw = renderSeasonContent(data.season, {
     headingTag: 'h3',
     headingStyle: 'font-size:0.95rem; color:#38bdf8; margin:16px 0 8px;',
   });
+  container.innerHTML = '<div class="card" style="padding:14px; margin-bottom:10px;">' + raw + '</div>';
 }
 
 function renderProfileCareer(data) {

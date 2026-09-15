@@ -155,7 +155,7 @@ body:not(.is-linked) .signin-cta { display: inline-block; }
   display: flex; flex-direction: column; align-items: center; gap: 3px;
 }
 .tab-btn svg { transition: color 0.25s ease; }
-.tab-btn.active { background: #38bdf8; color: #050811; box-shadow: 0 0 12px rgba(56, 189, 248, 0.5); }
+.tab-btn.active { background: #38bdf8; color: #050811; box-shadow: 0 0 8px rgba(56, 189, 248, 0.4); }
 .tab-btn.active svg { stroke: #050811; }
 
 .view-panel { display: none; }
@@ -257,8 +257,9 @@ select[size] option { padding: 6px 8px; }
 .player-modal-stat { text-align: center; padding: 8px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; }
 .player-modal-stat-value { font-size: 1.2rem; font-weight: 700; color: #f8fafc; }
 .player-modal-stat-label { font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; }
-.player-modal-section-title { font-size: 0.95rem; color: #38bdf8; font-weight: 600; padding: 10px 0 8px; border-bottom: 1px solid rgba(56, 189, 248, 0.2); margin: 14px 0 8px; }
-.player-modal-item { display: flex; justify-content: space-between; padding: 5px 0; font-size: 0.85rem; color: #f8fafc; }
+.player-modal-section-title { font-family: 'Orbitron', sans-serif; font-size: 0.95rem; color: #38bdf8; font-weight: 600; padding: 10px 0 8px; border-bottom: 1px solid rgba(56, 189, 248, 0.2); margin: 14px 0 8px; }
+.player-modal-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid rgba(56, 189, 248, 0.1); font-size: 0.85rem; color: #f8fafc; }
+.player-modal-items .player-modal-item:last-child { border-bottom: none; }
 .player-modal-award { padding: 8px 12px; margin-bottom: 6px; background: #1e293b; border-radius: 6px; font-size: 0.85rem; }
 .player-modal-loading { text-align: center; color: #94a3b8; padding: 24px; font-size: 0.9rem; }
 .site-footer {
@@ -368,6 +369,7 @@ details[open].section-block > summary::before { content: '\25BE '; }
 .show-more-btn:focus-visible,
 .round-header:focus-visible,
 .signin-cta:focus-visible,
+.link-back-text:focus-visible,
 .footer-discord:focus-visible {
   outline: 2px solid #38bdf8;
   outline-offset: 2px;
