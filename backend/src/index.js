@@ -49,7 +49,8 @@ function checkRateLimit(ip, action) {
 
 export default {
   async fetch(request, env, ctx) {
-    const allowedOrigin = env.ALLOWED_ORIGIN || 'https://filippudak.github.io';
+    const origin = new URL(request.url).hostname;
+    const allowedOrigin = env.ALLOWED_ORIGIN || (origin === 'localhost' ? '*' : 'https://filippudak.github.io');
     const corsHeaders = {
       'Access-Control-Allow-Origin': allowedOrigin,
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -150,7 +151,7 @@ export default {
   },
 
   // Cron trigger handlers
-  async scheduled(event, env, ctx) {
+  async scheduled(event, env, _ctx) {
     try {
       const { syncFromMelee } = await import('./triggers/syncFromMelee.js');
       const result = await syncFromMelee(env);

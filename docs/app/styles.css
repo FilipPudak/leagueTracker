@@ -355,7 +355,7 @@ details[open].section-block > summary::before { content: '\25BE '; }
 /* Grid layouts for JS-generated content */
 .career-record-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 0.85rem; }
 .career-profile-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 0.85rem; }
-.player-modal-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+.player-modal-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid rgba(56, 189, 248, 0.2); }
 
 /* Focus-visible styles for accessibility */
 .tab-btn:focus-visible,

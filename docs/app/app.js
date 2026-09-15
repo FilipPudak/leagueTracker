@@ -17,7 +17,7 @@ const KEY_PLAYER = 'lt_playerId';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.8.3';
+const APP_VERSION = '4.8.4';
 
 const appState = {
   status: 'unlinked',
@@ -760,8 +760,8 @@ function renderStandingsTable(table) {
     const rankClass = row.rank <= 3 ? ' rank-' + row.rank : '';
     const playerName = nameMap[row.playerId] || row.playerId;
     return `<tr class="standings-row${rankClass}" ${row.rank > STANDINGS_PAGE_SIZE && !standingsShowAll ? 'style="display:none;"' : ''}>
-      <td style="font-weight:700;">${escapeHtml(row.rank)}</td>
-      <td class="hover-underline" style="font-weight:600; color:#38bdf8; cursor:pointer;" onclick="openPlayerModal('${escapeHtml(row.playerId)}')">${escapeHtml(playerName)}</td>
+      <td style="font-weight:700; text-align:left;">${escapeHtml(row.rank)}</td>
+      <td class="hover-underline" style="font-weight:600; color:#38bdf8; cursor:pointer; text-align:left;" onclick="openPlayerModal('${escapeHtml(row.playerId)}')">${escapeHtml(playerName)}</td>
       <td style="text-align:center;">${escapeHtml(row.played)}</td>
       <td style="text-align:center;">${escapeHtml(row.won)}</td>
       <td style="text-align:center;">${escapeHtml(row.drawn)}</td>
