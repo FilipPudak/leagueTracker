@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.10.1';
+const APP_VERSION = '4.11.0';
 
 const appState = {
   status: 'unlinked',
@@ -853,9 +853,17 @@ function loadStandingsData() {
     });
 }
 
+function champBadge(count) {
+  const markup = LeagueCore.championStarMarkup(count);
+  if (!markup) return '';
+  const title = LeagueCore.championStarTitle(count);
+  return ' <span class="champ-star" role="img" aria-label="' + title + '" title="' + title + '">' + markup + '</span>';
+}
+
 function renderStandings(res) {
   standingsShowAll = false;
   appState.standingsRenderedSeason = res.seasonId != null ? String(res.seasonId) : '';
+  appState.championCounts = res.championCounts || {};
   updateRoundFilter(res.allRegularRounds || res.rounds, res.asOfRound);
   renderStandingsTable(res.table);
   renderRoundResults(res.rounds);
@@ -895,7 +903,7 @@ function renderStandingsTable(table) {
     const playerName = nameMap[row.playerId] || row.playerId;
     return `<tr class="standings-row${rankClass}" ${row.rank > STANDINGS_PAGE_SIZE && !standingsShowAll ? 'style="display:none;"' : ''}>
       <td style="font-weight:700; text-align:left;">${escapeHtml(row.rank)}</td>
-      <td style="text-align:left;"><button type="button" class="name-btn" onclick="openPlayerModal('${escapeHtml(row.playerId)}')">${escapeHtml(playerName)}</button></td>
+      <td style="text-align:left;"><button type="button" class="name-btn" onclick="openPlayerModal('${escapeHtml(row.playerId)}')">${escapeHtml(playerName)}</button>${champBadge((appState.championCounts || {})[row.playerId])}</td>
       <td style="text-align:center;">${escapeHtml(row.played)}</td>
       <td style="text-align:center;">${escapeHtml(row.won)}</td>
       <td style="text-align:center;">${escapeHtml(row.drawn)}</td>
@@ -1220,7 +1228,7 @@ function renderCareerStats(res) {
   const rec = r.matches;
   const pct = (v) => v == null ? '—' : v + '%';
   const recordHtml = `
-    <div style="font-weight:700; color:#f8fafc; margin-bottom:8px;">Career record${r.sinceSeason ? ' — since Season ' + escapeHtml(r.sinceSeason) : ''}</div>
+    <div class="section-heading">Career Record${r.sinceSeason ? ' — since Season ' + escapeHtml(r.sinceSeason) : ''}</div>
     <div class="career-record-grid">
       <div><span style="color:#94a3b8;">Nights</span><br><strong style="color:#f8fafc;">${escapeHtml(r.nights)}</strong></div>
       <div><span style="color:#94a3b8;">Matches</span><br><strong style="color:#f8fafc;">${escapeHtml(rec.played)}</strong></div>
@@ -1264,25 +1272,8 @@ function renderCareerStats(res) {
     });
   }
 
-  const prog = res.progression;
-  const peak = res.peak;
-  let progHtml = '<div style="font-weight:700; color:#f8fafc; margin-bottom:8px;">Season progression</div>';
-  if (peak && peak.length > 0) {
-    const peakStr = peak.map(p => 'Season ' + p.seasonId).join(', ');
-    progHtml += `<div style="margin-bottom:8px;"><span style="color:#fbbf24;">Peak:</span> <span style="color:#f8fafc;">#${escapeHtml(peak[0].rank)} (${escapeHtml(peakStr)})</span></div>`;
-  }
-  if (prog.length > 0) {
-    progHtml += prog.map(p => {
-      if (p.rank == null && !p.isCurrent) return null;
-      const rank = p.rank != null ? '#' + p.rank : '—';
-      const pts = p.points != null ? p.points + ' pts' : '';
-      const currentMark = p.isCurrent ? ' (current)' : '';
-      const asOf = p.asOfRound != null ? ' (after Night ' + p.asOfRound + ')' : '';
-      const detail = [pts].filter(Boolean).join(', ');
-      return `<span style="color:${p.isCurrent ? '#38bdf8' : '#94a3b8'}; font-size:0.85rem;">Season ${escapeHtml(p.seasonId)} ${escapeHtml(rank)}${detail ? ' · ' + escapeHtml(detail) : ''}${asOf}${currentMark}</span>`;
-    }).filter(Boolean).join('<span style="color:#475569; margin:0 6px;">→</span>');
-  }
-  progressionCard.innerHTML = progHtml;
+  const prog = res.progression || [];
+  progressionCard.innerHTML = '<div class="section-heading">Season Progression</div>' + seasonProgressionHtml(prog, res.peak);
   progressionCard.style.display = 'block';
 
   const badges = res.badges || [];
@@ -1338,6 +1329,30 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function statTile(value, label) {
+  return `<div class="player-modal-stat"><div class="player-modal-stat-value">${value}</div><div class="player-modal-stat-label">${label}</div></div>`;
+}
+
+// One renderer for the season-progression chain, shared by My Stats and the
+// player profile (asOf detail renders when the data carries it).
+function seasonProgressionHtml(prog, peak) {
+  let html = '';
+  if (peak && peak.length > 0) {
+    const peakStr = peak.map((p) => 'Season ' + p.seasonId).join(', ');
+    html += `<div style="margin-bottom:8px;"><span style="color:#fbbf24;">Peak:</span> <span style="color:#f8fafc;">#${escapeHtml(peak[0].rank)} (${escapeHtml(peakStr)})</span></div>`;
+  }
+  html += (prog || []).map((p) => {
+    if (p.rank == null && !p.isCurrent) return null;
+    const rank = p.rank != null ? '#' + p.rank : '—';
+    const pts = p.points != null ? p.points + ' pts' : '';
+    const currentMark = p.isCurrent ? ' (current)' : '';
+    const asOf = p.asOfRound != null ? ' (after Night ' + p.asOfRound + ')' : '';
+    const detail = [pts].filter(Boolean).join(', ');
+    return `<span style="color:${p.isCurrent ? '#38bdf8' : '#94a3b8'}; font-size:0.85rem;">Season ${escapeHtml(p.seasonId)} ${escapeHtml(rank)}${detail ? ' · ' + escapeHtml(detail) : ''}${asOf}${currentMark}</span>`;
+  }).filter(Boolean).join('<span style="color:#475569; margin:0 6px;">→</span>');
+  return html;
 }
 
 let listExpanded = {};
@@ -1634,8 +1649,11 @@ function normalizeBootHash() {
   }
 }
 
+const overlayReturnFocus = {};
+
 function openOverlay(id) {
   const el = $(id);
+  overlayReturnFocus[id] = document.activeElement;
   if (el) el.style.display = 'flex';
   history.pushState({ ...(history.state || {}), overlay: id }, '');
   updateBodyScrollLock();
@@ -1645,11 +1663,12 @@ function forceCloseOverlay(id) {
   const el = $(id);
   if (el) el.style.display = 'none';
   updateBodyScrollLock();
+  const returnTo = overlayReturnFocus[id];
+  delete overlayReturnFocus[id];
+  if (returnTo && typeof returnTo.focus === 'function') returnTo.focus();
   if (id === 'player-modal-overlay') {
     playerModalData = null;
     modalRequestToken++;
-    if (modalReturnFocus && typeof modalReturnFocus.focus === 'function') modalReturnFocus.focus();
-    modalReturnFocus = null;
   }
 }
 
@@ -1686,7 +1705,6 @@ window.addEventListener('popstate', (e) => {
 let playerModalData = null;
 let profileData = null;
 let profileCurrentSeasonId = null;
-let modalReturnFocus = null;
 let modalRequestToken = 0;
 
 function handleHashRoute() {
@@ -1732,7 +1750,6 @@ async function openPlayerModal(playerId) {
   const content = $('player-modal-content');
   if (!overlay || !content) return;
 
-  modalReturnFocus = document.activeElement;
   const token = ++modalRequestToken;
   const seasonId = seasonForBrowsing();
   nameEl.textContent = 'Loading…';
@@ -1826,7 +1843,8 @@ function renderPlayerModal(data) {
   const content = $('player-modal-content');
   if (!nameEl || !content) return;
 
-  nameEl.textContent = data.playerName || data.playerId;
+  nameEl.innerHTML = escapeHtml(data.playerName || data.playerId)
+    + champBadge(data.career && data.career.championCount);
   content.innerHTML = renderSeasonContent(data.season);
 }
 
@@ -1865,7 +1883,10 @@ async function loadPlayerProfile(playerId) {
     }
 
     const titleEl = $('profile-title');
-    if (titleEl) titleEl.textContent = profileData.playerName || playerId;
+    if (titleEl) {
+      titleEl.innerHTML = escapeHtml(profileData.playerName || playerId)
+        + champBadge(profileData.career && profileData.career.championCount);
+    }
 
     const seasonSel = $('profile-season-filter');
     if (seasonSel) {
@@ -1928,32 +1949,20 @@ function renderProfileCareer(data) {
   const recordHtml = `
     <div class="card card-tight">
       <div class="section-heading">Career Record</div>
-      <div class="career-record-grid">
-        <div><span style="color:#94a3b8;">Nights</span><br><strong style="color:#f8fafc;">${escapeHtml(c.nightsPlayed)}</strong></div>
-        <div><span style="color:#94a3b8;">W-D-L</span><br><strong style="color:#f8fafc;">${escapeHtml(wdll.won)}-${escapeHtml(wdll.drawn)}-${escapeHtml(wdll.lost)}</strong></div>
-        <div><span style="color:#94a3b8;">Game diff</span><br><strong style="color:#f8fafc;">${c.gameDiff > 0 ? '+' : ''}${escapeHtml(c.gameDiff)}</strong></div>
-        <div><span style="color:#94a3b8;">Avg pts/night</span><br><strong style="color:#f8fafc;">${escapeHtml(c.avgPtsPerNight)}</strong></div>
+      <div class="player-modal-stats">
+        ${statTile(escapeHtml(c.nightsPlayed), 'Nights')}
+        ${statTile(escapeHtml(wdll.won) + '-' + escapeHtml(wdll.drawn) + '-' + escapeHtml(wdll.lost), 'W-D-L')}
+        ${statTile((c.gameDiff > 0 ? '+' : '') + escapeHtml(c.gameDiff), 'Game diff')}
+        ${statTile(escapeHtml(c.avgPtsPerNight), 'Avg pts/night')}
       </div>
     </div>`;
 
   let progHtml = '';
   if (c.progression && c.progression.length > 0) {
-    const peak = c.peak;
-    progHtml = '<div class="card card-tight">';
-    progHtml += '<div class="section-heading">Season Progression</div>';
-    if (peak && peak.length > 0) {
-      const peakStr = peak.map(p => 'Season ' + p.seasonId).join(', ');
-      progHtml += `<div style="margin-bottom:8px;"><span style="color:#fbbf24;">Peak:</span> <span style="color:#f8fafc;">#${escapeHtml(peak[0].rank)} (${escapeHtml(peakStr)})</span></div>`;
-    }
-    progHtml += c.progression.map(p => {
-      if (p.rank == null && !p.isCurrent) return null;
-      const rank = p.rank != null ? '#' + p.rank : '—';
-      const pts = p.points != null ? p.points + ' pts' : '';
-      const currentMark = p.isCurrent ? ' (current)' : '';
-      const detail = [pts].filter(Boolean).join(', ');
-      return `<span style="color:${p.isCurrent ? '#38bdf8' : '#94a3b8'}; font-size:0.85rem;">Season ${escapeHtml(p.seasonId)} ${escapeHtml(rank)}${detail ? ' · ' + escapeHtml(detail) : ''}${currentMark}</span>`;
-    }).filter(Boolean).join('<span style="color:#475569; margin:0 6px;">→</span>');
-    progHtml += '</div>';
+    progHtml = '<div class="card card-tight">' +
+      '<div class="section-heading">Season Progression</div>' +
+      seasonProgressionHtml(c.progression, c.peak) +
+      '</div>';
   }
 
   let badgesHtml = '';

@@ -101,11 +101,20 @@ export async function handleGetStandingsData(body, env) {
     .map(t => ({ round: t.round, name: t.name }))
     .sort((a, b) => b.round - a.round);
 
+  const championTitleRows = await DB.prepare(
+    'SELECT player_id FROM awards WHERE award_name = ?'
+  ).bind('Galactic Champion').all();
+  const championCounts = {};
+  for (const r of (championTitleRows.results || [])) {
+    championCounts[r.player_id] = (championCounts[r.player_id] || 0) + 1;
+  }
+
   return {
     seasonId,
     table,
     rounds,
     allRegularRounds,
     asOfRound: effectiveAsOf,
+    championCounts,
   };
 }

@@ -590,3 +590,45 @@ describe('v4.10.0: sign-in modal, guest banner, header sizing', () => {
     assert.ok((js.match(/closeOverlay\('/g) || []).length >= 3, 'all three overlays route through closeOverlay');
   });
 });
+
+describe('v4.11.0: champion stars, shared atoms, overlay focus parity', () => {
+  it('champion titles appear as gold stars only at the three identity surfaces', () => {
+    const js = readJS();
+    const css = readCSS();
+    assert.ok(js.includes('function champBadge'), 'star badge helper must exist');
+    assert.ok(js.includes('appState.championCounts = res.championCounts'), 'standings response feeds the badge');
+    assert.equal((js.match(/champBadge\(/g) || []).length, 4, 'helper plus exactly three call sites: table, modal, profile');
+    assert.ok(css.includes('.champ-star'), 'gold star styling must exist');
+  });
+
+  it('season progression renders from one shared function', () => {
+    const js = readJS();
+    assert.ok(js.includes('function seasonProgressionHtml'), 'shared progression renderer must exist');
+    assert.equal((js.match(/seasonProgressionHtml\(/g) || []).length, 3, 'definition plus both consumers');
+    assert.ok(js.includes("' (after Night '"), 'as-of detail preserved in the shared renderer');
+  });
+
+  it('every overlay returns focus to its opener', () => {
+    const js = readJS();
+    assert.ok(js.includes('const overlayReturnFocus = {}'), 'focus memory must be per-overlay');
+    assert.ok(js.includes('overlayReturnFocus[id] = document.activeElement'), 'open captures the opener');
+    assert.ok(js.includes('returnTo.focus()'), 'close restores the opener');
+    assert.ok(!js.includes('modalReturnFocus'), 'player-only bespoke focus variable must be gone');
+  });
+
+  it('my-stats and profile cards share the card-tight atom', () => {
+    const html = readHTML();
+    const js = readJS();
+    assert.ok(!/style="padding: ?14px/.test(html), 'no inline 14px card clones left in markup');
+    assert.ok(js.includes('statTile(escapeHtml(c.nightsPlayed)'), 'profile career uses the tile idiom');
+    assert.ok(js.includes('<div class="section-heading">Career Record'), 'headings use the shared atom');
+  });
+
+  it('profile career record keeps only the four headline stats', () => {
+    const js = readJS();
+    const career = js.match(/function renderProfileCareer[\s\S]*?container\.innerHTML = recordHtml/);
+    assert.ok(career, 'career renderer must exist');
+    assert.ok(career[0].includes('player-modal-stats'), 'headline stats render as tiles');
+    assert.ok(!career[0].includes('career-record-grid'), 'grid dialect not duplicated in the profile');
+  });
+});

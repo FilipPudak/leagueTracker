@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap" as="style">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="styles.css?v=4.10.1">
+  <link rel="stylesheet" href="styles.css?v=4.11.0">
 </head>
 <body>
   <script>document.body.classList.toggle('is-linked',!!localStorage.getItem('lt_token'))</script>
@@ -111,7 +111,7 @@
       </div>
 
       <div id="standings-content" style="display: none;">
-        <div class="card" style="padding:14px; margin-bottom:10px;">
+        <div class="card card-tight">
           <div id="standings-table-section">
             <h3 class="section-heading">Season Table</h3>
           <div class="standings-table-wrap" id="standings-table-wrap">
@@ -238,11 +238,11 @@
           <button type="button" class="career-tab" role="tab" aria-selected="false" aria-controls="career-tab-badges" onclick="switchCareerTab('badges')">Badges</button>
         </div>
         <div id="career-tab-record" class="career-panel active" role="tabpanel">
-          <div id="career-record-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
-          <div id="career-progression-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
+          <div id="career-record-card" class="card card-tight" style="display:none;"></div>
+          <div id="career-progression-card" class="card card-tight" style="display:none;"></div>
         </div>
         <div id="career-tab-versus" class="career-panel" role="tabpanel">
-          <div id="career-rivalry-card" class="card" style="padding:14px; margin-bottom:10px; display:none;"></div>
+          <div id="career-rivalry-card" class="card card-tight" style="display:none;"></div>
         </div>
         <div id="career-tab-badges" class="career-panel" role="tabpanel">
           <div id="career-badges-container" class="badges-grid"></div>
@@ -259,7 +259,7 @@
         <div id="myseason-content" style="display: none;">
           <div id="myseason-gamification-section" style="margin-top: 0; display: none;">
             <h3 class="section-heading">Voting Milestone</h3>
-            <div id="myseason-milestone-container" class="card" style="padding: 14px; margin-bottom: 12px;">
+            <div id="myseason-milestone-container" class="card card-tight">
               <div style="background: #1e293b; border-radius: 6px; height: 12px; overflow: hidden; margin-bottom: 10px;">
                 <div id="milestone-bar" style="background: linear-gradient(90deg, #38bdf8, #22d3ee); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 6px;"></div>
               </div>
@@ -350,7 +350,7 @@
     </div>
   </div>
 
-  <script src="app-core.js?v=4.10.1"></script>
-<script src="app.js?v=4.10.1"></script>
+  <script src="app-core.js?v=4.11.0"></script>
+<script src="app.js?v=4.11.0"></script>
 </body>
 </html>

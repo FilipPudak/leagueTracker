@@ -143,6 +143,11 @@ export async function handleGetPlayerProfile(body, env) {
   const badges = await computeBadges(DB, playerId, activeSeasonId, currentWeek !== null);
   const earnedBadges = badges.filter(b => b.earned);
 
+  const championTitleRows = await DB.prepare(
+    'SELECT season_id FROM awards WHERE award_name = ? AND player_id = ?'
+  ).bind('Galactic Champion', playerId).all();
+  const championCount = (championTitleRows.results || []).length;
+
   return {
     playerId,
     playerName: player.name,
@@ -167,6 +172,7 @@ export async function handleGetPlayerProfile(body, env) {
       progression,
       peak,
       badges: earnedBadges,
+      championCount,
     },
   };
 }

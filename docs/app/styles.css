@@ -297,6 +297,7 @@ select[size] option { padding: 6px 8px; }
 .standings-row { transition: background 0.15s ease; }
 .standings-row td { padding: 8px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
 .hover-underline { text-decoration: none; transition: text-decoration-color 0.15s; }
+.champ-star { color: #facc15; font-size: 0.8em; letter-spacing: 1px; margin-left: 4px; white-space: nowrap; text-shadow: 0 0 6px rgba(250, 204, 21, 0.35); }
 .name-btn { background: none; border: none; padding: 0; font-family: inherit; font-weight: 600; font-size: inherit; color: #38bdf8; cursor: pointer; text-decoration: none; text-align: left; }
 .standings-row.rank-1 td:first-child { color: #facc15; font-weight: 900; }
 .standings-row.rank-2 td:first-child { color: #e2e8f0; font-weight: 900; }

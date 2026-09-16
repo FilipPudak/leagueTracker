@@ -72,7 +72,20 @@ const LeagueCore = (() => {
     return selectValue == null ? '' : String(selectValue);
   }
 
-  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, gamificationViewFor, leaderOptionLabel, visibleListSlice, listToggleLabel, voteSubmitAction, shouldRetryAsNewVote, resolveStandingsAsOf, GUEST_PITCH, CACHE_TTL_MS };
+  // ★ = career Galactic Champion titles, rendered next to player names.
+  function championStarMarkup(count) {
+    const n = Number(count) || 0;
+    if (n <= 0) return '';
+    if (n >= 4) return '★★★+';
+    return '★'.repeat(n);
+  }
+
+  function championStarTitle(count) {
+    const n = Number(count) || 0;
+    return n <= 0 ? '' : n + '× Galactic Champion';
+  }
+
+  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, gamificationViewFor, leaderOptionLabel, visibleListSlice, listToggleLabel, voteSubmitAction, shouldRetryAsNewVote, resolveStandingsAsOf, championStarMarkup, championStarTitle, GUEST_PITCH, CACHE_TTL_MS };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.LeagueCore = LeagueCore;

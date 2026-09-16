@@ -33,6 +33,27 @@ describe('handleGetStandingsData', () => {
     assert.equal(result.table[0].points, 18);
   });
 
+  it('returns career champion counts for star rendering', async () => {
+    const tables = makeTables({
+      melee_tournaments: [
+        { melee_id: 100, season_id: 6, round: 1, name: 'week 1', date: '2026-06-15', phase: 'regular' },
+      ],
+      season_standings: [
+        { season_id: 6, round: 1, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+        { season_id: 6, round: 1, player_id: 'P002', wins: 2, losses: 1, draws: 0, match_points: 6, rank: 2 },
+      ],
+    });
+    tables.awards = [
+      { season_id: 5, award_name: 'Galactic Champion', player_id: 'P001', score: null },
+      { season_id: 6, award_name: 'Galactic Champion', player_id: 'P001', score: null },
+      { season_id: 6, award_name: 'Galactic Ruler', player_id: 'P001', score: 42 },
+    ];
+    const db = createMockDb(tables);
+
+    const result = await handleGetStandingsData({ seasonId: 6 }, { DB: db });
+    assert.deepEqual(result.championCounts, { P001: 2 }, 'only Galactic Champion rows count, across seasons');
+  });
+
   it('returns season table with rankings', async () => {
     const tables = makeTables({
       melee_tournaments: [

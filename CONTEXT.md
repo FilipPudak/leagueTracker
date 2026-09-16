@@ -208,7 +208,10 @@ never per-player rankings.
   an as-of round picker) plus per-night results; championship/side events appear as clearly
   labeled rounds. Mirrors the league site's information architecture (cumulative table + round
   tabs), powered purely by Melee-derived data.
-- The site's ★ = count of cut wins (Champion count) — the app may render the same later.
+- The site's ★ = count of cut wins (Champion count) — the app renders it: career Galactic
+  Champion titles as gold ★ next to player names in the season table, the player modal header, and
+  the profile header only. Glyphs repeat per title up to ★★★, `★★★+` beyond; exact count in
+  `aria-label`/`title` ("N× Galactic Champion"). Never on night-result rows, podium rows, or pickers.
 - **Player profile (full page):** shows season stats, career record, progression, badges, and
   leader-use breakdown for any player. **Intentionally omits gamification** (milestones, raffle
   tickets, streaks — private to the linked player only) and **rivalry/versus** data (personal

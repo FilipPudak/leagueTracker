@@ -157,6 +157,26 @@ describe('handleGetPlayerProfile', () => {
     assert.equal(result.season.won, 0);
   });
 
+  it('career carries champion title count across seasons', async () => {
+    const tables = makeTables({
+      melee_tournaments: [
+        { melee_id: 100, season_id: 6, round: 1, name: 'week 1', date: '2026-06-15', phase: 'regular' },
+      ],
+      season_standings: [
+        { season_id: 6, round: 1, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+      ],
+      awards: [
+        { season_id: 5, award_name: 'Galactic Champion', player_id: 'P001', score: null },
+        { season_id: 6, award_name: 'Galactic Champion', player_id: 'P002', score: null },
+        { season_id: 6, award_name: 'Galactic Ruler', player_id: 'P001', score: 42 },
+      ],
+    });
+    env = { DB: createMockDb(tables) };
+
+    const result = await handleGetPlayerProfile({ playerId: 'P001', seasonId: 6 }, env);
+    assert.equal(result.career.championCount, 1);
+  });
+
   it('returns awards only for closed seasons', async () => {
     const result = await handleGetPlayerProfile({ playerId: 'P001', seasonId: 6 }, env);
     assert.deepEqual(result.season.awards, []);

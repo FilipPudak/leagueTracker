@@ -294,3 +294,23 @@ describe('resolveStandingsAsOf', () => {
     assert.equal(core.resolveStandingsAsOf(false, ''), '');
   });
 });
+
+describe('champion star rendering', () => {
+  it('empty for zero, null and garbage counts', () => {
+    assert.equal(core.championStarMarkup(0), '');
+    assert.equal(core.championStarMarkup(null), '');
+    assert.equal(core.championStarMarkup('x'), '');
+  });
+
+  it('repeats per title and caps at three plus', () => {
+    assert.equal(core.championStarMarkup(1), '★');
+    assert.equal(core.championStarMarkup(2), '★★');
+    assert.equal(core.championStarMarkup(3), '★★★');
+    assert.equal(core.championStarMarkup(4), '★★★+');
+  });
+
+  it('title text carries the exact count', () => {
+    assert.equal(core.championStarTitle(2), '2× Galactic Champion');
+    assert.equal(core.championStarTitle(0), '');
+  });
+});
