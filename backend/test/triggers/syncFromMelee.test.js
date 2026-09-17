@@ -106,28 +106,50 @@ describe('triggers/syncFromMelee', () => {
     globalThis.fetch = originalFetch;
   });
 
-  it('skips when SEASON_STARTED is FALSE', async () => {
-    const settings = basicTables().settings
-      .filter(s => s.key !== 'SEASON_STARTED')
-      .concat([{ key: 'SEASON_STARTED', value: 'FALSE' }]);
-    db = createMockDb(makeTables({ settings }));
+  it('post-close: syncs data and materializes Champion if cut data arrives after close', async () => {
+    const tables = makeTables();
+    tables.settings = tables.settings.map(s => {
+      if (s.key === 'SEASON_STARTED') return { ...s, value: 'FALSE' };
+      if (s.key === 'CURRENT_WEEK') return { ...s, value: 'Season Ended' };
+      return s;
+    });
+    tables.melee_tournaments = [
+      { melee_id: 200, season_id: 6, round: 12, name: 'SWU Wednesday league season 6 Top 8', date: '2026-09-09', phase: 'cut' },
+    ];
+    tables.season_standings = [
+      { season_id: 6, round: 12, player_id: 'P005', wins: 4, losses: 1, draws: 0, match_points: 12, rank: 1 },
+    ];
+    db = createMockDb(tables);
+    const { mockFetch } = buildMockFetch({ tournaments: [] });
+    globalThis.fetch = mockFetch;
 
-    let fetchCount = 0;
-    globalThis.fetch = async () => { fetchCount++; return { ok: false }; };
-
-    await syncFromMelee({ DB: db }, {});
-    assert.equal(fetchCount, 0);
+    const result = await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch), now: '2026-09-23T20:15:00Z' });
+    assert.equal(result.status, 'post-close-sync');
+    const champion = db.getStore().awards.find(a => a.award_name === 'Galactic Champion' && a.season_id === 6);
+    assert.ok(champion, 'Champion materialized during post-close sync');
+    assert.equal(champion.player_id, 'P005');
+    const settings = await getSettings(db);
+    assert.equal(settings.CURRENT_WEEK, 'Season Ended', 'lifecycle untouched');
   });
 
-  it('skips when SEASON_STARTED is missing', async () => {
-    const settings = basicTables().settings.filter(s => s.key !== 'SEASON_STARTED');
-    db = createMockDb(makeTables({ settings }));
+  it('post-close: no-op when Champion already exists', async () => {
+    const tables = makeTables();
+    tables.settings = tables.settings.map(s => {
+      if (s.key === 'SEASON_STARTED') return { ...s, value: 'FALSE' };
+      if (s.key === 'CURRENT_WEEK') return { ...s, value: 'Season Ended' };
+      return s;
+    });
+    tables.awards = [
+      { season_id: 6, award_name: 'Galactic Champion', player_id: 'P005', score: 1 },
+    ];
+    db = createMockDb(tables);
+    const { mockFetch } = buildMockFetch({ tournaments: [] });
+    globalThis.fetch = mockFetch;
 
-    let fetchCount = 0;
-    globalThis.fetch = async () => { fetchCount++; return { ok: false }; };
-
-    await syncFromMelee({ DB: db }, {});
-    assert.equal(fetchCount, 0);
+    const result = await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch), now: '2026-09-23T20:15:00Z' });
+    assert.equal(result.status, 'post-close-sync');
+    const awardsBefore = db.getStore().awards.filter(a => a.season_id === 6).length;
+    assert.equal(awardsBefore, 1, 'no extra awards written');
   });
 
   it('fetches tournaments and stores in melee_tournaments', async () => {
@@ -305,6 +327,40 @@ describe('triggers/syncFromMelee', () => {
     const players = db.getStore().players;
     assert.equal(players.find(p => p.id === 'P001').active, 1, 'Alice active (attended)');
     assert.equal(players.find(p => p.id === 'P005').active, 0, 'Eve stays inactive (did not attend)');
+  });
+
+  it('stores a new second night as round 2 when round 1 is already synced (no collision)', async () => {
+    const tables = withSeasonStarted(makeTables());
+    tables.settings = tables.settings.map(s =>
+      s.key === 'CURRENT_WEEK' ? { ...s, value: 'Week 1' } : s
+    );
+    tables.melee_tournaments = [
+      { melee_id: 100, season_id: 6, round: 1, name: TOURNAMENTS[0].Name, date: TOURNAMENTS[0].StartDate, phase: 'regular' },
+    ];
+    tables.season_standings = [
+      { season_id: 6, round: 1, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+    ];
+    tables.match_results = [
+      { season_id: 6, round: 1, melee_match_id: 'r1m1', player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: '2-0', is_bye: 0 },
+    ];
+    db = createMockDb(tables);
+    const { mockFetch } = buildMockFetch({ tournaments: TOURNAMENTS.slice(0, 2) });
+    globalThis.fetch = mockFetch;
+
+    const result = await syncFromMelee({ DB: db }, {
+      MeleeClient: makeMockClient(mockFetch),
+      now: '2026-07-08T20:15:00Z',
+    });
+
+    const store = db.getStore();
+    const week2 = store.melee_tournaments.find(t => t.melee_id === 101);
+    assert.ok(week2, 'second-night tournament stored');
+    assert.equal(week2.round, 2, 'numbered after existing round 1, not collided onto it');
+    assert.equal(store.season_standings.filter(s => s.round === 2).length, 3, 'week 2 standings synced');
+    assert.equal(store.match_results.filter(m => m.round === 2).length, 3, 'week 2 matches synced');
+    assert.ok(store.attendance.some(a => a.week === 2), 'week 2 attendance recorded');
+    assert.equal(result.status, 'advanced');
+    assert.equal(result.week, 2, 'advance respects the freshly synced round');
   });
 
   it('listTournaments failure → aborts before advance, no crash, no writes', async () => {

@@ -1,4 +1,4 @@
-import { getMaxSeasonId, updateSetting, parseSeasonId } from '../db/queries.js';
+import { getMaxSeasonId, updateSettingsBatch, parseSeasonId } from '../db/queries.js';
 import { constantTimeEqual } from '../lib/auth.js';
 import { badRequest } from '../lib/errors.js';
 
@@ -33,10 +33,12 @@ export async function handleStartNewSeason(body, env) {
     ).bind(nextSeasonId, nextSeasonName, today).run();
   }
 
-  await updateSetting(DB, 'ACTIVE_SEASON_ID', String(nextSeasonId));
-  await updateSetting(DB, 'CURRENT_WEEK', 'Week 1');
-  await updateSetting(DB, 'VOTING_OPEN', 'FALSE');
-  await updateSetting(DB, 'SEASON_STARTED', 'TRUE');
+  await updateSettingsBatch(DB, [
+    ['ACTIVE_SEASON_ID', String(nextSeasonId)],
+    ['CURRENT_WEEK', 'Week 1'],
+    ['VOTING_OPEN', 'FALSE'],
+    ['SEASON_STARTED', 'TRUE'],
+  ]);
 
   return { seasonId: nextSeasonId, seasonName: nextSeasonName };
 }

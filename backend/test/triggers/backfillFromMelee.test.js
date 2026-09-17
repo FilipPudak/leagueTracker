@@ -330,6 +330,7 @@ describe('triggers/backfillFromMelee', () => {
 
   it('includes cut and side events with correct phases', async () => {
     const tables = makeTables();
+    tables.melee_tournaments = [];
     db = createMockDb(tables);
     const fetchFn = async (url) => {
       if (url.includes('/api/tournament/list')) {
@@ -356,6 +357,7 @@ describe('triggers/backfillFromMelee', () => {
 
   it('assigns regular rounds 1-N and cut/side after', async () => {
     const tables = makeTables();
+    tables.melee_tournaments = [];
     db = createMockDb(tables);
     const fetchFn = async (url) => {
       if (url.includes('/api/tournament/list')) {
@@ -374,6 +376,9 @@ describe('triggers/backfillFromMelee', () => {
 
     const regularRounds = regulars.map(t => t.round).sort((a, b) => a - b);
     assert.deepEqual(regularRounds, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 'Regulars get rounds 1-11');
+
+    const allRounds = tournaments.map(t => t.round);
+    assert.equal(new Set(allRounds).size, allRounds.length, 'No duplicate rounds');
 
     const maxRegularRound = Math.max(...regularRounds);
     for (const s of specials) {

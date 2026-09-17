@@ -21,7 +21,7 @@ const smellRules = {
 
 export default [
   {
-    ignores: ["**/node_modules/**", ".wrangler/**", "tmp/**", ".opencode/**"]
+    ignores: ["**/node_modules/**", "**/.wrangler/**", "tmp/**", ".opencode/**"]
   },
   js.configs.recommended,
   {

@@ -433,7 +433,7 @@ describe('router/index.js – fetch handler', () => {
     tables.settings.push({ key: 'SEASON_STARTED', value: 'TRUE' });
     const testEnv = env(tables, { MELEE_CLIENT_ID: 'x', MELEE_CLIENT_SECRET: 'y' });
     try {
-      await worker.scheduled({ cron: '15 20 * * 3' }, testEnv, { waitUntil() {} });
+      await worker.scheduled({ cron: '15 20 * * 3', scheduledTime: 1758054900000 }, testEnv, { waitUntil() {} });
     } catch (err) {
       assert.fail(`scheduled() must swallow errors (cron reliability): ${err.message}`);
     } finally {
@@ -442,6 +442,29 @@ describe('router/index.js – fetch handler', () => {
     const settings = testEnv.DB.getStore().settings;
     const week = settings.find(s => s.key === 'CURRENT_WEEK');
     assert.equal(week.value, 'Week 3', 'week untouched on fetch failure via cron');
+    const heartbeat = settings.find(s => s.key === 'LAST_CRON_AT');
+    assert.ok(heartbeat, 'cron heartbeat written even when sync fails');
+    assert.equal(heartbeat.value, new Date(1758054900000).toISOString(), 'heartbeat records the scheduled event time');
+  });
+
+  it('scheduled() probe cron writes only LAST_PROBE_AT and performs no sync', async () => {
+    const originalFetch = globalThis.fetch;
+    let fetchCalls = 0;
+    globalThis.fetch = async () => { fetchCalls++; return { ok: false, status: 400, headers: { get: () => null }, text: async () => 'boom' }; };
+    const tables = basicTables();
+    tables.settings.push({ key: 'SEASON_STARTED', value: 'TRUE' });
+    const testEnv = env(tables, { MELEE_CLIENT_ID: 'x', MELEE_CLIENT_SECRET: 'y' });
+    try {
+      await worker.scheduled({ cron: '15 */2 * * *', scheduledTime: 1758055200000 }, testEnv, { waitUntil() {} });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+    const settings = testEnv.DB.getStore().settings;
+    assert.equal(fetchCalls, 0, 'probe must not touch the Melee API');
+    const probe = settings.find(s => s.key === 'LAST_PROBE_AT');
+    assert.ok(probe, 'probe heartbeat written');
+    assert.equal(probe.value, new Date(1758055200000).toISOString());
+    assert.ok(!settings.find(s => s.key === 'LAST_CRON_AT'), 'probe does not write the weekly-heartbeat key');
   });
 
   it('session timestamp touch is registered via ctx.waitUntil', async () => {

@@ -1,5 +1,5 @@
 import { MeleeClient } from '../lib/melee.js';
-import { getSettings, updateSetting, parseSeasonId, parseWeek, isSeasonStarted, isSeasonPaused, isVotingOpen } from '../db/queries.js';
+import { getSettings, updateSettingsBatch, parseSeasonId, parseWeek, isSeasonStarted, isSeasonPaused, isVotingOpen } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, computeChampion, computeBountyHunter, writePodiumBlock } from '../lib/awards.js';
 import { fetchLeagueTournaments, buildWeekMap, createPlayerFinder } from '../lib/meleeLeague.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';
@@ -33,12 +33,7 @@ export async function syncFromMelee(env, deps = {}) {
 
   const settings = await getSettings(DB);
   const seasonStarted = isSeasonStarted(settings.SEASON_STARTED);
-
-  if (!seasonStarted) {
-    console.log('[SyncFromMelee] Season not started; skipping.');
-    return { status: 'skipped', reason: 'season-not-started' };
-  }
-
+  const seasonEnded = !seasonStarted;
   const activeSeasonId = parseSeasonId(settings.ACTIVE_SEASON_ID);
   const currentWeek = parseWeek(settings.CURRENT_WEEK);
   const votingOpen = isVotingOpen(settings.VOTING_OPEN);
@@ -253,6 +248,20 @@ export async function syncFromMelee(env, deps = {}) {
     return { status: 'paused', syncedTournaments: weekMap.size };
   }
 
+  if (seasonEnded) {
+    const championRow = await DB.prepare(
+      "SELECT 1 FROM awards WHERE season_id = ? AND award_name = 'Galactic Champion' AND player_id != '' LIMIT 1"
+    ).bind(activeSeasonId).first();
+    if (!championRow) {
+      const champion = await computeChampion(DB, activeSeasonId);
+      if (champion.length > 0) {
+        await writePodiumBlock(DB, activeSeasonId, 'Galactic Champion', champion);
+        console.log('[SyncFromMelee] Post-close: Galactic Champion materialized.');
+      }
+    }
+    return { status: 'post-close-sync', syncedTournaments: weekMap.size };
+  }
+
   const schemer = await computeSchemer(DB, activeSeasonId);
   if (schemer.length > 0) {
     await writePodiumBlock(DB, activeSeasonId, 'Galactic Schemer', schemer);
@@ -365,8 +374,7 @@ export async function syncFromMelee(env, deps = {}) {
   }
 
   if (!votingOpen && (canAdvance || weekDataPresent)) {
-    await updateSetting(DB, 'VOTING_OPEN', 'TRUE');
-    await updateSetting(DB, 'LAST_ADVANCED', today);
+    await updateSettingsBatch(DB, [['VOTING_OPEN', 'TRUE'], ['LAST_ADVANCED', today]]);
     console.log(canAdvance
       ? '[SyncFromMelee] First run — voting opened.'
       : '[SyncFromMelee] Week data present — voting opened by retry fire.');
@@ -379,14 +387,11 @@ export async function syncFromMelee(env, deps = {}) {
       if (champion.length > 0) {
         await writePodiumBlock(DB, activeSeasonId, 'Galactic Champion', champion);
       }
-      await updateSetting(DB, 'CURRENT_WEEK', 'Season Ended');
-      await updateSetting(DB, 'VOTING_OPEN', 'FALSE');
-      await updateSetting(DB, 'SEASON_STARTED', 'FALSE');
+      await updateSettingsBatch(DB, [['CURRENT_WEEK', 'Season Ended'], ['VOTING_OPEN', 'FALSE'], ['SEASON_STARTED', 'FALSE']]);
       console.log('[SyncFromMelee] Season ended.');
       return { status: 'season-ended' };
     }
-    await updateSetting(DB, 'CURRENT_WEEK', `Week ${nextWeek}`);
-    await updateSetting(DB, 'LAST_ADVANCED', today);
+    await updateSettingsBatch(DB, [['CURRENT_WEEK', `Week ${nextWeek}`], ['LAST_ADVANCED', today]]);
     console.log(`[SyncFromMelee] Advanced to Week ${nextWeek}.`);
     return { status: 'advanced', week: nextWeek };
   }

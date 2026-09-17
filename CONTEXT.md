@@ -231,6 +231,8 @@ never per-player rankings.
 | `SEASON_STARTED` | startNewSeason, close | gates the weekly run entirely |
 | `SEASON_PAUSED` | pause/resume actions | sync yes, move no |
 | `LAST_ADVANCED` | weekly run | date-based marker (YYYY-MM-DD) — prevents double-advance on dual-cron Wednesdays |
+| `LAST_CRON_AT` | every real cron fire | ISO heartbeat written by `scheduled()` before any sync work — proof the scheduler dispatched |
+| `LAST_PROBE_AT` | liveness probe (every 2h, `15 */2 * * *`) | heartbeat-only fire (no sync); fresh `LAST_PROBE_AT` + stale `LAST_CRON_AT` ⇒ weekly schedules dead while platform scheduler lives |
 | `TIMEZONE` | manual | display only (Europe/Stockholm) |
 | `WEEKLY_DEADLINE_DAY` / `_TIME` | manual | **displayed only** ("closes Wed 17:45"), never enforced |
 | ~~`SEASON_LENGTH`~~ | — | **retired** → `seasons.length` |

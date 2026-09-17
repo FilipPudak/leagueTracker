@@ -48,22 +48,24 @@ export async function handleGetLeaderboardData(body, env) {
     }))
   );
 
-  // Schemer: stored award or live compute
-  let schemer = awardsMap['Galactic Schemer'] || null;
-  if (!schemer || schemer.length === 0) {
+  // Schemer: live for active season (fresh between weekly refreshes), stored for past seasons
+  let schemer;
+  if (isActiveSeason && !seasonEnded) {
     const live = await computeSchemer(DB, seasonId);
     schemer = live.length > 0 ? assignStandardRanks(live) : null;
   } else {
-    schemer = assignStandardRanks(schemer);
+    schemer = awardsMap['Galactic Schemer'] || null;
+    schemer = schemer ? assignStandardRanks(schemer) : null;
   }
 
-  // Ambassador: stored award or live compute
-  let ambassador = awardsMap['Galactic Ambassador'] || null;
-  if (!ambassador || ambassador.length === 0) {
+  // Ambassador: same live-vs-stored rule as Schemer
+  let ambassador;
+  if (isActiveSeason && !seasonEnded) {
     const live = await computeAmbassador(DB, seasonId);
     ambassador = live.length > 0 ? assignStandardRanks(live) : null;
   } else {
-    ambassador = assignStandardRanks(ambassador);
+    ambassador = awardsMap['Galactic Ambassador'] || null;
+    ambassador = ambassador ? assignStandardRanks(ambassador) : null;
   }
 
   // Galactic Ruler: stored or live from season_standings

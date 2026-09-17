@@ -19,6 +19,13 @@ export async function updateSetting(db, key, value) {
   ).bind(key, String(value)).run();
 }
 
+export async function updateSettingsBatch(db, entries) {
+  const stmts = entries.map(([key, value]) =>
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').bind(key, String(value))
+  );
+  await db.batch(stmts);
+}
+
 function isTruthySetting(settingValue) {
   if (settingValue == null) return false;
   const v = String(settingValue).trim().toUpperCase();

@@ -620,7 +620,8 @@ describe('v4.11.0: champion stars, shared atoms, overlay focus parity', () => {
     const html = readHTML();
     const js = readJS();
     assert.ok(!/style="padding: ?14px/.test(html), 'no inline 14px card clones left in markup');
-    assert.ok(js.includes('statTile(escapeHtml(c.nightsPlayed)'), 'profile career uses the tile idiom');
+    assert.ok(js.includes('statTile(c.nightsPlayed,'), 'profile career uses the tile idiom');
+    assert.ok(js.includes('function statTile') && js.match(/function statTile[\s\S]*?escapeHtml\(value\)/), 'statTile must escape internally (safe shared seam)');
     assert.ok(js.includes('<div class="section-heading">Career Record'), 'headings use the shared atom');
   });
 

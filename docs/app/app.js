@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.11.0';
+const APP_VERSION = '4.12.0';
 
 const appState = {
   status: 'unlinked',
@@ -793,7 +793,22 @@ function submitVotes(isRetry) {
 
   const action = LeagueCore.voteSubmitAction(appState.currentVote);
   callApi(action, { voteData: { leader1Id: l1, opponentId: opp } })
-    .then(() => { endFlight(); showVoteRecorded(); })
+    .then((res) => {
+      endFlight();
+      showVoteRecorded();
+      if (res && res.weeklyParticipation) {
+        const wpCard = $('weekly-participation-card');
+        const wpText = $('weekly-participation-text');
+        if (wpCard && wpText) {
+          wpText.textContent = res.weeklyParticipation.voted + ' of ' + res.weeklyParticipation.total + ' players have voted this week';
+          wpCard.style.display = 'block';
+        }
+      }
+      if (window.innerWidth >= 1024) {
+        loadMySeasonStats();
+        loadCareerStats();
+      }
+    })
     .catch((err) => {
       endFlight();
       const msg = err.userMessage || err.message || '';
@@ -1332,7 +1347,7 @@ function escapeHtml(value) {
 }
 
 function statTile(value, label) {
-  return `<div class="player-modal-stat"><div class="player-modal-stat-value">${value}</div><div class="player-modal-stat-label">${label}</div></div>`;
+  return `<div class="player-modal-stat"><div class="player-modal-stat-value">${escapeHtml(value)}</div><div class="player-modal-stat-label">${escapeHtml(label)}</div></div>`;
 }
 
 // One renderer for the season-progression chain, shared by My Stats and the
@@ -1822,7 +1837,7 @@ function renderSeasonContent(s, opts = {}) {
       s.leaders.map(l => {
         const wp = l.winPct != null ? l.winPct + '%' : '—';
         return `<div class="player-modal-item">
-          <span>${escapeHtml(l.name)}</span>
+          <span>${escapeHtml(LeagueCore.leaderOptionLabel(l))}</span>
           <span>${escapeHtml(l.plays)} plays · ${escapeHtml(l.wins)}W ${escapeHtml(l.draws)}D ${escapeHtml(l.losses)}L · ${wp}</span>
         </div>`;
       }).join('') +
@@ -1950,10 +1965,10 @@ function renderProfileCareer(data) {
     <div class="card card-tight">
       <div class="section-heading">Career Record</div>
       <div class="player-modal-stats">
-        ${statTile(escapeHtml(c.nightsPlayed), 'Nights')}
-        ${statTile(escapeHtml(wdll.won) + '-' + escapeHtml(wdll.drawn) + '-' + escapeHtml(wdll.lost), 'W-D-L')}
-        ${statTile((c.gameDiff > 0 ? '+' : '') + escapeHtml(c.gameDiff), 'Game diff')}
-        ${statTile(escapeHtml(c.avgPtsPerNight), 'Avg pts/night')}
+        ${statTile(c.nightsPlayed, 'Nights')}
+        ${statTile(wdll.won + '-' + wdll.drawn + '-' + wdll.losses, 'W-D-L')}
+        ${statTile((c.gameDiff > 0 ? '+' : '') + c.gameDiff, 'Game diff')}
+        ${statTile(c.avgPtsPerNight, 'Avg pts/night')}
       </div>
     </div>`;
 

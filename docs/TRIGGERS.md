@@ -6,10 +6,12 @@ The backend uses a Cloudflare Worker with dual-cron triggers for DST-safe weekly
 
 ```toml
 [triggers]
-crons = ["15 20 * * 3", "15 21 * * 3"]
+crons = ["15 20 * * 3", "15 21 * * 3", "0 7 * * 4", "15 */2 * * *"]
 ```
 
-Two fires per Wednesday (20:15 and 21:15 UTC). Exactly one is 22:15 Stockholm in either DST state (summer UTC+2 / winter UTC+1).
+Two fires per Wednesday (20:15 and 21:15 UTC). Exactly one is 22:15 Stockholm in either DST state (summer UTC+2 / winter UTC+1). A Thursday 07:00 UTC fire retries data and opens voting if Wednesday's results weren't published in time.
+
+**Liveness probe:** `15 */2 * * *` (every 2 hours) writes the `LAST_PROBE_AT` heartbeat and does nothing else. It exists to detect silently-dead cron triggers: if `LAST_PROBE_AT` is fresh but `LAST_CRON_AT` is older than the last scheduled league-night fire, the weekly schedules — not the platform — are broken.
 
 ## `syncFromMelee`
 
@@ -20,6 +22,7 @@ Two fires per Wednesday (20:15 and 21:15 UTC). Exactly one is 22:15 Stockholm in
 3. **Attendance:** Rebuilt from regular standings
 4. **Awards:** Recomputes Schemer, Ambassador, Ruler, Champion, Bounty Hunter, A New Hope
 5. **Advance gate:** `shouldAdvance(isoNow, marker)` checks:
+   - Stockholm local weekday is Wednesday (league night)
    - Stockholm local time ≥ 22:10
    - `LAST_ADVANCED` marker ≠ today's date (YYYY-MM-DD)
 6. **First run of season:** Sets `VOTING_OPEN=TRUE`, sets `LAST_ADVANCED=today`
@@ -51,6 +54,8 @@ All require `adminToken` matching `ADMIN_SECRET` env var.
 | `SEASON_STARTED` | Gates the sync entirely | `startNewSeason`, close |
 | `SEASON_PAUSED` | Sync yes, move no | `pauseCurrentSeason`/`resumeCurrentSeason` |
 | `LAST_ADVANCED` | Date marker (YYYY-MM-DD) — prevents double-advance | Weekly advance |
+| `LAST_CRON_AT` | ISO timestamp of last real cron fire (written before sync) | every cron fire |
+| `LAST_PROBE_AT` | ISO timestamp of last liveness-probe fire | probe every 2h |
 | `TIMEZONE` | Display only (`Europe/Stockholm`) | Manual |
 | `WEEKLY_DEADLINE_DAY`/`_TIME` | Display only (`Wednesday`/`17:45`) | Manual |
 

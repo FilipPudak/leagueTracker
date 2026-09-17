@@ -34,7 +34,7 @@ export async function handleGetPlayerProfile(body, env) {
 
   const MATCH_COLS = 'season_id, round, player1_id, player2_id, winner_id, result, is_bye';
 
-  const [seasonStandingsResult, seasonTournamentsResult, leadersRaw, deckWinRates, nightsAttendedResult, totalNightsResult, seasonRow, allSeasonStandingsResult] = await Promise.all([
+  const [seasonStandingsResult, seasonTournamentsResult, leadersRaw, deckWinRates, nightsAttendedResult, totalNightsResult, seasonRow, allSeasonStandingsResult, championTitleRows] = await Promise.all([
     DB.prepare('SELECT season_id, round, player_id, wins, losses, draws, rank FROM season_standings WHERE season_id = ? AND player_id = ?').bind(sid, playerId).all(),
     DB.prepare('SELECT round, phase FROM melee_tournaments WHERE season_id = ?').bind(sid).all(),
     DB.prepare(`
@@ -50,6 +50,7 @@ export async function handleGetPlayerProfile(body, env) {
     DB.prepare("SELECT COUNT(DISTINCT round) as cnt FROM melee_tournaments WHERE season_id = ? AND phase = 'regular'").bind(sid).first(),
     DB.prepare('SELECT top_results FROM seasons WHERE id = ?').bind(sid).first(),
     DB.prepare('SELECT season_id, round, player_id, wins, losses, draws, rank FROM season_standings WHERE season_id = ?').bind(sid).all(),
+    DB.prepare('SELECT season_id FROM awards WHERE award_name = ? AND player_id = ?').bind('Galactic Champion', playerId).all(),
   ]);
 
   const regularRoundSet = new Set(
@@ -143,9 +144,6 @@ export async function handleGetPlayerProfile(body, env) {
   const badges = await computeBadges(DB, playerId, activeSeasonId, currentWeek !== null);
   const earnedBadges = badges.filter(b => b.earned);
 
-  const championTitleRows = await DB.prepare(
-    'SELECT season_id FROM awards WHERE award_name = ? AND player_id = ?'
-  ).bind('Galactic Champion', playerId).all();
   const championCount = (championTitleRows.results || []).length;
 
   return {

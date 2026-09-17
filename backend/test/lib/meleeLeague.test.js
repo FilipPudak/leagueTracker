@@ -149,6 +149,39 @@ describe('meleeLeague', () => {
       assert.equal(weekMap.get(101).round, 1);
     });
 
+    it('numbers a new tournament past the highest existing round (no UNIQUE collision)', () => {
+      const tournaments = [
+        { ID: 462767, Name: 'SWU Wednesday league season 7 9/9', StartDate: '2026-09-09', phase: 'regular' },
+        { ID: 466139, Name: 'SWU Wednesday league season 7 16/9 (week 2) ', StartDate: '2026-09-16', phase: 'regular' },
+      ];
+      const existingRoundMap = new Map([[462767, 1]]);
+      const weekMap = buildWeekMap(tournaments, existingRoundMap);
+      assert.equal(weekMap.get(462767).round, 1);
+      assert.equal(weekMap.get(466139).round, 2);
+    });
+
+    it('numbers specials after new regulars when rounds come from the DB', () => {
+      const tournaments = [
+        { ID: 100, Name: 'SWU Wednesday league season 6 15/7', StartDate: '2026-07-15', phase: 'regular' },
+        { ID: 101, Name: 'SWU Wednesday league season 6 22/7', StartDate: '2026-07-22', phase: 'regular' },
+        { ID: 102, Name: 'SWU Wednesday league season 6 TOP 8', StartDate: '2026-07-29', phase: 'cut' },
+      ];
+      const existingRoundMap = new Map([[100, 1]]);
+      const weekMap = buildWeekMap(tournaments, existingRoundMap);
+      assert.equal(weekMap.get(100).round, 1);
+      assert.equal(weekMap.get(101).round, 2);
+      assert.equal(weekMap.get(102).round, 3);
+    });
+
+    it('reserves rounds of stored tournaments absent from the fetched list', () => {
+      const tournaments = [
+        { ID: 200, Name: 'SWU Wednesday league season 6 22/7', StartDate: '2026-07-22', phase: 'regular' },
+      ];
+      const existingRoundMap = new Map([[100, 1]]);
+      const weekMap = buildWeekMap(tournaments, existingRoundMap);
+      assert.equal(weekMap.get(200).round, 2);
+    });
+
     it('includes phase in map entries', () => {
       const tournaments = [
         { ID: 100, Name: 'SWU Wednesday league season 6 TOP 8', phase: 'cut' },

@@ -69,6 +69,13 @@ export async function fetchLeagueTournaments(client, { targetSeason } = {}) {
 
 export function buildWeekMap(tournaments, existingRoundMap = new Map()) {
   const weekMap = new Map();
+  const used = new Set([...existingRoundMap.values()].filter(r => Number.isInteger(r) && r > 0));
+  let next = 1;
+  const takeRound = () => {
+    while (used.has(next)) next++;
+    used.add(next);
+    return next++;
+  };
 
   const regulars = [];
   const specials = [];
@@ -78,10 +85,9 @@ export function buildWeekMap(tournaments, existingRoundMap = new Map()) {
     else specials.push(t);
   }
 
-  let seq = 1;
   for (const t of regulars) {
     const existingRound = existingRoundMap.get(t.ID);
-    const round = existingRound != null ? existingRound : seq++;
+    const round = existingRound != null ? existingRound : takeRound();
     weekMap.set(t.ID, {
       meleeId: t.ID,
       round,
@@ -91,10 +97,9 @@ export function buildWeekMap(tournaments, existingRoundMap = new Map()) {
     });
   }
 
-  let specialSeq = seq;
   for (const t of specials) {
     const existingRound = existingRoundMap.get(t.ID);
-    const round = existingRound != null ? existingRound : specialSeq++;
+    const round = existingRound != null ? existingRound : takeRound();
     const phase = t.phase || classifyPhase(t.Name);
     weekMap.set(t.ID, {
       meleeId: t.ID,

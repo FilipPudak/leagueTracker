@@ -27,6 +27,8 @@ const WRITE_ACTIONS = new Set(['submitVote', 'updateVote', 'linkAccount', 'unlin
 const RATE_LIMIT_SWEEP_INTERVAL_MS = 5 * 60_000;
 let lastSweep = 0;
 
+const PROBE_CRON = '15 */2 * * *';
+
 function checkRateLimit(ip, action) {
   const now = Date.now();
   if (now - lastSweep > RATE_LIMIT_SWEEP_INTERVAL_MS) {
@@ -152,6 +154,18 @@ export default {
 
   // Cron trigger handlers
   async scheduled(event, env, _ctx) {
+    const isProbe = event?.cron === PROBE_CRON;
+    try {
+      await env.DB.prepare(
+        `INSERT OR REPLACE INTO settings (key, value) VALUES ('${isProbe ? 'LAST_PROBE_AT' : 'LAST_CRON_AT'}', ?)`
+      ).bind(new Date(event?.scheduledTime ?? Date.now()).toISOString()).run();
+    } catch (err) {
+      console.error('[Cron] heartbeat write failed:', err);
+    }
+    if (isProbe) {
+      console.log('[Cron] probe heartbeat written; skipping sync.');
+      return;
+    }
     try {
       const { syncFromMelee } = await import('./triggers/syncFromMelee.js');
       const result = await syncFromMelee(env);

@@ -254,10 +254,10 @@ describe('handleGetLeaderboardData', () => {
   it('resolveNames falls back to raw playerId when not in nameMap', async () => {
     const tables = tablesWithoutAwards();
     tables.awards = [
-      { season_id: 6, award_name: 'Galactic Schemer', player_id: 'P_NONEXISTENT', score: 5 },
+      { season_id: 5, award_name: 'Galactic Schemer', player_id: 'P_NONEXISTENT', score: 5 },
     ];
     const db = createMockDb(tables);
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
+    const result = await handleGetLeaderboardData({ seasonId: 5 }, { DB: db });
     assert.ok(result.schemer);
     assert.equal(result.schemer[0].name, 'P_NONEXISTENT', 'falls back to raw playerId when not in nameMap');
   });
