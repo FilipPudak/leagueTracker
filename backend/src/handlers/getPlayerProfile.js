@@ -51,7 +51,7 @@ export async function handleGetPlayerProfile(body, env) {
     DB.prepare('SELECT top_results FROM seasons WHERE id = ?').bind(sid).first(),
     DB.prepare('SELECT season_id, round, player_id, wins, losses, draws, rank FROM season_standings WHERE season_id = ?').bind(sid).all(),
     DB.prepare('SELECT season_id FROM awards WHERE award_name = ? AND player_id = ?').bind('Galactic Champion', playerId).all(),
-    DB.prepare('SELECT DISTINCT season_id FROM awards WHERE award_name = ? AND player_id = ?').bind('Galactic Ruler', playerId).all(),
+    DB.prepare('SELECT DISTINCT season_id FROM awards WHERE award_name = ? AND player_id = ? AND rank = 1').bind('Galactic Ruler', playerId).all(),
   ]);
 
   const regularRoundSet = new Set(

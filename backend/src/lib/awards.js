@@ -85,8 +85,8 @@ export async function writePodiumBlock(db, seasonId, awardName, entries) {
 
   const insertStmts = topN.map(entry =>
     db.prepare(
-      'INSERT INTO awards (season_id, award_name, player_id, score) VALUES (?, ?, ?, ?)'
-    ).bind(seasonId, awardName, entry.playerId, entry.score)
+      'INSERT INTO awards (season_id, award_name, player_id, score, rank) VALUES (?, ?, ?, ?, ?)'
+    ).bind(seasonId, awardName, entry.playerId, entry.score, entry.rank || null)
   );
 
   await db.batch([deleteStmt, ...insertStmts]);

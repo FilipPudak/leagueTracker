@@ -110,8 +110,8 @@ export async function handleGetStandingsData(body, env) {
   }
 
   const rulerTitleRows = await DB.prepare(
-    'SELECT DISTINCT player_id FROM awards WHERE award_name = ?'
-  ).bind('Galactic Ruler').all();
+    'SELECT DISTINCT player_id FROM awards WHERE award_name = ? AND rank = 1 AND season_id != ?'
+  ).bind('Galactic Ruler', seasonId).all();
   const rulerCounts = {};
   for (const r of (rulerTitleRows.results || [])) {
     rulerCounts[r.player_id] = 1;

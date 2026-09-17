@@ -143,10 +143,12 @@ ignored).
 
 Materialized podiums written at season close into the `awards` table. Every tied winner is its
 own row; a podium may exceed three entries (tie-aware); standard competition ranking (1,1,3,4).
+For **Galactic Ruler**, each entry carries a `rank` column (1/2/3) — only rank=1 is the
+actual award winner; the podium shows the full top 3 for context.
 
 | Award | Definition | Tie-break |
 |---|---|---|
-| **Galactic Ruler** | #1 on the season table after the final **regular** week | points → undefeated-night count → night-rank sum → shared |
+| **Galactic Ruler** | #1 on the season table after the final **regular** week. Podium displays top 3; only rank=1 is the award winner. | points → undefeated-night count → night-rank sum → shared |
 | **Galactic Champion** | Rank 1 of the chronologically last **cut** event of the season (the bracket winner — may differ from Ruler; S6: Champion=Filip, Ruler=Dennis) | impossible (bracket rank is strict); if a season has no cut data, no row |
 | **Galactic Schemer** | Most distinct leaders played (from votes) | share podium |
 | **Galactic Ambassador** | Most favorite-opponent votes received | share podium |

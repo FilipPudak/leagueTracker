@@ -301,7 +301,7 @@ export async function syncFromMelee(env, deps = {}) {
 
   const rulerEntries = seasonTable
     .filter(r => r.rank <= 3)
-    .map(r => ({ playerId: r.playerId, score: r.points, name: '' }));
+    .map(r => ({ playerId: r.playerId, score: r.points, name: '', rank: r.rank }));
 
   if (rulerEntries.length > 0) {
     await writePodiumBlock(DB, activeSeasonId, 'Galactic Ruler', rulerEntries);

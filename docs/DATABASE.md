@@ -90,6 +90,7 @@ Materialized award podiums. Written at season close or by `materializePastAwards
 | `award_name` | TEXT NOT NULL | One of 6 awards |
 | `player_id` | TEXT NOT NULL | FK → `players.id` |
 | `score` | REAL | Award-specific score |
+| `rank` | INTEGER | Podium position (1/2/3) — only populated for Galactic Ruler; NULL for other awards |
 
 Constraint: `PRIMARY KEY (season_id, award_name, player_id)`
 
