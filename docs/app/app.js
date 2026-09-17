@@ -498,6 +498,7 @@ function submitAccountLink() {
 
   if (!email) { showLinkStatus('Please enter your email address.'); return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showLinkStatus('Please enter a valid email address.'); return; }
+  if (email.length > 254) { showLinkStatus('Email address is too long.'); return; }
   if (linkMode === 'pick' && !playerId) { showLinkStatus('Please select your player name.'); return; }
 
   linkInFlight = true;
@@ -868,10 +869,10 @@ function loadStandingsData() {
     });
 }
 
-function champBadge(count) {
-  const markup = LeagueCore.championStarMarkup(count);
+function awardBadge(type, count) {
+  const markup = LeagueCore.awardBadgeMarkup(type, count);
   if (!markup) return '';
-  const title = LeagueCore.championStarTitle(count);
+  const title = LeagueCore.awardBadgeTitle(type, count);
   return ' <span class="champ-star" role="img" aria-label="' + title + '" title="' + title + '">' + markup + '</span>';
 }
 
@@ -879,6 +880,7 @@ function renderStandings(res) {
   standingsShowAll = false;
   appState.standingsRenderedSeason = res.seasonId != null ? String(res.seasonId) : '';
   appState.championCounts = res.championCounts || {};
+  appState.rulerCounts = res.rulerCounts || {};
   updateRoundFilter(res.allRegularRounds || res.rounds, res.asOfRound);
   renderStandingsTable(res.table);
   renderRoundResults(res.rounds);
@@ -918,7 +920,7 @@ function renderStandingsTable(table) {
     const playerName = nameMap[row.playerId] || row.playerId;
     return `<tr class="standings-row${rankClass}" ${row.rank > STANDINGS_PAGE_SIZE && !standingsShowAll ? 'style="display:none;"' : ''}>
       <td style="font-weight:700; text-align:left;">${escapeHtml(row.rank)}</td>
-      <td style="text-align:left;"><button type="button" class="name-btn" onclick="openPlayerModal('${escapeHtml(row.playerId)}')">${escapeHtml(playerName)}</button>${champBadge((appState.championCounts || {})[row.playerId])}</td>
+      <td style="text-align:left;"><button type="button" class="name-btn" onclick="openPlayerModal('${escapeHtml(row.playerId)}')">${escapeHtml(playerName)}</button>${awardBadge('ruler', (appState.rulerCounts || {})[row.playerId])}${awardBadge('champion', (appState.championCounts || {})[row.playerId])}</td>
       <td style="text-align:center;">${escapeHtml(row.played)}</td>
       <td style="text-align:center;">${escapeHtml(row.won)}</td>
       <td style="text-align:center;">${escapeHtml(row.drawn)}</td>
@@ -1288,7 +1290,7 @@ function renderCareerStats(res) {
   }
 
   const prog = res.progression || [];
-  progressionCard.innerHTML = '<div class="section-heading">Season Progression</div>' + seasonProgressionHtml(prog, res.peak);
+    progressionCard.innerHTML = seasonProgressionHtml(prog, res.peak);
   progressionCard.style.display = 'block';
 
   const badges = res.badges || [];
@@ -1352,22 +1354,27 @@ function statTile(value, label) {
 
 // One renderer for the season-progression chain, shared by My Stats and the
 // player profile (asOf detail renders when the data carries it).
-function seasonProgressionHtml(prog, peak) {
-  let html = '';
+// When opts.wrapCard is true, wraps in a card (profile path); otherwise raw HTML.
+function seasonProgressionHtml(prog, peak, opts) {
+  const heading = '<div class="section-heading">Season Progression</div>';
+  let inner = '';
   if (peak && peak.length > 0) {
     const peakStr = peak.map((p) => 'Season ' + p.seasonId).join(', ');
-    html += `<div style="margin-bottom:8px;"><span style="color:#fbbf24;">Peak:</span> <span style="color:#f8fafc;">#${escapeHtml(peak[0].rank)} (${escapeHtml(peakStr)})</span></div>`;
+    inner += `<div style="margin-bottom:8px;"><span style="color:#fbbf24;">Peak:</span> <span style="color:#f8fafc;">#${escapeHtml(peak[0].rank)} (${escapeHtml(peakStr)})</span></div>`;
   }
-  html += (prog || []).map((p) => {
+  inner += (prog || []).map((p) => {
     if (p.rank == null && !p.isCurrent) return null;
     const rank = p.rank != null ? '#' + p.rank : '—';
     const pts = p.points != null ? p.points + ' pts' : '';
     const currentMark = p.isCurrent ? ' (current)' : '';
-    const asOf = p.asOfRound != null ? ' (after Night ' + p.asOfRound + ')' : '';
     const detail = [pts].filter(Boolean).join(', ');
-    return `<span style="color:${p.isCurrent ? '#38bdf8' : '#94a3b8'}; font-size:0.85rem;">Season ${escapeHtml(p.seasonId)} ${escapeHtml(rank)}${detail ? ' · ' + escapeHtml(detail) : ''}${asOf}${currentMark}</span>`;
+    return `<span style="color:${p.isCurrent ? '#38bdf8' : '#94a3b8'}; font-size:0.85rem;">Season ${escapeHtml(p.seasonId)} ${escapeHtml(rank)}${detail ? ' · ' + escapeHtml(detail) : ''}${currentMark}</span>`;
   }).filter(Boolean).join('<span style="color:#475569; margin:0 6px;">→</span>');
-  return html;
+  if (!inner) return '';
+  if (opts && opts.wrapCard) {
+    return '<div class="card card-tight">' + heading + inner + '</div>';
+  }
+  return heading + inner;
 }
 
 let listExpanded = {};
@@ -1859,7 +1866,8 @@ function renderPlayerModal(data) {
   if (!nameEl || !content) return;
 
   nameEl.innerHTML = escapeHtml(data.playerName || data.playerId)
-    + champBadge(data.career && data.career.championCount);
+    + awardBadge('ruler', data.career && data.career.rulerCount)
+    + awardBadge('champion', data.career && data.career.championCount);
   content.innerHTML = renderSeasonContent(data.season);
 }
 
@@ -1900,7 +1908,8 @@ async function loadPlayerProfile(playerId) {
     const titleEl = $('profile-title');
     if (titleEl) {
       titleEl.innerHTML = escapeHtml(profileData.playerName || playerId)
-        + champBadge(profileData.career && profileData.career.championCount);
+        + awardBadge('ruler', profileData.career && profileData.career.rulerCount)
+        + awardBadge('champion', profileData.career && profileData.career.championCount);
     }
 
     const seasonSel = $('profile-season-filter');
@@ -1966,7 +1975,7 @@ function renderProfileCareer(data) {
       <div class="section-heading">Career Record</div>
       <div class="player-modal-stats">
         ${statTile(c.nightsPlayed, 'Nights')}
-        ${statTile(wdll.won + '-' + wdll.drawn + '-' + wdll.losses, 'W-D-L')}
+        ${statTile(wdll.won + '-' + wdll.drawn + '-' + wdll.lost, 'W-D-L')}
         ${statTile((c.gameDiff > 0 ? '+' : '') + c.gameDiff, 'Game diff')}
         ${statTile(c.avgPtsPerNight, 'Avg pts/night')}
       </div>
@@ -1974,10 +1983,7 @@ function renderProfileCareer(data) {
 
   let progHtml = '';
   if (c.progression && c.progression.length > 0) {
-    progHtml = '<div class="card card-tight">' +
-      '<div class="section-heading">Season Progression</div>' +
-      seasonProgressionHtml(c.progression, c.peak) +
-      '</div>';
+    progHtml = seasonProgressionHtml(c.progression, c.peak, { wrapCard: true });
   }
 
   let badgesHtml = '';

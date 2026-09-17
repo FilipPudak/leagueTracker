@@ -592,12 +592,13 @@ describe('v4.10.0: sign-in modal, guest banner, header sizing', () => {
 });
 
 describe('v4.11.0: champion stars, shared atoms, overlay focus parity', () => {
-  it('champion titles appear as gold stars only at the three identity surfaces', () => {
+  it('award badges appear at the three identity surfaces', () => {
     const js = readJS();
     const css = readCSS();
-    assert.ok(js.includes('function champBadge'), 'star badge helper must exist');
-    assert.ok(js.includes('appState.championCounts = res.championCounts'), 'standings response feeds the badge');
-    assert.equal((js.match(/champBadge\(/g) || []).length, 4, 'helper plus exactly three call sites: table, modal, profile');
+    assert.ok(js.includes('function awardBadge'), 'award badge helper must exist');
+    assert.ok(js.includes('appState.championCounts = res.championCounts'), 'champion counts feed the badge');
+    assert.ok(js.includes('appState.rulerCounts = res.rulerCounts'), 'ruler counts feed the badge');
+    assert.equal((js.match(/awardBadge\(/g) || []).length, 7, 'helper plus six call sites: 2 per surface (ruler + champion)');
     assert.ok(css.includes('.champ-star'), 'gold star styling must exist');
   });
 
@@ -605,7 +606,8 @@ describe('v4.11.0: champion stars, shared atoms, overlay focus parity', () => {
     const js = readJS();
     assert.ok(js.includes('function seasonProgressionHtml'), 'shared progression renderer must exist');
     assert.equal((js.match(/seasonProgressionHtml\(/g) || []).length, 3, 'definition plus both consumers');
-    assert.ok(js.includes("' (after Night '"), 'as-of detail preserved in the shared renderer');
+    assert.ok(!js.includes("' (after Night '"), '(after Night X) dropped from progression');
+    assert.ok(js.includes("' (current)'"), 'current marker preserved');
   });
 
   it('every overlay returns focus to its opener', () => {

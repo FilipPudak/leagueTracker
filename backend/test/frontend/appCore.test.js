@@ -295,22 +295,30 @@ describe('resolveStandingsAsOf', () => {
   });
 });
 
-describe('champion star rendering', () => {
+describe('award badge rendering', () => {
   it('empty for zero, null and garbage counts', () => {
-    assert.equal(core.championStarMarkup(0), '');
-    assert.equal(core.championStarMarkup(null), '');
-    assert.equal(core.championStarMarkup('x'), '');
+    assert.equal(core.awardBadgeMarkup('champion', 0), '');
+    assert.equal(core.awardBadgeMarkup('champion', null), '');
+    assert.equal(core.awardBadgeMarkup('champion', 'x'), '');
+    assert.equal(core.awardBadgeMarkup('ruler', 0), '');
+    assert.equal(core.awardBadgeMarkup('ruler', null), '');
   });
 
-  it('repeats per title and caps at three plus', () => {
-    assert.equal(core.championStarMarkup(1), '★');
-    assert.equal(core.championStarMarkup(2), '★★');
-    assert.equal(core.championStarMarkup(3), '★★★');
-    assert.equal(core.championStarMarkup(4), '★★★+');
+  it('single badge per type — no repeats', () => {
+    assert.equal(core.awardBadgeMarkup('champion', 1), '🏆');
+    assert.equal(core.awardBadgeMarkup('champion', 3), '🏆');
+    assert.equal(core.awardBadgeMarkup('champion', 5), '🏆');
+    assert.equal(core.awardBadgeMarkup('ruler', 1), '★');
+    assert.equal(core.awardBadgeMarkup('ruler', 2), '★');
   });
 
-  it('title text carries the exact count', () => {
-    assert.equal(core.championStarTitle(2), '2× Galactic Champion');
-    assert.equal(core.championStarTitle(0), '');
+  it('unknown type returns empty', () => {
+    assert.equal(core.awardBadgeMarkup('unknown', 1), '');
+  });
+
+  it('title text', () => {
+    assert.equal(core.awardBadgeTitle('champion', 2), '2× Galactic Champion');
+    assert.equal(core.awardBadgeTitle('ruler', 1), 'Galactic Ruler');
+    assert.equal(core.awardBadgeTitle('champion', 0), '');
   });
 });

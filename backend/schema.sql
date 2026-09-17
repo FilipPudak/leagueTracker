@@ -17,6 +17,10 @@ CREATE TABLE IF NOT EXISTS players (
   active INTEGER DEFAULT 1
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_players_email_unique
+  ON players(email)
+  WHERE email IS NOT NULL AND email != '';
+
 -- Leader options (replaces Leaders sheet)
 CREATE TABLE IF NOT EXISTS leaders (
   id TEXT PRIMARY KEY,

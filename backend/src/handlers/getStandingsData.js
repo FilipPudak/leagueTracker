@@ -109,6 +109,14 @@ export async function handleGetStandingsData(body, env) {
     championCounts[r.player_id] = (championCounts[r.player_id] || 0) + 1;
   }
 
+  const rulerTitleRows = await DB.prepare(
+    'SELECT DISTINCT player_id FROM awards WHERE award_name = ?'
+  ).bind('Galactic Ruler').all();
+  const rulerCounts = {};
+  for (const r of (rulerTitleRows.results || [])) {
+    rulerCounts[r.player_id] = 1;
+  }
+
   return {
     seasonId,
     table,
@@ -116,5 +124,6 @@ export async function handleGetStandingsData(body, env) {
     allRegularRounds,
     asOfRound: effectiveAsOf,
     championCounts,
+    rulerCounts,
   };
 }
