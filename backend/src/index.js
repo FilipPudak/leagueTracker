@@ -14,6 +14,7 @@ import { handleSyncNow } from './handlers/syncNow.js';
 import { handlePauseSeason, handleResumeSeason } from './handlers/pauseSeason.js';
 import { handleAddLeaders, handleSetLeadersActive, handleRemoveLeaders } from './handlers/leaderManagement.js';
 import { handleMaterializePastAwards } from './handlers/materializePastAwards.js';
+import { handleGetWeeklyParticipation } from './handlers/getWeeklyParticipation.js';
 import { findSessionByToken, touchSessionTimestamp } from './lib/auth.js';
 
 const TOKEN_REQUIRED = ['submitVote', 'updateVote', 'unlinkAccount', 'getMySeasonStats', 'getMyCareerStats'];
@@ -110,6 +111,7 @@ export default {
       setLeadersActive: handleSetLeadersActive,
       removeLeaders: handleRemoveLeaders,
       materializePastAwards: handleMaterializePastAwards,
+      getWeeklyParticipation: handleGetWeeklyParticipation,
     };
 
     const handler = handlers[action];

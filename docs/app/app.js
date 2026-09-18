@@ -676,6 +676,20 @@ function switchTab(tabId) {
       if (!appState.votingOpen && votedCard && votedCard.style.display !== 'block') {
         showStatus('Voting is currently closed for this week.', false);
       }
+      callApi('getWeeklyParticipation', {}).then((res) => {
+        if (res && res.weeklyParticipation) {
+          const wpCard = $('weekly-participation-card');
+          const wpText = $('weekly-participation-text');
+          if (wpCard && wpText) {
+            if (res.weeklyParticipation.total > 0) {
+              wpText.textContent = res.weeklyParticipation.voted + ' of ' + res.weeklyParticipation.total + ' players have voted this week';
+              wpCard.style.display = 'block';
+            } else {
+              wpCard.style.display = 'none';
+            }
+          }
+        }
+      }).catch(() => {});
     } else {
       openSignIn();
     }
