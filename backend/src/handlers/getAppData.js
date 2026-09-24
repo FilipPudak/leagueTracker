@@ -67,6 +67,15 @@ export async function handleGetAppData(body, env, session) {
     weeklyParticipation = await getWeeklyParticipation(DB, activeSeasonId, currentWeek);
   }
 
+  // Did the current player attend this week?
+  let attended = null;
+  if (session && activeSeasonId && currentWeek) {
+    const row = await DB.prepare(
+      'SELECT 1 FROM attendance WHERE season_id = ? AND week = ? AND player_id = ?'
+    ).bind(activeSeasonId, currentWeek, session.player_id).first();
+    attended = Boolean(row);
+  }
+
   // Unlinked players for the link form picker
   let unlinkedPlayers = [];
   if (status === 'unlinked') {
@@ -102,5 +111,6 @@ export async function handleGetAppData(body, env, session) {
     alreadyVoted: alreadySubmitted,
     currentVote,
     weeklyParticipation,
+    attended,
   };
 }

@@ -115,6 +115,15 @@ export async function handleLinkAccount(body, env) {
     weeklyParticipation = await getWeeklyParticipation(DB, activeSeasonId, weekNum);
   }
 
+  // Did the player attend this week?
+  let attended = null;
+  if (activeSeasonId && weekNum) {
+    const row = await DB.prepare(
+      'SELECT 1 FROM attendance WHERE season_id = ? AND week = ? AND player_id = ?'
+    ).bind(activeSeasonId, weekNum, playerId).first();
+    attended = Boolean(row);
+  }
+
   return {
     token,
     linkedPlayer: { id: player.id, name: player.name, email: email.trim().toLowerCase() },
@@ -130,5 +139,6 @@ export async function handleLinkAccount(body, env) {
     week: weekNum,
     seasonId: activeSeasonId,
     weeklyParticipation,
+    attended,
   };
 }

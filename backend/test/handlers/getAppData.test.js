@@ -183,4 +183,44 @@ describe('handleGetAppData', () => {
       assert.ok(result.players.length >= 4, 'All players for unlinked user');
     });
   });
+
+  describe('attended field', () => {
+    it('returns true when player has attendance for current week', async () => {
+      const tables = basicTables();
+      tables.attendance.push({ season_id: 6, week: 3, player_id: 'P001' });
+      const db = createMockDb(tables);
+      const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
+      const result = await handleGetAppData({}, { DB: db }, session);
+      assert.equal(result.attended, true);
+    });
+
+    it('returns false when player has no attendance for current week', async () => {
+      const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
+      const result = await handleGetAppData({}, env, session);
+      assert.equal(result.attended, false);
+    });
+
+    it('returns null when no session', async () => {
+      const result = await handleGetAppData({}, env, null);
+      assert.equal(result.attended, null);
+    });
+
+    it('returns null when no active season', async () => {
+      const tables = basicTables();
+      tables.settings = tables.settings.filter(s => s.key !== 'ACTIVE_SEASON_ID');
+      const db = createMockDb(tables);
+      const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
+      const result = await handleGetAppData({}, { DB: db }, session);
+      assert.equal(result.attended, null);
+    });
+
+    it('returns null when no current week', async () => {
+      const tables = basicTables();
+      tables.settings = tables.settings.filter(s => s.key !== 'CURRENT_WEEK');
+      const db = createMockDb(tables);
+      const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
+      const result = await handleGetAppData({}, { DB: db }, session);
+      assert.equal(result.attended, null);
+    });
+  });
 });

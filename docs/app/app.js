@@ -264,6 +264,7 @@ function applyBoot(boot) {
   appState.week = boot.week;
   appState.seasonId = boot.seasonId;
   appState.leaders = boot.leaders || [];
+  appState.attended = boot.attended;
 
   const subtitleEl = $('app-subtitle');
   if (subtitleEl) subtitleEl.textContent = LeagueCore.computeSubtitle(boot);
@@ -366,6 +367,11 @@ function applyBoot(boot) {
       if (voteForm) voteForm.style.display = 'none';
       clearStatus();
       if (landedOnVote) showStatus('Voting is currently closed for this week.', false);
+    } else if (appState.attended === false) {
+      if (voteForm) voteForm.style.display = 'none';
+      const notAttendedCard = $('not-attended-card');
+      if (notAttendedCard) notAttendedCard.style.display = 'block';
+      clearStatus();
     }
   } else {
     showLinkedPresence(null);
@@ -526,7 +532,8 @@ function submitAccountLink() {
         seasonName: appState.seasonName,
         week: appState.week,
         seasonId: appState.seasonId,
-        weeklyParticipation: res.weeklyParticipation
+        weeklyParticipation: res.weeklyParticipation,
+        attended: res.attended,
       };
       showSpinner(false);
       linkInFlight = false;
@@ -673,8 +680,11 @@ function switchTab(tabId) {
       showSpinner(false);
       setActiveView('vote-view');
       const votedCard = $('already-voted-card');
+      const notAttendedCard = $('not-attended-card');
       if (!appState.votingOpen && votedCard && votedCard.style.display !== 'block') {
         showStatus('Voting is currently closed for this week.', false);
+      } else if (appState.attended === false && notAttendedCard) {
+        notAttendedCard.style.display = 'block';
       }
       callApi('getWeeklyParticipation', {}).then((res) => {
         if (res && res.weeklyParticipation) {
@@ -689,6 +699,7 @@ function switchTab(tabId) {
             }
           }
         }
+        applyVoteTabRefresh(res);
       }).catch(() => {});
     } else {
       openSignIn();
@@ -751,18 +762,50 @@ function ensureOption(selectId, value, label) {
   sel.value = String(value);
 }
 
+function restoreVoteSelection() {
+  if (!appState.currentVote) return;
+  const leader = (appState.leaders || []).find(l => String(l.id) === String(appState.currentVote.leaderId));
+  const player = (appState.roster || []).find(p => String(p.id) === String(appState.currentVote.opponentId));
+  ensureOption('leader-1', appState.currentVote.leaderId, LeagueCore.leaderOptionLabel(leader));
+  ensureOption('favorite-opponent', appState.currentVote.opponentId, player ? player.name : appState.currentVote.opponentId);
+}
+
 function changeVote() {
   const voteForm = $('vote-form');
   const votedCard = $('already-voted-card');
   if (voteForm) voteForm.style.display = '';
   if (votedCard) votedCard.style.display = 'none';
   clearStatus();
+  restoreVoteSelection();
+}
 
-  if (appState.currentVote) {
-    const leader = (appState.leaders || []).find(l => String(l.id) === String(appState.currentVote.leaderId));
-    const player = (appState.roster || []).find(p => String(p.id) === String(appState.currentVote.opponentId));
-    ensureOption('leader-1', appState.currentVote.leaderId, LeagueCore.leaderOptionLabel(leader));
-    ensureOption('favorite-opponent', appState.currentVote.opponentId, player ? player.name : appState.currentVote.opponentId);
+function applyVoteTabRefresh(res) {
+  if (!res || res.attended === null || res.attended === undefined) return;
+  const voteForm = $('vote-form');
+  const votedCard = $('already-voted-card');
+  const notAttendedCard = $('not-attended-card');
+  const hasVoted = votedCard && votedCard.style.display === 'block';
+
+  if (res.attended === false) {
+    appState.attended = false;
+    if (voteForm && !hasVoted) voteForm.style.display = 'none';
+    if (notAttendedCard) notAttendedCard.style.display = 'block';
+    return;
+  }
+
+  appState.attended = true;
+  if (notAttendedCard) notAttendedCard.style.display = 'none';
+  if (!appState.votingOpen || hasVoted) return;
+  if (voteForm) voteForm.style.display = '';
+
+  const weekChanged = res.week && appState.week !== res.week;
+  const needsRefilter = res.facedOnly && !appState.playersFiltered;
+  if (res.players && (weekChanged || needsRefilter)) {
+    appState.players = res.players;
+    appState.playersFiltered = Boolean(res.facedOnly);
+    appState.week = res.week || appState.week;
+    populateVotingDropdowns(appState.leaders, res.players, appState.linkedPlayer.id);
+    restoreVoteSelection();
   }
 }
 

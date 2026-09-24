@@ -18,7 +18,7 @@ import { handleGetWeeklyParticipation } from './handlers/getWeeklyParticipation.
 import { findSessionByToken, touchSessionTimestamp } from './lib/auth.js';
 
 const TOKEN_REQUIRED = ['submitVote', 'updateVote', 'unlinkAccount', 'getMySeasonStats', 'getMyCareerStats'];
-const TOKEN_OPTIONAL = ['getAppData'];
+const TOKEN_OPTIONAL = ['getAppData', 'getWeeklyParticipation'];
 
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW_MS = 60_000;

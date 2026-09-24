@@ -105,6 +105,31 @@ describe('router/index.js – fetch handler', () => {
     assert.equal(json.data.linkedPlayer.id, 'P001');
   });
 
+  it('getWeeklyParticipation with valid token resolves session and returns attended', async () => {
+    const resp = await worker.fetch(
+      post({ action: 'getWeeklyParticipation', token: 'test-token-alice' }),
+      env()
+    );
+
+    assert.equal(resp.status, 200);
+    const json = await resp.json();
+    assert.equal(json.success, true);
+    assert.equal(json.data.week, 3);
+    assert.equal(json.data.attended, false, 'P001 has no attendance for week 3 in basic fixture');
+  });
+
+  it('getWeeklyParticipation without token works and returns null attended', async () => {
+    const resp = await worker.fetch(
+      post({ action: 'getWeeklyParticipation', token: '' }),
+      env()
+    );
+
+    assert.equal(resp.status, 200);
+    const json = await resp.json();
+    assert.equal(json.success, true);
+    assert.equal(json.data.attended, null);
+  });
+
   it('submitVote missing token → 401', async () => {
     const resp = await worker.fetch(
       post({ action: 'submitVote', voteData: { leader1Id: '1' } }),
