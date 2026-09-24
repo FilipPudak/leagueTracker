@@ -56,6 +56,43 @@ describe('frontend/app-core', () => {
     });
   });
 
+  describe('shouldShowVoteCta (vote-CTA visibility gate)', () => {
+    it('shows when voting is open, linked, not yet voted, and player attended', () => {
+      assert.equal(core.shouldShowVoteCta({ votingOpen: true, linked: true, alreadyVoted: false, attended: true }), true);
+    });
+
+    it('hides when player did not attend (attended false)', () => {
+      assert.equal(core.shouldShowVoteCta({ votingOpen: true, linked: true, alreadyVoted: false, attended: false }), false);
+    });
+
+    it('shows when attendance is unknown (null) — grace mirrors validateVote', () => {
+      assert.equal(core.shouldShowVoteCta({ votingOpen: true, linked: true, alreadyVoted: false, attended: null }), true);
+      assert.equal(core.shouldShowVoteCta({ votingOpen: true, linked: true, alreadyVoted: false, attended: undefined }), true);
+    });
+
+    it('hides when voting is closed', () => {
+      assert.equal(core.shouldShowVoteCta({ votingOpen: false, linked: true, alreadyVoted: false, attended: true }), false);
+    });
+
+    it('hides when not linked', () => {
+      assert.equal(core.shouldShowVoteCta({ votingOpen: true, linked: false, alreadyVoted: false, attended: true }), false);
+    });
+
+    it('hides when already voted', () => {
+      assert.equal(core.shouldShowVoteCta({ votingOpen: true, linked: true, alreadyVoted: true, attended: true }), false);
+    });
+
+    it('hides for non-attendee even when other conditions pass', () => {
+      assert.equal(core.shouldShowVoteCta({ votingOpen: true, linked: true, alreadyVoted: false, attended: false }), false,
+        'this is the reported bug: CTA must not show for a non-attendee');
+    });
+
+    it('treats missing state object safely', () => {
+      assert.equal(core.shouldShowVoteCta(), false);
+      assert.equal(core.shouldShowVoteCta(null), false);
+    });
+  });
+
   describe('list expansion helpers (most-played leaders)', () => {
     const seven = Array.from({ length: 7 }, (_, i) => ({ id: String(i + 1) }));
 

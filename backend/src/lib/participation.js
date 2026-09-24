@@ -79,6 +79,21 @@ export async function getWeeklyParticipation(db, seasonId, week) {
   };
 }
 
+// Tri-state attendance signal for the voting UI, mirroring validateVote's grace
+// rule: null when the week has no attendance data at all (rain-out or results
+// not yet synced — eligibility unknowable), true/false only once the week's
+// data exists. The UI must never claim "didn't play" on null.
+export async function getAttendedStatus(db, seasonId, week, playerId) {
+  const weekRow = await db.prepare(
+    'SELECT 1 FROM attendance WHERE season_id = ? AND week = ? LIMIT 1'
+  ).bind(seasonId, week).first();
+  if (!weekRow) return null;
+  const mine = await db.prepare(
+    'SELECT 1 FROM attendance WHERE season_id = ? AND week = ? AND player_id = ?'
+  ).bind(seasonId, week, playerId).first();
+  return Boolean(mine);
+}
+
 // Get season participation aggregate (leaderboard)
 export async function getSeasonParticipation(db, seasonId) {
   const attendanceRows = await db.prepare(`

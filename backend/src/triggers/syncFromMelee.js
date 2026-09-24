@@ -5,20 +5,34 @@ import { fetchLeagueTournaments, buildWeekMap, createPlayerFinder } from '../lib
 import { computeSeasonTable } from '../lib/seasonTable.js';
 import { auditVotesForWeek } from '../lib/voteAudit.js';
 
-export function shouldAdvance(isoNow, marker) {
-  const date = new Date(isoNow);
+function stockholmTimeParts(isoNow) {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/Stockholm',
     weekday: 'short',
     hour: 'numeric',
     minute: 'numeric',
-    hour12: false,
-  }).formatToParts(date);
+    hourCycle: 'h23',
+  }).formatToParts(new Date(isoNow));
   const part = type => parts.find(p => p.type === type)?.value ?? '';
-  const isLeagueNight = part('weekday') === 'Wed';
-  const hours = Number(part('hour'));
-  const minutes = Number(part('minute'));
-  const isLateEnough = hours > 22 || (hours === 22 && minutes >= 10);
+  return {
+    weekday: part('weekday'),
+    minutes: Number(part('hour')) * 60 + Number(part('minute')),
+  };
+}
+
+// League-night fire slots are DST-symmetric: crons at 20:15/21:15/22:15 UTC
+// guarantee exactly two time-gate-eligible fires per Wednesday, landing at
+// 22:15 and 23:15 Stockholm in both CEST and CET. The first eligible fire
+// (primary) may defer lifecycle moves while the week's data is unpublished;
+// the second always acts, so a week can never be lost to late publishing.
+export function isPrimaryFire(isoNow) {
+  return stockholmTimeParts(isoNow).minutes < 23 * 60 + 10;
+}
+
+export function shouldAdvance(isoNow, marker) {
+  const { weekday, minutes } = stockholmTimeParts(isoNow);
+  const isLeagueNight = weekday === 'Wed';
+  const isLateEnough = minutes >= 22 * 60 + 10;
   const today = isoNow.split('T')[0];
   const notYetAdvanced = marker !== today;
   return isLeagueNight && isLateEnough && notYetAdvanced;
@@ -373,14 +387,19 @@ export async function syncFromMelee(env, deps = {}) {
     weekDataPresent = !!weekRow;
   }
 
-  if (!votingOpen && (canAdvance || weekDataPresent)) {
-    await updateSettingsBatch(DB, [['VOTING_OPEN', 'TRUE'], ['LAST_ADVANCED', today]]);
-    console.log(canAdvance
-      ? '[SyncFromMelee] First run — voting opened.'
-      : '[SyncFromMelee] Week data present — voting opened by retry fire.');
-    return { status: 'voting-opened' };
-  }
-  if (canAdvance) {
+  if (!votingOpen) {
+    if (canAdvance && isPrimaryFire(now) && !weekDataPresent) {
+      console.log('[SyncFromMelee] Try-1 first run with no week data; deferring open to the retry fire.');
+      return { status: 'synced-deferred', action: 'open', targetWeek: currentWeek };
+    }
+    if (canAdvance || weekDataPresent) {
+      await updateSettingsBatch(DB, [['VOTING_OPEN', 'TRUE'], ['LAST_ADVANCED', today]]);
+      console.log(canAdvance
+        ? '[SyncFromMelee] First run — voting opened.'
+        : '[SyncFromMelee] Week data present — voting opened by retry fire.');
+      return { status: 'voting-opened' };
+    }
+  } else if (canAdvance) {
     const nextWeek = Math.max((currentWeek || 0) + 1, latestRegularAttended);
     if (nextWeek > seasonLength) {
       const champion = await computeChampion(DB, activeSeasonId);
@@ -390,6 +409,14 @@ export async function syncFromMelee(env, deps = {}) {
       await updateSettingsBatch(DB, [['CURRENT_WEEK', 'Season Ended'], ['VOTING_OPEN', 'FALSE'], ['SEASON_STARTED', 'FALSE']]);
       console.log('[SyncFromMelee] Season ended.');
       return { status: 'season-ended' };
+    }
+    // The just-played night counts as data only once a round beyond the open
+    // week has attendance. Close decisions above never defer: their target is
+    // a cut round, which produces no regular attendance by definition.
+    const newWeekData = latestRegularAttended > (currentWeek || 0);
+    if (isPrimaryFire(now) && !newWeekData) {
+      console.log('[SyncFromMelee] Try-1 with no new-round data; deferring advance to the retry fire.');
+      return { status: 'synced-deferred', action: 'advance', targetWeek: nextWeek };
     }
     await updateSettingsBatch(DB, [['CURRENT_WEEK', `Week ${nextWeek}`], ['LAST_ADVANCED', today]]);
     console.log(`[SyncFromMelee] Advanced to Week ${nextWeek}.`);

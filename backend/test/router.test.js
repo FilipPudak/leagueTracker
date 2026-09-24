@@ -106,16 +106,18 @@ describe('router/index.js – fetch handler', () => {
   });
 
   it('getWeeklyParticipation with valid token resolves session and returns attended', async () => {
+    const tables = basicTables();
+    tables.attendance.push({ season_id: 6, week: 3, player_id: 'P002' });
     const resp = await worker.fetch(
       post({ action: 'getWeeklyParticipation', token: 'test-token-alice' }),
-      env()
+      env(tables)
     );
 
     assert.equal(resp.status, 200);
     const json = await resp.json();
     assert.equal(json.success, true);
     assert.equal(json.data.week, 3);
-    assert.equal(json.data.attended, false, 'P001 has no attendance for week 3 in basic fixture');
+    assert.equal(json.data.attended, false, 'week 3 has data (P002) but P001 is absent');
   });
 
   it('getWeeklyParticipation without token works and returns null attended', async () => {
@@ -458,7 +460,7 @@ describe('router/index.js – fetch handler', () => {
     tables.settings.push({ key: 'SEASON_STARTED', value: 'TRUE' });
     const testEnv = env(tables, { MELEE_CLIENT_ID: 'x', MELEE_CLIENT_SECRET: 'y' });
     try {
-      await worker.scheduled({ cron: '15 20 * * 3', scheduledTime: 1758054900000 }, testEnv, { waitUntil() {} });
+      await worker.scheduled({ cron: '15 20,21,22 * * 3', scheduledTime: 1758054900000 }, testEnv, { waitUntil() {} });
     } catch (err) {
       assert.fail(`scheduled() must swallow errors (cron reliability): ${err.message}`);
     } finally {

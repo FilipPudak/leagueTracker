@@ -7,6 +7,7 @@ import {
   getRaffleTickets,
   getWeeklyParticipation,
   getSeasonParticipation,
+  getAttendedStatus,
 } from '../../src/lib/participation.js';
 
 function makeStreakTables() {
@@ -255,5 +256,28 @@ describe('getSeasonParticipation', () => {
     const result = await getSeasonParticipation(db, 7);
     assert.ok(result.participationPct >= 0);
     assert.ok(result.participationPct <= 100);
+  });
+});
+
+describe('getAttendedStatus', () => {
+  it('returns true when player has an attendance row in a week that has data', async () => {
+    const db = createMockDb(makeStreakTables());
+    assert.equal(await getAttendedStatus(db, 7, 1, 'P100'), true);
+  });
+
+  it('returns false when week has attendance rows but not the player', async () => {
+    const db = createMockDb(makeStreakTables());
+    assert.equal(await getAttendedStatus(db, 7, 1, 'P103'), false);
+  });
+
+  it('returns null when the week has no attendance data at all (grace rule)', async () => {
+    const db = createMockDb(makeStreakTables());
+    assert.equal(await getAttendedStatus(db, 7, 9, 'P100'), null,
+      'unknown must not masquerade as false — mirrors validateVote grace');
+  });
+
+  it('returns null with empty tables', async () => {
+    const db = createMockDb(emptyTables());
+    assert.equal(await getAttendedStatus(db, 6, 1, 'P001'), null);
   });
 });

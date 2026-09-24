@@ -238,6 +238,40 @@ describe('handleLinkAccount', () => {
     assert.equal(typeof result.weeklyParticipation.total, 'number');
   });
 
+  describe('attended field (tri-state)', () => {
+    it('returns null when week has no attendance data (grace)', async () => {
+      const result = await handleLinkAccount(
+        { playerId: 'P001', email: 'alice@test.com', deviceId: 'dev-alice' },
+        env
+      );
+      assert.equal(result.attended, null, 'Week 3 has no rows in fixture → unknown, not false');
+    });
+
+    it('returns true when player attended current week', async () => {
+      const tables = linkTables();
+      tables.attendance.push({ season_id: 6, week: 3, player_id: 'P001' });
+      DB = createMockDb(tables);
+      env = { DB };
+      const result = await handleLinkAccount(
+        { playerId: 'P001', email: 'alice@test.com', deviceId: 'dev-alice' },
+        env
+      );
+      assert.equal(result.attended, true);
+    });
+
+    it('returns false when week has data but player is missing', async () => {
+      const tables = linkTables();
+      tables.attendance.push({ season_id: 6, week: 3, player_id: 'P002' });
+      DB = createMockDb(tables);
+      env = { DB };
+      const result = await handleLinkAccount(
+        { playerId: 'P001', email: 'alice@test.com', deviceId: 'dev-alice' },
+        env
+      );
+      assert.equal(result.attended, false);
+    });
+  });
+
   it('missing deviceId → 400', async () => {
     await assert.rejects(
       () => handleLinkAccount({ playerId: 'P001', email: 'alice@test.com' }, env),

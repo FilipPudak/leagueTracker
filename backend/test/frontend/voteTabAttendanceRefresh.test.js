@@ -26,14 +26,21 @@ describe('Vote tab attendance refresh (applyVoteTabRefresh)', () => {
 
   it('updates appState.attended from the response', () => {
     const body = refreshFnBody();
-    assert.ok(body.includes('appState.attended = false') && body.includes('appState.attended = true'),
-      'must store fresh attended state');
+    assert.ok(body.includes('appState.attended = res.attended'),
+      'must store fresh attended state from the authoritative response');
+  });
+
+  it('keeps the standings-tab vote CTA in sync with fresh attendance', () => {
+    const body = refreshFnBody();
+    assert.ok(body.includes('shouldShowVoteCta'),
+      'vote-CTA visibility must be recomputed per refresh, never stale');
+    assert.ok(body.includes('vote-cta'), 'must target the vote-cta element');
   });
 
   it('shows the not-attended card and hides the form when attended is false', () => {
     const body = refreshFnBody();
     assert.ok(body.includes('not-attended-card'), 'must render attendance state');
-    assert.ok(/attended === false[\s\S]*?voteForm/.test(body),
+    assert.ok(/res\.attended === false[\s\S]*?voteForm/.test(body),
       'must hide the form for non-attendees');
   });
 

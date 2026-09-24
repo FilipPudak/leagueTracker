@@ -61,6 +61,17 @@ const LeagueCore = (() => {
     return currentVote ? 'updateVote' : 'submitVote';
   }
 
+  // Vote-CTA gate: only surface the "go vote" prompt to a linked player whose
+  // voting period is open, who has not voted, and who is not known to have
+  // skipped the night. attended === null means "week data not known yet"
+  // (grace) so it must NOT hide the CTA — mirrors validateVote's server rule;
+  // only attended === false (confirmed non-attendance) hides it.
+  function shouldShowVoteCta(state) {
+    const s = state || {};
+    if (!s.votingOpen || !s.linked || s.alreadyVoted) return false;
+    return s.attended !== false;
+  }
+
   function shouldRetryAsNewVote(message, isRetry) {
     return !isRetry && typeof message === 'string' && message.includes('No vote to update');
   }
@@ -89,7 +100,7 @@ const LeagueCore = (() => {
     return '';
   }
 
-  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, gamificationViewFor, leaderOptionLabel, visibleListSlice, listToggleLabel, voteSubmitAction, shouldRetryAsNewVote, resolveStandingsAsOf, awardBadgeMarkup, awardBadgeTitle, GUEST_PITCH, CACHE_TTL_MS };
+  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, gamificationViewFor, leaderOptionLabel, visibleListSlice, listToggleLabel, voteSubmitAction, shouldShowVoteCta, shouldRetryAsNewVote, resolveStandingsAsOf, awardBadgeMarkup, awardBadgeTitle, GUEST_PITCH, CACHE_TTL_MS };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.LeagueCore = LeagueCore;

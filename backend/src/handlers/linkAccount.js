@@ -1,6 +1,6 @@
 import { getPlayerById, getPlayerByEmail, getAllSeasons, getSettings, isVotingOpen, isSeasonPaused, parseWeek, parseSeasonId } from '../db/queries.js';
 import { createSession, findSessionByPlayerAndDevice } from '../lib/auth.js';
-import { getWeeklyParticipation } from '../lib/participation.js';
+import { getWeeklyParticipation, getAttendedStatus } from '../lib/participation.js';
 import { getFacedOpponents } from '../lib/voteValidation.js';
 
 export async function handleLinkAccount(body, env) {
@@ -115,13 +115,10 @@ export async function handleLinkAccount(body, env) {
     weeklyParticipation = await getWeeklyParticipation(DB, activeSeasonId, weekNum);
   }
 
-  // Did the player attend this week?
+  // Did the player attend this week? (null = week data not known)
   let attended = null;
   if (activeSeasonId && weekNum) {
-    const row = await DB.prepare(
-      'SELECT 1 FROM attendance WHERE season_id = ? AND week = ? AND player_id = ?'
-    ).bind(activeSeasonId, weekNum, playerId).first();
-    attended = Boolean(row);
+    attended = await getAttendedStatus(DB, activeSeasonId, weekNum, playerId);
   }
 
   return {

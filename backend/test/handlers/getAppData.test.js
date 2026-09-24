@@ -194,10 +194,20 @@ describe('handleGetAppData', () => {
       assert.equal(result.attended, true);
     });
 
-    it('returns false when player has no attendance for current week', async () => {
+    it('returns false when week has attendance data but not the player', async () => {
+      const tables = basicTables();
+      tables.attendance.push({ season_id: 6, week: 3, player_id: 'P002' });
+      const db = createMockDb(tables);
+      const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
+      const result = await handleGetAppData({}, { DB: db }, session);
+      assert.equal(result.attended, false);
+    });
+
+    it('returns null (grace) when the week has no attendance data at all', async () => {
       const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
       const result = await handleGetAppData({}, env, session);
-      assert.equal(result.attended, false);
+      assert.equal(result.attended, null,
+        'late/rain-out week: unknown must not claim non-attendance (validateVote grace)');
     });
 
     it('returns null when no session', async () => {

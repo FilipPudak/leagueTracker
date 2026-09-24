@@ -1,5 +1,5 @@
 import { getSettings, parseSeasonId, parseWeek, isVotingOpen, isSeasonPaused } from '../db/queries.js';
-import { getWeeklyParticipation as getWeeklyParticipationCount } from '../lib/participation.js';
+import { getWeeklyParticipation as getWeeklyParticipationCount, getAttendedStatus } from '../lib/participation.js';
 import { getFacedOpponents } from '../lib/voteValidation.js';
 
 export async function handleGetWeeklyParticipation(body, env, session) {
@@ -21,10 +21,7 @@ export async function handleGetWeeklyParticipation(body, env, session) {
   let facedOnly = false;
 
   if (session) {
-    const row = await DB.prepare(
-      'SELECT 1 FROM attendance WHERE season_id = ? AND week = ? AND player_id = ?'
-    ).bind(activeSeasonId, currentWeek, session.player_id).first();
-    attended = Boolean(row);
+    attended = await getAttendedStatus(DB, activeSeasonId, currentWeek, session.player_id);
 
     const allPlayersResult = await DB.prepare('SELECT * FROM players').all();
     const allPlayers = allPlayersResult.results || [];

@@ -44,14 +44,19 @@ username that is literally a GUID (P022 "Sigge Maslov").
 | **`CURRENT_WEEK`** | *The week currently open for voting* = the most recent completed league night. On season start it is `Week 1` before week 1 is played; the first sync run opens voting without advancing. |
 | **Vote referent** | A vote for week N is about **night N as it just finished**. |
 | **Voting window** | Opens at night N's sync; closes when night N+1's sync advances the week. The stored weekly deadline (Wed 17:45) is **displayed only** — a courtesy reminder before games start — and never enforced. |
-| **Cron** | Fires **twice on Wednesday (20:15 and 21:15 UTC)** and once on **Thursday (07:00 UTC)**. One of the Wednesday fires is always 22:15 Stockholm (DST-safe). The Thursday fire is a data-backed retry: if Wednesday's results weren't published in time, it opens voting early without advancing. |
+| **Cron** | Fires **three times on Wednesday (20:15, 21:15 and 22:15 UTC)** and once on **Thursday (07:00 UTC)**. Exactly **two** Wednesday fires are ever time-gate-eligible: they land at **22:15** (primary try) and **23:15** (retry) Stockholm in *both* DST states. The Thursday fire is a data-backed retry: if Wednesday's results weren't published in time, it opens voting early without advancing. |
 | **Advance gate** | Week-advance and voting-open happen only when computed Stockholm local day is **Wednesday** (league night) **and** local time ≥ 22:10 **and** the `LAST_ADVANCED` marker (YYYY-MM-DD) is not today's date — so a manual `syncNow` or any stray trigger on another day can never close a voting window early. The Thursday fire uses `weekDataPresent` (attendance row exists for current week) instead of the time gate. Data sync itself runs idempotently on *every* fire: late-published Melee results are picked up automatically. |
+| **Two-try open** | The primary Wednesday try (22:15) may act only if the night it opens/advances to has attendance data; a data-less primary defers (sync only, no lifecycle writes) and the retry try (23:15) **always** acts, with or without data — so voting opens every league night ~1 h later at worst and a week's votes are never lost. The season **close is never deferred**: its target is a cut round, which by definition produces no regular attendance. |
 | **Paused** | `SEASON_PAUSED=TRUE`: sync continues, but no advance, no voting open/close. Toggled by `pauseCurrentSeason` / `resumeCurrentSeason`. |
 
-**Rationale:** Cloudflare crons are UTC-only. Double-fire + deterministic local-time gate yields
-"once per week, right after league night" in every DST state, and makes late data entry
-self-healing. If the organizer publishes results after both fires, the week still advances
-(voting opens with fallback to all players); an admin may run `syncNow` to pull results early.
+**Rationale:** Cloudflare crons are UTC-only. Three Wednesday UTC fires + deterministic local-time gate yields
+exactly two local-eligible fires per night in every DST state (DST shifts which of the three land at 22:15/23:15;
+the third is always off-gate — pre-22:10 in CET, after midnight in CEST). The two-try open makes
+"once per week, right after league night" reliable in every DST state and makes late data entry
+self-healing: an unpublished night defers 1 h instead of forcing a data-less open; if the organizer
+publishes after both fires, the retry still advances (voting opens with fallback to all players) and the
+week's `attended` state stays `null` (unknown ≠ didn't play) until data lands; an admin may run `syncNow`
+to pull results early.
 
 ## 4. Season Lifecycle
 
@@ -131,9 +136,12 @@ ignored).
   one:** no feature, endpoint, or UI may ever render the voter→opponent mapping; only aggregate
   tallies exist. (A previous "de-identified at rest" design was abandoned: it was already
   breakable via synchronized insert timestamps, and it made vote editing impossible.)
-- Voting without attending is allowed (rain-outs, arriving late to vote after the game): it earns
-  raffle tickets. However, the **favorite opponent must be someone the voter actually faced** that
-  week (enforced server-side at vote time; retroactively audited after sync).
+- Voting without attending is allowed (rain-outs, arriving late to vote after the game): it earns raffle
+  tickets. However, the **favorite opponent must be someone the voter actually faced** that week (enforced
+  server-side at vote time; retroactively audited after sync).
+- **`attended` (UI signal)** is tri-state, mirroring the server's grace rule: `true`/`false` only once the
+  week has attendance data; `null` ("unknown") while it does not. UI gating must never claim non-attendance
+  on `null` — the frontend may not be more certain than the server.
 - **Deck attribution:** Melee publishes no decks, so the app has no record of which leader a
   player actually played. Wherever leader-level records appear ("Leaders Played" with W/D/L and
   win %), the leader a player **voted** for in week N is attributed as the leader they **played**

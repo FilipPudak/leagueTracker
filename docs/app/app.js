@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.12.1';
+const APP_VERSION = '4.13.0';
 
 const appState = {
   status: 'unlinked',
@@ -328,7 +328,12 @@ function applyBoot(boot) {
 
   const voteCta = $('vote-cta');
   if (voteCta) {
-    voteCta.style.display = (appState.votingOpen && boot.status === 'linked' && !boot.alreadySubmitted && !boot.alreadyVoted) ? 'block' : 'none';
+    voteCta.style.display = LeagueCore.shouldShowVoteCta({
+      votingOpen: appState.votingOpen,
+      linked: boot.status === 'linked',
+      alreadyVoted: Boolean(boot.alreadySubmitted || boot.alreadyVoted),
+      attended: boot.attended,
+    }) ? 'block' : 'none';
   }
 
   if (boot.status === 'linked') {
@@ -780,27 +785,33 @@ function changeVote() {
 }
 
 function applyVoteTabRefresh(res) {
-  if (!res || res.attended === null || res.attended === undefined) return;
+  if (!res) return;
   const voteForm = $('vote-form');
   const votedCard = $('already-voted-card');
   const notAttendedCard = $('not-attended-card');
+  const voteCta = $('vote-cta');
   const hasVoted = votedCard && votedCard.style.display === 'block';
+  const canVote = appState.votingOpen && !hasVoted;
 
-  if (res.attended === false) {
-    appState.attended = false;
-    if (voteForm && !hasVoted) voteForm.style.display = 'none';
-    if (notAttendedCard) notAttendedCard.style.display = 'block';
-    return;
+  if (typeof res.attended === 'boolean') appState.attended = res.attended;
+  const gated = res.attended === false && canVote;
+
+  if (voteCta) {
+    const showCta = LeagueCore.shouldShowVoteCta({
+      votingOpen: appState.votingOpen,
+      linked: true,
+      alreadyVoted: hasVoted,
+      attended: res.attended,
+    });
+    voteCta.style.display = showCta ? 'block' : 'none';
   }
-
-  appState.attended = true;
-  if (notAttendedCard) notAttendedCard.style.display = 'none';
-  if (!appState.votingOpen || hasVoted) return;
-  if (voteForm) voteForm.style.display = '';
+  if (notAttendedCard) notAttendedCard.style.display = gated ? 'block' : 'none';
+  if (voteForm && canVote) voteForm.style.display = gated ? 'none' : '';
+  if (gated || !canVote) return;
 
   const weekChanged = res.week && appState.week !== res.week;
-  const needsRefilter = res.facedOnly && !appState.playersFiltered;
-  if (res.players && (weekChanged || needsRefilter)) {
+  const filterChanged = Boolean(res.facedOnly) !== appState.playersFiltered;
+  if (res.players && (weekChanged || filterChanged)) {
     appState.players = res.players;
     appState.playersFiltered = Boolean(res.facedOnly);
     appState.week = res.week || appState.week;

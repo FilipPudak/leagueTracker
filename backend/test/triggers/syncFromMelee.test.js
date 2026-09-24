@@ -2,7 +2,7 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables } from '../helpers/fixtures.js';
-import { syncFromMelee, shouldAdvance } from '../../src/triggers/syncFromMelee.js';
+import { syncFromMelee, shouldAdvance, isPrimaryFire } from '../../src/triggers/syncFromMelee.js';
 import { getSettings } from '../../src/db/queries.js';
 
 function makeTables(overrides = {}) {
@@ -236,6 +236,7 @@ describe('triggers/syncFromMelee', () => {
     tables.settings = tables.settings.map(s =>
       s.key === 'VOTING_OPEN' ? { ...s, value: 'FALSE' } : s
     );
+    tables.attendance.push({ season_id: 6, week: 3, player_id: 'P001' });
     db = createMockDb(tables);
     const { mockFetch } = buildMockFetch({ tournaments: TOURNAMENTS.slice(0, 1) });
     globalThis.fetch = mockFetch;
@@ -291,7 +292,7 @@ describe('triggers/syncFromMelee', () => {
     const { mockFetch } = buildMockFetch({ tournaments: TOURNAMENTS.slice(0, 1) });
     globalThis.fetch = mockFetch;
 
-    const lateTime = '2026-07-01T20:15:00Z';
+    const lateTime = '2026-07-01T21:15:00Z';
     await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch), now: lateTime });
 
     const settings = await getSettings(db);
@@ -512,6 +513,23 @@ describe('triggers/syncFromMelee', () => {
     });
   });
 
+  describe('isPrimaryFire (two-try fire slots, DST-symmetric)', () => {
+    it('summer: 20:15Z = 22:15 CEST is try 1; 21:15Z = 23:15 is try 2', () => {
+      assert.equal(isPrimaryFire('2026-07-01T20:15:00Z'), true);
+      assert.equal(isPrimaryFire('2026-07-01T21:15:00Z'), false);
+    });
+
+    it('winter: 21:15Z = 22:15 CET is try 1; 22:15Z = 23:15 is try 2', () => {
+      assert.equal(isPrimaryFire('2026-01-07T21:15:00Z'), true);
+      assert.equal(isPrimaryFire('2026-01-07T22:15:00Z'), false);
+    });
+
+    it('boundary at 23:10 local: before = try 1, at/after = try 2', () => {
+      assert.equal(isPrimaryFire('2026-07-01T21:09:00Z'), true);
+      assert.equal(isPrimaryFire('2026-07-01T21:10:00Z'), false);
+    });
+  });
+
   describe('award lifecycle (fully-synced season)', () => {
     function fullySyncedTables() {
       const tables = withSeasonStarted(makeTables());
@@ -555,7 +573,7 @@ describe('triggers/syncFromMelee', () => {
       db = createMockDb(fullySyncedTables());
       const result = await syncFromMelee(
         { DB: db },
-        { MeleeClient: emptyListClient(), now: '2026-07-15T20:15:00Z' }
+        { MeleeClient: emptyListClient(), now: '2026-07-15T21:15:00Z' }
       );
       assert.equal(result.status, 'advanced');
       assert.equal(result.week, 4);
@@ -693,15 +711,15 @@ describe('triggers/syncFromMelee', () => {
       assert.equal(settings.CURRENT_WEEK, 'Week 3');
     });
 
-    it('Wednesday first-run fallback still opens voting with no data for the week', async () => {
+    it('Wednesday retry fire still opens voting with no data for the week (fallback)', async () => {
       const tables = withVoting(withWeek(makeTables(), 'Week 3'), false);
       tables.melee_tournaments = regularTournaments([1, 2]);
       tables.attendance = attendanceFor([1, 2]);
       db = createMockDb(withSeasonStarted(tables));
 
-      const result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-07-01T20:15:00Z' });
+      const result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-07-01T21:15:00Z' });
 
-      assert.equal(result.status, 'voting-opened', 'Wednesday ≥22:10 opens even without data (late-results fallback)');
+      assert.equal(result.status, 'voting-opened', 'try 2 opens even without data (late-results fallback)');
     });
 
     it('retry fire never advances an already-open window', async () => {
@@ -759,6 +777,99 @@ describe('triggers/syncFromMelee', () => {
 
       assert.equal(result.status, 'advanced');
       assert.equal(result.week, 2, 'round 3 exists but has no attendance → normal +1 advance only');
+    });
+
+    describe('two-try fire (deferral)', () => {
+      function openWeek2NoNewData() {
+        const tables = withVoting(withWeek(makeTables(), 'Week 2'), true);
+        tables.melee_tournaments = regularTournaments([1, 2]);
+        tables.attendance = attendanceFor([1, 2]);
+        return withSeasonStarted(tables);
+      }
+
+      it('defers the advance on try 1 when the just-played round has no data', async () => {
+        db = createMockDb(openWeek2NoNewData());
+
+        const result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-07-01T20:15:00Z' });
+
+        assert.equal(result.status, 'synced-deferred');
+        const settings = await getSettings(db);
+        assert.equal(settings.CURRENT_WEEK, 'Week 2', 'try 1 without new-round data must not advance');
+        assert.ok(!settings.LAST_ADVANCED, 'deferral must not stamp LAST_ADVANCED');
+      });
+
+      it('advances on try 2 even with no new data (fallback — never lose the week)', async () => {
+        db = createMockDb(openWeek2NoNewData());
+
+        const result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-07-01T21:15:00Z' });
+
+        assert.equal(result.status, 'advanced');
+        assert.equal(result.week, 3);
+        const settings = await getSettings(db);
+        assert.equal(settings.CURRENT_WEEK, 'Week 3');
+      });
+
+      it('advances on try 1 immediately once the new round has data', async () => {
+        const tables = withVoting(withWeek(makeTables(), 'Week 2'), true);
+        tables.melee_tournaments = regularTournaments([1, 2, 3]);
+        tables.attendance = attendanceFor([1, 2, 3]);
+        db = createMockDb(withSeasonStarted(tables));
+
+        const result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-07-01T20:15:00Z' });
+
+        assert.equal(result.status, 'advanced');
+        assert.equal(result.week, 3);
+      });
+
+      it('winter symmetry: lone 20:15Z fire is pre-gate, 21:15Z defers, 22:15Z completes', async () => {
+        db = createMockDb(openWeek2NoNewData());
+        let result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-01-07T20:15:00Z' });
+        assert.equal(result.status, 'synced-no-advance', '21:15 local is before the 22:10 gate');
+
+        result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-01-07T21:15:00Z' });
+        assert.equal(result.status, 'synced-deferred', '22:15 local try 1 without data defers');
+
+        result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-01-07T22:15:00Z' });
+        assert.equal(result.status, 'advanced', '23:15 local try 2 fallback advances');
+        const settings = await getSettings(db);
+        assert.equal(settings.CURRENT_WEEK, 'Week 3');
+      });
+
+      it('defers the first-run open on try 1 when the week has no data', async () => {
+        const tables = withVoting(withWeek(makeTables(), 'Week 3'), false);
+        tables.melee_tournaments = regularTournaments([1, 2]);
+        tables.attendance = attendanceFor([1, 2]);
+        db = createMockDb(withSeasonStarted(tables));
+
+        const result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-07-01T20:15:00Z' });
+
+        assert.equal(result.status, 'synced-deferred');
+        const settings = await getSettings(db);
+        assert.equal(settings.VOTING_OPEN, 'FALSE', 'voting must not open on a data-less try 1');
+      });
+
+      it('opens the first run on try 2 even without data', async () => {
+        const tables = withVoting(withWeek(makeTables(), 'Week 3'), false);
+        tables.melee_tournaments = regularTournaments([1, 2]);
+        tables.attendance = attendanceFor([1, 2]);
+        db = createMockDb(withSeasonStarted(tables));
+
+        const result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-07-01T21:15:00Z' });
+
+        assert.equal(result.status, 'voting-opened');
+      });
+
+      it('never defers the season close', async () => {
+        const tables = withVoting(withWeek(makeTables(), 'Week 11'), true);
+        tables.melee_tournaments = regularTournaments([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+        tables.attendance = attendanceFor([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+        db = createMockDb(withSeasonStarted(tables));
+
+        const result = await syncFromMelee({ DB: db }, { MeleeClient: emptyClient(), now: '2026-07-01T20:15:00Z' });
+
+        assert.equal(result.status, 'season-ended',
+          'close-night target is a cut round (no regular attendance ever) — deferral must never block closing');
+      });
     });
   });
 
