@@ -1,7 +1,14 @@
 import { getSettings, getAwardsForSeason, getMostPlayedLeaders, parseSeasonId, parseWeek, isVotingOpen } from '../db/queries.js';
-import { computeSchemer, computeAmbassador, computeChampion, assignStandardRanks } from '../lib/awards.js';
+import { computeSchemer, computeAmbassador, computeChampion, computeNewHopeClimbers, assignStandardRanks } from '../lib/awards.js';
 import { getSeasonParticipation } from '../lib/participation.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';
+
+// As-of round for live podiums: the open voting week while a season runs,
+// the final week once it has ended.
+function resolveLiveRound(seasonEnded, seasonLength, votingOpen, currentWeek) {
+  if (!seasonEnded && votingOpen && currentWeek) return currentWeek;
+  return seasonLength;
+}
 
 const AMBASSADOR_CALLSIGNS = [
   'Gold Leader', 'Green Leader', 'Red Leader',
@@ -73,7 +80,7 @@ export async function handleGetLeaderboardData(body, env) {
   if ((!ruler || ruler.length === 0) && isActiveSeason) {
     const season = await DB.prepare('SELECT length, top_results FROM seasons WHERE id = ?').bind(seasonId).first();
     const seasonLength = season?.length || 11;
-    const round = seasonEnded ? seasonLength : (votingOpen && currentWeek ? currentWeek : seasonLength);
+    const round = resolveLiveRound(seasonEnded, seasonLength, votingOpen, currentWeek);
     const standings = await DB.prepare(
       'SELECT player_id, rank, match_points FROM season_standings WHERE season_id = ? AND round = ?'
     ).bind(seasonId, round).all();
@@ -94,33 +101,9 @@ export async function handleGetLeaderboardData(body, env) {
     const season = await DB.prepare('SELECT length, top_results FROM seasons WHERE id = ?').bind(seasonId).first();
     const seasonLength = season?.length || 11;
     const topResults = season?.top_results || 7;
-    const midRound = Math.floor(seasonLength / 2);
-
-    // Mid-season: raw accumulated standings
-    const regularRoundsForMid = await DB.prepare(
-      'SELECT DISTINCT round FROM melee_tournaments WHERE season_id = ? AND phase = ? AND round <= ?'
-    ).bind(seasonId, 'regular', midRound).all();
-    const regularMidRoundSet = new Set((regularRoundsForMid.results || []).map(r => r.round));
-
-    const midStandings = await DB.prepare(
-      'SELECT player_id, round, match_points FROM season_standings WHERE season_id = ? AND round <= ?'
-    ).bind(seasonId, midRound).all();
-
-    const midPointsMap = new Map();
-    for (const row of (midStandings.results || [])) {
-      if (!regularMidRoundSet.has(row.round)) continue;
-      midPointsMap.set(row.player_id, (midPointsMap.get(row.player_id) || 0) + (row.match_points || 0));
-    }
-
-    const midEntries = [...midPointsMap.entries()].sort((a, b) => b[1] - a[1]);
-    const midRankMap = new Map();
-    let midRank = 1;
-    for (const [pid] of midEntries) {
-      midRankMap.set(pid, midRank++);
-    }
 
     // Final: derived season table (best-X)
-    const finalRound = seasonEnded ? seasonLength : (votingOpen && currentWeek ? currentWeek : seasonLength);
+    const finalRound = resolveLiveRound(seasonEnded, seasonLength, votingOpen, currentWeek);
     const allStandings = await DB.prepare(
       'SELECT round, player_id, wins, losses, draws, match_points, rank FROM season_standings WHERE season_id = ? AND round <= ?'
     ).bind(seasonId, finalRound).all();
@@ -137,15 +120,7 @@ export async function handleGetLeaderboardData(body, env) {
     const seasonTable = computeSeasonTable(nights, topResults);
     const finalRankMap = new Map(seasonTable.map(r => [r.playerId, r.rank]));
 
-    const climbers = [...midRankMap.keys()]
-      .filter(pid => finalRankMap.has(pid))
-      .map(pid => ({
-        playerId: pid,
-        climb: (midRankMap.get(pid) || 0) - (finalRankMap.get(pid) || 0),
-      }))
-      .filter(c => c.climb > 0)
-      .sort((a, b) => b.climb - a.climb)
-      .slice(0, 3);
+    const climbers = await computeNewHopeClimbers(DB, seasonId, finalRankMap, seasonLength);
 
     newHope = climbers.length > 0 ? assignStandardRanks(climbers.map(c => ({
       playerId: c.playerId,

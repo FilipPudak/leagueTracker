@@ -26,7 +26,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'firstNight');
+        const b = badges.find(x => x.id === 'firstNight');
         assert.equal(b.earned, true);
       });
 
@@ -39,7 +39,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'firstNight');
+        const b = badges.find(x => x.id === 'firstNight');
         assert.equal(b.earned, false);
       });
     });
@@ -54,7 +54,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'nightChampion');
+        const b = badges.find(x => x.id === 'nightChampion');
         assert.equal(b.earned, true);
       });
 
@@ -67,7 +67,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'nightChampion');
+        const b = badges.find(x => x.id === 'nightChampion');
         assert.equal(b.earned, false);
       });
     });
@@ -86,7 +86,7 @@ describe('lib/badges computeBadges', () => {
           ],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'giantSlayer');
+        const b = badges.find(x => x.id === 'giantSlayer');
         assert.equal(b.earned, true);
       });
 
@@ -103,7 +103,7 @@ describe('lib/badges computeBadges', () => {
           ],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'giantSlayer');
+        const b = badges.find(x => x.id === 'giantSlayer');
         assert.equal(b.earned, true);
       });
 
@@ -120,7 +120,7 @@ describe('lib/badges computeBadges', () => {
           ],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'giantSlayer');
+        const b = badges.find(x => x.id === 'giantSlayer');
         assert.equal(b.earned, false);
       });
 
@@ -137,7 +137,7 @@ describe('lib/badges computeBadges', () => {
           ],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'giantSlayer');
+        const b = badges.find(x => x.id === 'giantSlayer');
         assert.equal(b.earned, false);
       });
     });
@@ -156,7 +156,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'crowdFavorite');
+        const b = badges.find(x => x.id === 'crowdFavorite');
         assert.equal(b.earned, true);
       });
 
@@ -172,7 +172,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'crowdFavorite');
+        const b = badges.find(x => x.id === 'crowdFavorite');
         assert.equal(b.earned, false);
       });
 
@@ -189,7 +189,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'crowdFavorite');
+        const b = badges.find(x => x.id === 'crowdFavorite');
         assert.equal(b.earned, false);
       });
 
@@ -206,7 +206,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001', 6, true);
-        const b = badges.find(b => b.id === 'crowdFavorite');
+        const b = badges.find(x => x.id === 'crowdFavorite');
         assert.equal(b.earned, false);
       });
 
@@ -223,7 +223,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001', 6, true);
-        const b = badges.find(b => b.id === 'crowdFavorite');
+        const b = badges.find(x => x.id === 'crowdFavorite');
         assert.equal(b.earned, true);
       });
     });
@@ -247,7 +247,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'loyalist');
+        const b = badges.find(x => x.id === 'loyalist');
         assert.equal(b.earned, true);
       });
 
@@ -267,7 +267,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'loyalist');
+        const b = badges.find(x => x.id === 'loyalist');
         assert.equal(b.earned, false);
       });
 
@@ -289,7 +289,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'loyalist');
+        const b = badges.find(x => x.id === 'loyalist');
         assert.equal(b.earned, false);
       });
     });
@@ -311,7 +311,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'nightWins');
+        const b = badges.find(x => x.id === 'nightWins');
         assert.equal(b.value, 6);
         assert.equal(b.tier, 'bronze');
       });
@@ -323,7 +323,7 @@ describe('lib/badges computeBadges', () => {
         }
         const db = createMockDb({ attendance: [], season_standings: standings, match_results: [], votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'nightWins');
+        const b = badges.find(x => x.id === 'nightWins');
         assert.equal(b.value, 18);
         assert.equal(b.tier, 'silver');
       });
@@ -335,7 +335,7 @@ describe('lib/badges computeBadges', () => {
         }
         const db = createMockDb({ attendance: [], season_standings: standings, match_results: [], votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'nightWins');
+        const b = badges.find(x => x.id === 'nightWins');
         assert.equal(b.value, 30);
         assert.equal(b.tier, 'gold');
       });
@@ -351,7 +351,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'cleanSheet');
+        const b = badges.find(x => x.id === 'cleanSheet');
         assert.equal(b.value, 1);
         assert.equal(b.tier, 'bronze');
       });
@@ -369,7 +369,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'cleanSheet');
+        const b = badges.find(x => x.id === 'cleanSheet');
         assert.equal(b.value, 3);
         assert.equal(b.tier, 'silver');
       });
@@ -386,7 +386,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'cleanSheet');
+        const b = badges.find(x => x.id === 'cleanSheet');
         assert.equal(b.value, 1);
       });
     });
@@ -401,7 +401,7 @@ describe('lib/badges computeBadges', () => {
         }
         const db = createMockDb({ attendance, melee_tournaments, season_standings: [], match_results: [], votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'attendance');
+        const b = badges.find(x => x.id === 'attendance');
         assert.equal(b.value, 10);
         assert.equal(b.tier, 'bronze');
       });
@@ -417,7 +417,7 @@ describe('lib/badges computeBadges', () => {
         }
         const db = createMockDb({ attendance, melee_tournaments, season_standings: [], match_results: [], votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'attendance');
+        const b = badges.find(x => x.id === 'attendance');
         assert.equal(b.value, 10);
         assert.equal(b.tier, 'bronze');
       });
@@ -437,7 +437,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'leaderVariety');
+        const b = badges.find(x => x.id === 'leaderVariety');
         assert.equal(b.value, 3);
         assert.equal(b.tier, 'bronze');
       });
@@ -451,7 +451,7 @@ describe('lib/badges computeBadges', () => {
         }
         const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'sweepMaster');
+        const b = badges.find(x => x.id === 'sweepMaster');
         assert.equal(b.value, 5);
         assert.equal(b.tier, 'bronze');
       });
@@ -463,7 +463,7 @@ describe('lib/badges computeBadges', () => {
         }
         const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'sweepMaster');
+        const b = badges.find(x => x.id === 'sweepMaster');
         assert.equal(b.value, 0);
         assert.equal(b.tier, null);
       });
@@ -474,7 +474,7 @@ describe('lib/badges computeBadges', () => {
         ];
         const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'sweepMaster');
+        const b = badges.find(x => x.id === 'sweepMaster');
         assert.equal(b.value, 0);
       });
     });
@@ -492,7 +492,7 @@ describe('lib/badges computeBadges', () => {
         }
         const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'deckMaster');
+        const b = badges.find(x => x.id === 'deckMaster');
         assert.equal(b.earned, true);
       });
 
@@ -506,7 +506,7 @@ describe('lib/badges computeBadges', () => {
         }
         const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'deckMaster');
+        const b = badges.find(x => x.id === 'deckMaster');
         assert.equal(b.earned, false);
       });
 
@@ -523,7 +523,7 @@ describe('lib/badges computeBadges', () => {
         }
         const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'deckMaster');
+        const b = badges.find(x => x.id === 'deckMaster');
         assert.equal(b.earned, false);
       });
 
@@ -544,7 +544,7 @@ describe('lib/badges computeBadges', () => {
         }
         const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'deckMaster');
+        const b = badges.find(x => x.id === 'deckMaster');
         assert.equal(b.earned, false);
       });
 
@@ -560,7 +560,7 @@ describe('lib/badges computeBadges', () => {
         }
         const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'deckMaster');
+        const b = badges.find(x => x.id === 'deckMaster');
         assert.equal(b.earned, false);
       });
     });
@@ -573,7 +573,7 @@ describe('lib/badges computeBadges', () => {
         }
         const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'voter');
+        const b = badges.find(x => x.id === 'voter');
         assert.equal(b.value, 5);
         assert.equal(b.tier, 'bronze');
       });
@@ -585,7 +585,7 @@ describe('lib/badges computeBadges', () => {
         }
         const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'voter');
+        const b = badges.find(x => x.id === 'voter');
         assert.equal(b.value, 10);
         assert.equal(b.tier, 'silver');
       });
@@ -597,7 +597,7 @@ describe('lib/badges computeBadges', () => {
         }
         const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'voter');
+        const b = badges.find(x => x.id === 'voter');
         assert.equal(b.value, 20);
         assert.equal(b.tier, 'gold');
       });
@@ -605,7 +605,7 @@ describe('lib/badges computeBadges', () => {
       it('not earned with 0 votes', async () => {
         const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'voter');
+        const b = badges.find(x => x.id === 'voter');
         assert.equal(b.earned, false);
         assert.equal(b.tier, null);
       });
@@ -620,7 +620,7 @@ describe('lib/badges computeBadges', () => {
         }
         const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'voter');
+        const b = badges.find(x => x.id === 'voter');
         assert.equal(b.value, 6);
         assert.equal(b.tier, 'bronze');
       });
@@ -657,7 +657,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'firstNight');
+        const b = badges.find(x => x.id === 'firstNight');
         assert.equal(b.earned, false);
       });
 
@@ -670,7 +670,7 @@ describe('lib/badges computeBadges', () => {
         }
         const db = createMockDb({ attendance, melee_tournaments, season_standings: [], match_results: [], votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'attendance');
+        const b = badges.find(x => x.id === 'attendance');
         assert.equal(b.value, 0);
         assert.equal(b.tier, null);
       });
@@ -693,7 +693,7 @@ describe('lib/badges computeBadges', () => {
           awards: [],
         });
         const badges = await computeBadges(db, 'P001');
-        const b = badges.find(b => b.id === 'loyalist');
+        const b = badges.find(x => x.id === 'loyalist');
         assert.equal(b.earned, false, 'cut event in season 6 should not count as a regular season');
       });
     });

@@ -68,6 +68,44 @@ export async function computeAmbassador(db, seasonId) {
   return tieAwareTop3(all);
 }
 
+// A New Hope: biggest rank climb from the mid-season snapshot (raw accumulated
+// points at round ⌊length/2⌋, regular phase only — never best-X) to the derived
+// season table given by finalRankMap. A player must appear in BOTH snapshots.
+// Sorted by climb desc, capped at 3 (slice semantics preserved from close/live
+// materialization paths). Returns [{ playerId, climb }].
+export async function computeNewHopeClimbers(db, seasonId, finalRankMap, seasonLength) {
+  const midRound = Math.floor(seasonLength / 2);
+
+  const regularRoundsForMid = await db.prepare(
+    'SELECT DISTINCT round FROM melee_tournaments WHERE season_id = ? AND phase = ? AND round <= ?'
+  ).bind(seasonId, 'regular', midRound).all();
+  const regularMidRoundSet = new Set((regularRoundsForMid.results || []).map(r => r.round));
+
+  const midStandings = await db.prepare(
+    'SELECT player_id, round, match_points FROM season_standings WHERE season_id = ? AND round <= ?'
+  ).bind(seasonId, midRound).all();
+
+  const midPointsMap = new Map();
+  for (const row of (midStandings.results || [])) {
+    if (!regularMidRoundSet.has(row.round)) continue;
+    midPointsMap.set(row.player_id, (midPointsMap.get(row.player_id) || 0) + (row.match_points || 0));
+  }
+
+  const midEntries = [...midPointsMap.entries()].sort((a, b) => b[1] - a[1]);
+  const midRankMap = new Map();
+  let midRank = 1;
+  for (const [pid] of midEntries) {
+    midRankMap.set(pid, midRank++);
+  }
+
+  return [...midRankMap.keys()]
+    .filter(pid => finalRankMap.has(pid))
+    .map(pid => ({ playerId: pid, climb: (midRankMap.get(pid) || 0) - (finalRankMap.get(pid) || 0) }))
+    .filter(c => c.climb > 0)
+    .sort((a, b) => b.climb - a.climb)
+    .slice(0, 3);
+}
+
 // Write a podium block for an award (supports tie-aware results > 3 entries)
 export async function writePodiumBlock(db, seasonId, awardName, entries) {
   const topN = entries;

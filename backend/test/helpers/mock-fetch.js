@@ -14,8 +14,8 @@ export function createFetchMock() {
     errors.set(url, message);
   }
 
-  function setDefault(handler) {
-    defaultHandler = handler;
+  function setDefault(fn) {
+    defaultHandler = fn;
   }
 
   function getFetchCount(url) {

@@ -76,10 +76,10 @@ export async function handleGetAppData(body, env, session) {
   // Unlinked players for the link form picker
   let unlinkedPlayers = [];
   if (status === 'unlinked') {
-    const allPlayers = await DB.prepare(
+    const unlinkedResult = await DB.prepare(
       "SELECT id, name FROM players WHERE (email IS NULL OR email = '') ORDER BY name"
     ).all();
-    unlinkedPlayers = allPlayers.results || [];
+    unlinkedPlayers = unlinkedResult.results || [];
   }
 
   const safeSettings = {

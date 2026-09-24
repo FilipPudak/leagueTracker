@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { assignStandardRanks, computeSchemer, computeAmbassador, computeChampion, computeBountyHunter, writePodiumBlock, AWARD_NAMES } from '../../src/lib/awards.js';
+import { assignStandardRanks, computeSchemer, computeAmbassador, computeChampion, computeBountyHunter, computeNewHopeClimbers, writePodiumBlock, AWARD_NAMES } from '../../src/lib/awards.js';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables, emptyTables } from '../helpers/fixtures.js';
 
@@ -461,5 +461,140 @@ describe('computeBountyHunter', () => {
 
     const result = await computeBountyHunter(db, 6);
     assert.equal(result.length, 0);
+  });
+});
+
+describe('computeNewHopeClimbers', () => {
+  function nhTables({ rounds, standings }) {
+    const t = basicTables();
+    t.melee_tournaments = rounds;
+    t.season_standings = standings;
+    return t;
+  }
+
+  function standing(playerId, round, matchPoints) {
+    return { season_id: 6, round, player_id: playerId, wins: 0, losses: 0, draws: 0, match_points: matchPoints, rank: 1 };
+  }
+
+  function regular(round) {
+    return { melee_id: 700 + round, season_id: 6, round, name: `S6 w${round}`, date: '2026-07-01', phase: 'regular' };
+  }
+
+  // seasonLength 11 → midRound 5
+
+  it('computes climb as mid rank minus final rank, keeping only positive climbers', async () => {
+    const db = createMockDb(nhTables({
+      rounds: [regular(1), regular(2), regular(3)],
+      standings: [standing('P1', 1, 30), standing('P2', 2, 20), standing('P3', 3, 10)],
+    }));
+    const finalRankMap = new Map([['P1', 3], ['P2', 2], ['P3', 1]]);
+
+    const climbers = await computeNewHopeClimbers(db, 6, finalRankMap, 11);
+    // P1 went 1 → 3 (fell, excluded); P2 2 → 2 (0, excluded); P3 3 → 1 = climb 2.
+    assert.deepEqual(climbers, [{ playerId: 'P3', climb: 2 }]);
+  });
+
+  it('requires presence in BOTH snapshots (players missing from final are excluded)', async () => {
+    const db = createMockDb(nhTables({
+      rounds: [regular(1), regular(2)],
+      standings: [standing('P1', 1, 30), standing('P2', 2, 20), standing('P4', 1, 9)],
+    }));
+    const finalRankMap = new Map([['P1', 4], ['P2', 2]]);
+
+    const climbers = await computeNewHopeClimbers(db, 6, finalRankMap, 11);
+    assert.ok(!climbers.some(c => c.playerId === 'P4'), 'P4 absent from final table → no climb entry');
+  });
+
+  it('mid snapshot uses RAW accumulated points, not per-round best', async () => {
+    const db = createMockDb(nhTables({
+      rounds: [regular(1), regular(2)],
+      standings: [standing('P1', 1, 30), standing('P2', 1, 20), standing('P2', 2, 15)],
+    }));
+    const finalRankMap = new Map([['P1', 1], ['P2', 4]]);
+
+    const climbers = await computeNewHopeClimbers(db, 6, finalRankMap, 11);
+    // Raw sums: P2=35 mid rank 1, P1=30 mid rank 2 → P1 climbs 2→1.
+    // Per-round best (P1=30, P2=20) would put P1 mid rank 1 → climb 0 → [].
+    assert.deepEqual(climbers, [{ playerId: 'P1', climb: 1 }]);
+  });
+
+  it('rounds beyond midRound do not enter the mid snapshot', async () => {
+    const db = createMockDb(nhTables({
+      rounds: [regular(1), regular(2), regular(6)],
+      standings: [standing('P1', 1, 10), standing('P1', 6, 100), standing('P2', 2, 20)],
+    }));
+    const finalRankMap = new Map([['P1', 1], ['P2', 2]]);
+
+    const climbers = await computeNewHopeClimbers(db, 6, finalRankMap, 11);
+    // mid only counts round ≤ 5: P2=20 rank 1, P1=10 rank 2 → P1 climbs 1.
+    // (round 6's 100 pts must NOT make P1 mid leader → climb 0)
+    assert.deepEqual(climbers, [{ playerId: 'P1', climb: 1 }]);
+  });
+
+  it('cut/side rounds ≤ midRound are excluded from the mid snapshot', async () => {
+    const db = createMockDb(nhTables({
+      rounds: [regular(1), regular(2), { melee_id: 999, season_id: 6, round: 4, name: 'TOP 4', date: '2026-07-01', phase: 'cut' }],
+      standings: [standing('P1', 1, 10), standing('P1', 4, 100), standing('P2', 2, 20)],
+    }));
+    const finalRankMap = new Map([['P1', 1], ['P2', 2]]);
+
+    const climbers = await computeNewHopeClimbers(db, 6, finalRankMap, 11);
+    assert.deepEqual(climbers, [{ playerId: 'P1', climb: 1 }],
+      'the cut round at r4 must not inflate P1 into mid leadership');
+  });
+
+  it('caps at top 3 climbers', async () => {
+    const db = createMockDb(nhTables({
+      rounds: [regular(1), regular(2), regular(3), regular(4)],
+      standings: [standing('P1', 1, 50), standing('P2', 2, 40), standing('P3', 3, 30), standing('P4', 4, 20), standing('P5', 4, 10)],
+    }));
+    const finalRankMap = new Map([['P1', 6], ['P2', 5], ['P3', 1], ['P4', 2], ['P5', 3]]);
+
+    const climbers = await computeNewHopeClimbers(db, 6, finalRankMap, 11);
+    // climbs: P3: 3→1=2, P4: 4→2=2, P5: 5→3=2, P1: 1→6=-5, P2: 2→5=-3 → 3 climbers exactly at cap.
+    assert.equal(climbers.length, 3);
+    // add a fourth: shift P2 up too
+    db.getStore().season_standings.push({ season_id: 6, round: 3, player_id: 'P6', wins: 0, losses: 0, draws: 0, match_points: 25, rank: 1 });
+    db.getStore().melee_tournaments.push({ melee_id: 704, season_id: 6, round: 3, name: 'S6 w3b', date: '2026-07-01', phase: 'regular' });
+    const withSix = await computeNewHopeClimbers(db, 6, new Map([['P1', 7], ['P2', 6], ['P3', 1], ['P4', 2], ['P5', 3], ['P6', 4]]), 11);
+    // mid ranks: P1=1,P2=2,P3=3,P6=4,P4=5,P5=6 → climbs: P3: 3-1=2, P4: 5-2=3, P5: 6-3=3,
+    // P6: 4-4=0, others negative → sorted desc: P4@3, P5@3, P3@2 (P6 excluded, no climb).
+    assert.equal(withSix.length, 3, 'never more than 3 entries');
+    assert.deepEqual(withSix.map(c => c.playerId), ['P4', 'P5', 'P3']);
+  });
+
+  it('ties on climb keep deterministic order (best mid rank first)', async () => {
+    const db = createMockDb(nhTables({
+      rounds: [regular(1), regular(2), regular(3)],
+      standings: [standing('P1', 1, 30), standing('P2', 2, 20), standing('P3', 3, 10)],
+    }));
+    const finalRankMap = new Map([['P1', 4], ['P2', 1], ['P3', 2]]);
+
+    const climbers = await computeNewHopeClimbers(db, 6, finalRankMap, 11);
+    // P2: 2→1 climb 1, P3: 3→2 climb 1 (tie) → mid-rank order preserved: P2 before P3.
+    assert.deepEqual(climbers.map(c => c.playerId), ['P2', 'P3']);
+  });
+
+  it('tied mid points get consecutive mid ranks (historical quirk, unchanged)', async () => {
+    const db = createMockDb(nhTables({
+      rounds: [regular(1)],
+      standings: [standing('P1', 1, 20), standing('P2', 1, 20)],
+    }));
+    const finalRankMap = new Map([['P1', 3], ['P2', 1]]);
+
+    const climbers = await computeNewHopeClimbers(db, 6, finalRankMap, 11);
+    // P1 gets mid rank 1, P2 rank 2 (consecutive, NOT shared):
+    // P1: 1-3=-2 excluded; P2: 2-1=1 → sole climber.
+    // Shared-rank mid semantics would give both mid rank 1 → zero climbers.
+    assert.deepEqual(climbers, [{ playerId: 'P2', climb: 1 }]);
+  });
+
+  it('returns empty array when the season has no mid-round standings', async () => {
+    const db = createMockDb(nhTables({
+      rounds: [regular(1)],
+      standings: [],
+    }));
+    const climbers = await computeNewHopeClimbers(db, 6, new Map([['P1', 1]]), 11);
+    assert.deepEqual(climbers, []);
   });
 });

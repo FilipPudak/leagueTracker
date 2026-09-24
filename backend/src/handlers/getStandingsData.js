@@ -46,7 +46,7 @@ export async function handleGetStandingsData(body, env) {
 
   const tableStandings = allStandingsList
     .filter(s => {
-      const t = tournamentList.find(t => t.round === s.round);
+      const t = tournamentList.find(x => x.round === s.round);
       return t && t.phase === 'regular' && s.round <= effectiveAsOf;
     });
 

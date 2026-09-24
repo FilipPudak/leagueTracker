@@ -1,5 +1,5 @@
 import { constantTimeEqual } from '../lib/auth.js';
-import { computeChampion, computeBountyHunter, writePodiumBlock } from '../lib/awards.js';
+import { computeChampion, computeBountyHunter, computeNewHopeClimbers, writePodiumBlock } from '../lib/awards.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';
 import { parseSeasonId } from '../db/queries.js';
 import { badRequest } from '../lib/errors.js';
@@ -62,43 +62,8 @@ export async function handleMaterializePastAwards(body, env) {
 
   if (seasonId > 1) {
     const seasonLength = season?.length || 11;
-    const midRound = Math.floor(seasonLength / 2);
-
-    // Mid-season: raw accumulated standings
-    const regularRoundsForMid = await DB.prepare(
-      'SELECT DISTINCT round FROM melee_tournaments WHERE season_id = ? AND phase = ? AND round <= ?'
-    ).bind(seasonId, 'regular', midRound).all();
-    const regularMidRoundSet = new Set((regularRoundsForMid.results || []).map(r => r.round));
-
-    const midStandings = await DB.prepare(
-      'SELECT player_id, round, match_points FROM season_standings WHERE season_id = ? AND round <= ?'
-    ).bind(seasonId, midRound).all();
-
-    const midPointsMap = new Map();
-    for (const row of (midStandings.results || [])) {
-      if (!regularMidRoundSet.has(row.round)) continue;
-      midPointsMap.set(row.player_id, (midPointsMap.get(row.player_id) || 0) + (row.match_points || 0));
-    }
-
-    const midEntries = [...midPointsMap.entries()].sort((a, b) => b[1] - a[1]);
-    const midRankMap = new Map();
-    let midRank = 1;
-    for (const [pid] of midEntries) {
-      midRankMap.set(pid, midRank++);
-    }
-
     const finalRankMap = new Map(seasonTable.map(r => [r.playerId, r.rank]));
-
-    const climbers = [...midRankMap.keys()]
-      .filter(pid => finalRankMap.has(pid))
-      .map(pid => ({
-        playerId: pid,
-        climb: (midRankMap.get(pid) || 0) - (finalRankMap.get(pid) || 0),
-      }))
-      .filter(c => c.climb > 0)
-      .sort((a, b) => b.climb - a.climb)
-      .slice(0, 3);
-
+    const climbers = await computeNewHopeClimbers(DB, seasonId, finalRankMap, seasonLength);
     podiums['A New Hope'] = climbers.map(c => ({ playerId: c.playerId, score: c.climb }));
   } else {
     podiums['A New Hope'] = [];

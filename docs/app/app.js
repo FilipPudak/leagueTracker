@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.13.0';
+const APP_VERSION = '4.13.1';
 
 const appState = {
   status: 'unlinked',
@@ -1032,9 +1032,12 @@ function renderRoundResults(rounds) {
     const phaseClass = 'round-phase-' + round.phase;
     const isCut = round.phase === 'cut';
     const isSide = round.phase === 'side';
-    const phaseLabel = isCut ? 'Top Cut' : (isSide ? 'Side Event' : 'Regular');
+    let baseLabel = 'Night ' + round.round;
+    if (isSide) baseLabel = 'Side Event';
+    if (isCut) baseLabel = 'Top Cut';
+    const phaseLabel = isCut || isSide ? baseLabel : 'Regular';
     const dateStr = formatNightDate(round.date);
-    const title = (isCut ? 'Top Cut' : isSide ? 'Side Event' : 'Night ' + round.round) + (dateStr ? ' — ' + dateStr : '');
+    const title = baseLabel + (dateStr ? ' — ' + dateStr : '');
     const playerRows = (round.players || [])
       .sort((a, b) => (a.rank || 999) - (b.rank || 999))
       .map(p => {
