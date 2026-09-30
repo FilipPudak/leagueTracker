@@ -10,7 +10,8 @@ database_name = "league-tracker"
 database_id = "ccf38d5e-1639-4eb3-8447-9f3644127e4b"
 
 [triggers]
-crons = ["15 20,21,22 * * 3", "0 7 * * 4", "15 */2 * * *"]
+# NOTE: Cloudflare counts weekdays 1=Sunday (3=TUE, 4=WED) — abbreviations avoid the trap.
+crons = ["15 20,21,22 * * WED", "0 7 * * THU", "15 */2 * * *"]
 
 [vars]
 ALLOWED_ORIGIN = "https://filippudak.github.io"

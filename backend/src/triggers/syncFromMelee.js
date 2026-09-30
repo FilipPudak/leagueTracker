@@ -179,8 +179,8 @@ export async function syncFromMelee(env, deps = {}) {
     })));
   }
 
-  // P3: extract this lifecycle tail into runLifecycle() after Sep-30 prod
-  // validation of the two-try open — see AGENTS.md follow-ups.
+  // P3: extract this lifecycle tail into runLifecycle() after the first
+  // automatic WED-cycle (2026-10-07) logs are reviewed — see AGENTS.md follow-ups.
   const fresh = await getSettings(DB);
   if ((fresh.LAST_ADVANCED || '') !== lastAdvanced || isVotingOpen(fresh.VOTING_OPEN) !== votingOpen) {
     console.warn('[SyncFromMelee] Race guard: lifecycle settings changed during this run (concurrent sync?); skipping advance.');

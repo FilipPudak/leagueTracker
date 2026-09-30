@@ -460,7 +460,7 @@ describe('router/index.js – fetch handler', () => {
     tables.settings.push({ key: 'SEASON_STARTED', value: 'TRUE' });
     const testEnv = env(tables, { MELEE_CLIENT_ID: 'x', MELEE_CLIENT_SECRET: 'y' });
     try {
-      await worker.scheduled({ cron: '15 20,21,22 * * 3', scheduledTime: 1758054900000 }, testEnv, { waitUntil() {} });
+      await worker.scheduled({ cron: '15 20,21,22 * * WED', scheduledTime: 1758054900000 }, testEnv, { waitUntil() {} });
     } catch (err) {
       assert.fail(`scheduled() must swallow errors (cron reliability): ${err.message}`);
     } finally {
