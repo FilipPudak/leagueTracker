@@ -1,12 +1,11 @@
 import { getPlayerById, getPlayerByEmail, getAllSeasons, getSettings, isVotingOpen, isSeasonPaused, parseWeek, parseSeasonId } from '../db/queries.js';
 import { createSession, findSessionByPlayerAndDevice } from '../lib/auth.js';
 import { getWeeklyParticipation, getAttendedStatus } from '../lib/participation.js';
-import { getFacedOpponents } from '../lib/voteValidation.js';
+import { filterFacedOpponents } from '../lib/voteValidation.js';
 
-export async function handleLinkAccount(body, env) {
-  const { DB } = env;
-  const { playerId: rawPlayerId, email, deviceId } = body;
-
+// Full email-claim decision chain — every rejection keeps its exact status
+// and message so the link form can surface them verbatim.
+async function resolveLinkTarget(DB, rawPlayerId, email, deviceId) {
   if (!deviceId) {
     const err = new Error('Missing device ID. Please try again.');
     err.status = 400;
@@ -32,7 +31,6 @@ export async function handleLinkAccount(body, env) {
     playerId = claimed.id;
   }
 
-  // Verify player exists
   const player = await getPlayerById(DB, playerId);
   if (!player) {
     const err = new Error('Player not found.');
@@ -40,7 +38,6 @@ export async function handleLinkAccount(body, env) {
     throw err;
   }
 
-  // Check if email is already linked to a different player
   const existingByEmail = await getPlayerByEmail(DB, email);
   if (existingByEmail && existingByEmail.id !== playerId) {
     const err = new Error('This email is already linked to another player.');
@@ -58,16 +55,28 @@ export async function handleLinkAccount(body, env) {
       .bind(email.trim().toLowerCase(), playerId).run();
   }
 
+  return { playerId, player };
+}
+
+// Honor-based claim permanence above: same device reuses its token; a new
+// device for the same player gets its own session.
+async function issueSessionToken(DB, playerId, deviceId, email) {
   const session = await findSessionByPlayerAndDevice(DB, playerId, deviceId);
-  let token;
-  const now = new Date().toISOString();
   if (session) {
-    token = session.token;
+    const now = new Date().toISOString();
     await DB.prepare('UPDATE sessions SET last_active = ?, email = ? WHERE token = ?')
-      .bind(now, email.trim().toLowerCase(), token).run();
-  } else {
-    token = await createSession(DB, playerId, deviceId, email);
+      .bind(now, email.trim().toLowerCase(), session.token).run();
+    return session.token;
   }
+  return createSession(DB, playerId, deviceId, email);
+}
+
+export async function handleLinkAccount(body, env) {
+  const { DB } = env;
+  const { playerId: rawPlayerId, email, deviceId } = body;
+
+  const { playerId, player } = await resolveLinkTarget(DB, rawPlayerId, email, deviceId);
+  const token = await issueSessionToken(DB, playerId, deviceId, email);
 
   // Get current state
   const allSettings = await getSettings(DB);
@@ -95,18 +104,9 @@ export async function handleLinkAccount(body, env) {
   const leaders = await DB.prepare('SELECT * FROM leaders WHERE active = 1 ORDER BY name').all();
   const rosterResult = await DB.prepare('SELECT id, name FROM players WHERE active = 1 ORDER BY name').all();
   const roster = rosterResult.results || [];
-  let players = roster;
-  let facedOnly = false;
-  if (votingOpen && activeSeasonId && weekNum) {
-    const faced = await getFacedOpponents(DB, activeSeasonId, weekNum, playerId);
-    if (faced && faced.size > 0) {
-      const filtered = roster.filter(p => faced.has(String(p.id)));
-      if (filtered.length > 0) {
-        players = filtered;
-        facedOnly = true;
-      }
-    }
-  }
+  const { players, facedOnly } = await filterFacedOpponents(
+    DB, roster, votingOpen, activeSeasonId, weekNum, playerId
+  );
   const seasons = await getAllSeasons(DB);
 
   // Weekly participation

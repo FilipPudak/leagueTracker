@@ -1,6 +1,6 @@
 import { getSettings, parseSeasonId, parseWeek, isVotingOpen, isSeasonPaused } from '../db/queries.js';
 import { getWeeklyParticipation as getWeeklyParticipationCount, getAttendedStatus } from '../lib/participation.js';
-import { getFacedOpponents } from '../lib/voteValidation.js';
+import { filterFacedOpponents } from '../lib/voteValidation.js';
 
 export async function handleGetWeeklyParticipation(body, env, session) {
   const { DB } = env;
@@ -25,18 +25,12 @@ export async function handleGetWeeklyParticipation(body, env, session) {
 
     const allPlayersResult = await DB.prepare('SELECT * FROM players').all();
     const allPlayers = allPlayersResult.results || [];
-    players = allPlayers.map(p => ({ id: p.id, name: p.name }));
-
-    if (votingOpen) {
-      const faced = await getFacedOpponents(DB, activeSeasonId, currentWeek, session.player_id);
-      if (faced && faced.size > 0) {
-        const filtered = allPlayers.filter(p => faced.has(String(p.id)));
-        if (filtered.length > 0) {
-          players = filtered.map(p => ({ id: p.id, name: p.name }));
-          facedOnly = true;
-        }
-      }
-    }
+    const candidates = allPlayers.map(p => ({ id: p.id, name: p.name }));
+    const filtered = await filterFacedOpponents(
+      DB, candidates, votingOpen, activeSeasonId, currentWeek, session.player_id
+    );
+    players = filtered.players;
+    facedOnly = filtered.facedOnly;
   }
 
   return { weeklyParticipation, attended, players, facedOnly, votingOpen, week: currentWeek };

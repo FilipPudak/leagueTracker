@@ -155,6 +155,22 @@ export async function computeBountyHunter(db, seasonId) {
 
   if (!prevSeasonId) return [];
 
+  const top4Ids = await loadPrevSeasonTop4(db, prevSeasonId);
+  if (top4Ids.length === 0) return [];
+
+  const wins = await countWinsAgainstTop4(db, seasonId, new Set(top4Ids));
+
+  const allWins = [];
+  for (const [pid, score] of wins) {
+    allWins.push({ playerId: pid, score });
+  }
+
+  return tieAwareTop3(allWins);
+}
+
+// Top-4 of the PREVIOUS season's derived season table (best-X nights — not
+// raw per-round standings). Empty when the season has no regular rounds.
+async function loadPrevSeasonTop4(db, prevSeasonId) {
   const season = await db.prepare('SELECT top_results FROM seasons WHERE id = ?').bind(prevSeasonId).first();
   const topResults = season?.top_results || 7;
 
@@ -181,10 +197,11 @@ export async function computeBountyHunter(db, seasonId) {
     }));
 
   const seasonTable = computeSeasonTable(nights, topResults);
-  const top4Ids = seasonTable.filter(r => r.rank <= 4).map(r => r.playerId);
+  return seasonTable.filter(r => r.rank <= 4).map(r => r.playerId);
+}
 
-  if (top4Ids.length === 0) return [];
-
+// Regular-season non-bye wins against top-4 alumni of the previous season.
+async function countWinsAgainstTop4(db, seasonId, top4Set) {
   const allMatches = await db.prepare(
     'SELECT melee_match_id, player1_id, player2_id, winner_id, is_bye FROM match_results WHERE season_id = ?'
   ).bind(seasonId).all();
@@ -212,20 +229,14 @@ export async function computeBountyHunter(db, seasonId) {
     const round = matchToTournament.get(m.melee_match_id);
     const phase = tournamentRoundToPhase.get(round);
     if (phase !== 'regular') continue;
-    if (m.winner_id === m.player1_id && top4Ids.includes(m.player2_id)) {
+    if (m.winner_id === m.player1_id && top4Set.has(m.player2_id)) {
       wins.set(m.player1_id, (wins.get(m.player1_id) || 0) + 1);
     }
-    if (m.winner_id === m.player2_id && top4Ids.includes(m.player1_id)) {
+    if (m.winner_id === m.player2_id && top4Set.has(m.player1_id)) {
       wins.set(m.player2_id, (wins.get(m.player2_id) || 0) + 1);
     }
   }
-
-  const allWins = [];
-  for (const [pid, score] of wins) {
-    allWins.push({ playerId: pid, score });
-  }
-
-  return tieAwareTop3(allWins);
+  return wins;
 }
 
 export { AWARD_NAMES };

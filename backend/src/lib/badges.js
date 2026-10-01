@@ -23,6 +23,82 @@ function nextTierInfo(value, thresholds) {
   return { nextTier: null, nextThreshold: null };
 }
 
+// --- Per-badge computations (pure over the batch-loaded rows unless noted) ---
+
+function computeCrowdFavorite(receivedVotes, activeSeasonId, isSeasonActive) {
+  for (const row of receivedVotes) {
+    if (isSeasonActive && row.season_id === activeSeasonId) continue;
+    if (row.cnt >= 3) return true;
+  }
+  return false;
+}
+
+function computeLoyalist(attendance) {
+  const seasons = [...new Set(attendance.map(a => a.season_id))].sort((a, b) => a - b);
+  for (let i = 2; i < seasons.length; i++) {
+    if (seasons[i] - seasons[i - 1] === 1 && seasons[i - 1] - seasons[i - 2] === 1) return true;
+  }
+  return false;
+}
+
+// Beat any previous Galactic Ruler or Champion — queries the awards table directly.
+async function computeGiantSlayer(db, beatenOpponentIds) {
+  if (beatenOpponentIds.size === 0) return false;
+  const champAwards = await db.prepare(
+    `SELECT DISTINCT player_id FROM awards
+     WHERE award_name IN ('Galactic Ruler', 'Galactic Champion')`
+  ).all();
+  const champPlayerIds = new Set((champAwards.results || []).map(r => r.player_id));
+  for (const oppId of beatenOpponentIds) {
+    if (champPlayerIds.has(oppId)) return true;
+  }
+  return false;
+}
+
+function computeWinTotals(standings) {
+  let totalWins = 0;
+  let undefeatedNights = 0;
+  for (const s of standings) {
+    totalWins += s.wins || 0;
+    if ((s.losses || 0) === 0) undefeatedNights++;
+  }
+  return { totalWins, undefeatedNights };
+}
+
+function computeSweepCount(matches, playerId) {
+  let sweepCount = 0;
+  for (const m of matches) {
+    if (m.is_bye) continue;
+    if (m.winner_id !== playerId) continue;
+    const games = parseMatchResult(m.result);
+    if (games && games.gamesLoser === 0 && games.gamesWinner >= 2) sweepCount++;
+  }
+  return sweepCount;
+}
+
+// 3+ wins with each of 6 different leaders within ONE season; the leader a
+// player "played" is the leader they voted for that week (attribution rule).
+function computeDeckMaster(matches, votes, playerId) {
+  const voteByWeekSeason = new Map(votes.map(v => [`${v.season_id}-${v.week}`, v.leader_id]));
+  const seasonIds = [...new Set(matches.map(m => m.season_id))];
+  for (const sid of seasonIds) {
+    const leaderWinCount = new Map();
+    for (const m of matches) {
+      if (m.season_id !== sid) continue;
+      if (m.is_bye) continue;
+      if (m.winner_id !== playerId) continue;
+      const leaderId = voteByWeekSeason.get(`${sid}-${m.round}`);
+      if (leaderId) leaderWinCount.set(leaderId, (leaderWinCount.get(leaderId) || 0) + 1);
+    }
+    let leadersWithThreeWins = 0;
+    for (const count of leaderWinCount.values()) {
+      if (count >= 3) leadersWithThreeWins++;
+    }
+    if (leadersWithThreeWins >= 6) return true;
+  }
+  return false;
+}
+
 export async function computeBadges(db, playerId, activeSeasonId = null, isSeasonActive = false) {
   const [attendanceRows, standingsRows, matchRows, votesRows, votesReceivedRows, leaderCount, champAsP1, champAsP2] = await Promise.all([
     db.prepare("SELECT a.season_id, a.week FROM attendance a JOIN melee_tournaments t ON t.season_id = a.season_id AND t.round = a.week WHERE a.player_id = ? AND t.phase = 'regular'").bind(playerId).all(),
@@ -60,68 +136,13 @@ export async function computeBadges(db, playerId, activeSeasonId = null, isSeaso
   const hasAttendance = attendance.length > 0;
   const hasRankOne = standings.some(s => s.rank === 1);
 
-  let crowdFavorite = false;
-  for (const row of receivedVotes) {
-    if (isSeasonActive && row.season_id === activeSeasonId) continue;
-    if (row.cnt >= 3) { crowdFavorite = true; break; }
-  }
+  const crowdFavorite = computeCrowdFavorite(receivedVotes, activeSeasonId, isSeasonActive);
+  const loyalist = computeLoyalist(attendance);
+  const giantSlayer = await computeGiantSlayer(db, beatenOpponentIds);
 
-  const seasons = [...new Set(attendance.map(a => a.season_id))].sort((a, b) => a - b);
-  let loyalist = false;
-  if (seasons.length >= 3) {
-    for (let i = 2; i < seasons.length; i++) {
-      if (seasons[i] - seasons[i - 1] === 1 && seasons[i - 1] - seasons[i - 2] === 1) {
-        loyalist = true;
-        break;
-      }
-    }
-  }
-
-  let giantSlayer = false;
-  if (beatenOpponentIds.size > 0) {
-    const champAwards = await db.prepare(
-      `SELECT DISTINCT player_id FROM awards
-       WHERE award_name IN ('Galactic Ruler', 'Galactic Champion')`
-    ).all();
-    const champPlayerIds = new Set((champAwards.results || []).map(r => r.player_id));
-    for (const oppId of beatenOpponentIds) {
-      if (champPlayerIds.has(oppId)) { giantSlayer = true; break; }
-    }
-  }
-
-  let totalWins = 0;
-  let undefeatedNights = 0;
-  for (const s of standings) {
-    totalWins += s.wins || 0;
-    if ((s.losses || 0) === 0) undefeatedNights++;
-  }
-
-  let sweepCount = 0;
-  for (const m of matches) {
-    if (m.is_bye) continue;
-    if (m.winner_id !== playerId) continue;
-    const games = parseMatchResult(m.result);
-    if (games && games.gamesLoser === 0 && games.gamesWinner >= 2) sweepCount++;
-  }
-
-  const voteByWeekSeason = new Map(votes.map(v => [`${v.season_id}-${v.week}`, v.leader_id]));
-  let hasDeckMaster = false;
-  const seasonIds = [...new Set(matches.map(m => m.season_id))];
-  for (const sid of seasonIds) {
-    const leaderWinCount = new Map();
-    for (const m of matches) {
-      if (m.season_id !== sid) continue;
-      if (m.is_bye) continue;
-      if (m.winner_id !== playerId) continue;
-      const leaderId = voteByWeekSeason.get(`${sid}-${m.round}`);
-      if (leaderId) leaderWinCount.set(leaderId, (leaderWinCount.get(leaderId) || 0) + 1);
-    }
-    let leadersWithThreeWins = 0;
-    for (const count of leaderWinCount.values()) {
-      if (count >= 3) leadersWithThreeWins++;
-    }
-    if (leadersWithThreeWins >= 6) { hasDeckMaster = true; break; }
-  }
+  const { totalWins, undefeatedNights } = computeWinTotals(standings);
+  const sweepCount = computeSweepCount(matches, playerId);
+  const hasDeckMaster = computeDeckMaster(matches, votes, playerId);
 
   const totalVotes = votes.length;
 

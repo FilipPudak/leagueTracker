@@ -58,3 +58,19 @@ export async function validateVote(db, { seasonId, week, playerId, leaderId, opp
     throw badRequest('You can only vote for an opponent you faced that week.');
   }
 }
+
+// Opponent picker scope shared by getAppData/linkAccount/getWeeklyParticipation:
+// during open voting a linked player may only pick opponents they actually
+// faced; falls back to the full candidate list when match data is missing or
+// the faced list resolves empty.
+export async function filterFacedOpponents(db, candidatePlayers, votingOpen, seasonId, week, playerId) {
+  if (!(votingOpen && playerId && seasonId && week)) {
+    return { players: candidatePlayers, facedOnly: false };
+  }
+  const faced = await getFacedOpponents(db, seasonId, week, playerId);
+  if (faced && faced.size > 0) {
+    const filtered = candidatePlayers.filter(p => faced.has(String(p.id)));
+    if (filtered.length > 0) return { players: filtered, facedOnly: true };
+  }
+  return { players: candidatePlayers, facedOnly: false };
+}

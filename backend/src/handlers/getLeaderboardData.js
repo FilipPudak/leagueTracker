@@ -56,80 +56,17 @@ export async function handleGetLeaderboardData(body, env) {
   );
 
   // Schemer: live for active season (fresh between weekly refreshes), stored for past seasons
-  let schemer;
-  if (isActiveSeason && !seasonEnded) {
-    const live = await computeSchemer(DB, seasonId);
-    schemer = live.length > 0 ? assignStandardRanks(live) : null;
-  } else {
-    schemer = awardsMap['Galactic Schemer'] || null;
-    schemer = schemer ? assignStandardRanks(schemer) : null;
-  }
+  const useLive = isActiveSeason && !seasonEnded;
+  let schemer = await resolveStoredOrLive(DB, awardsMap, 'Galactic Schemer', useLive, computeSchemer, seasonId);
 
   // Ambassador: same live-vs-stored rule as Schemer
-  let ambassador;
-  if (isActiveSeason && !seasonEnded) {
-    const live = await computeAmbassador(DB, seasonId);
-    ambassador = live.length > 0 ? assignStandardRanks(live) : null;
-  } else {
-    ambassador = awardsMap['Galactic Ambassador'] || null;
-    ambassador = ambassador ? assignStandardRanks(ambassador) : null;
-  }
+  let ambassador = await resolveStoredOrLive(DB, awardsMap, 'Galactic Ambassador', useLive, computeAmbassador, seasonId);
 
   // Galactic Ruler: stored or live from season_standings
-  let ruler = awardsMap['Galactic Ruler'] || null;
-  if ((!ruler || ruler.length === 0) && isActiveSeason) {
-    const season = await DB.prepare('SELECT length, top_results FROM seasons WHERE id = ?').bind(seasonId).first();
-    const seasonLength = season?.length || 11;
-    const round = resolveLiveRound(seasonEnded, seasonLength, votingOpen, currentWeek);
-    const standings = await DB.prepare(
-      'SELECT player_id, rank, match_points FROM season_standings WHERE season_id = ? AND round = ?'
-    ).bind(seasonId, round).all();
-    const rows = (standings.results || []).sort((a, b) => (a.rank || 999) - (b.rank || 999));
-    const top3 = rows.filter(s => s.rank != null && s.rank <= 3).slice(0, 3);
-    ruler = top3.length > 0 ? assignStandardRanks(top3.map(s => ({
-      playerId: s.player_id,
-      score: s.match_points || 0,
-      name: '',
-    }))) : null;
-  } else if (ruler) {
-    ruler = assignStandardRanks(ruler);
-  }
+  let ruler = await resolveRuler(DB, awardsMap, { seasonId, isActiveSeason, seasonEnded, votingOpen, currentWeek });
 
   // A New Hope: stored or live from season_standings
-  let newHope = awardsMap['A New Hope'] || null;
-  if ((!newHope || newHope.length === 0) && isActiveSeason) {
-    const season = await DB.prepare('SELECT length, top_results FROM seasons WHERE id = ?').bind(seasonId).first();
-    const seasonLength = season?.length || 11;
-    const topResults = season?.top_results || 7;
-
-    // Final: derived season table (best-X)
-    const finalRound = resolveLiveRound(seasonEnded, seasonLength, votingOpen, currentWeek);
-    const allStandings = await DB.prepare(
-      'SELECT round, player_id, wins, losses, draws, match_points, rank FROM season_standings WHERE season_id = ? AND round <= ?'
-    ).bind(seasonId, finalRound).all();
-
-    const nights = (allStandings.results || []).map(s => ({
-      playerId: s.player_id,
-      round: s.round,
-      wins: s.wins || 0,
-      draws: s.draws || 0,
-      losses: s.losses || 0,
-      rank: s.rank,
-    }));
-
-    const seasonTable = computeSeasonTable(nights, topResults);
-    const finalRankMap = new Map(seasonTable.map(r => [r.playerId, r.rank]));
-
-    const climbers = await computeNewHopeClimbers(DB, seasonId, finalRankMap, seasonLength);
-
-    newHope = climbers.length > 0 ? assignStandardRanks(climbers.map(c => ({
-      playerId: c.playerId,
-      score: c.climb,
-      name: '',
-    }))) : null;
-  } else if (newHope) {
-    newHope = assignStandardRanks(newHope);
-  }
+  let newHope = await resolveNewHope(DB, awardsMap, { seasonId, isActiveSeason, seasonEnded, votingOpen, currentWeek });
 
   // Bounty Hunter: stored only, hidden while voting is live
   let bountyHunter = isLive ? null : (awardsMap['Bounty Hunter'] || null);
@@ -158,12 +95,7 @@ export async function handleGetLeaderboardData(body, env) {
   // Mask Ambassador names with callsigns while voting is live (privacy).
   // Names are already resolved from playerId above, so the masked rows drop the
   // id entirely — shipping it would let anyone re-identify the callsigns.
-  if (isLive && ambassador) {
-    ambassador.forEach((entry, i) => {
-      entry.name = AMBASSADOR_CALLSIGNS[i] || `Vanguard-${i + 1}`;
-      delete entry.playerId;
-    });
-  }
+  maskAmbassadorCallsigns(ambassador, isLive);
 
   // Format scores
   schemer = formatScore(schemer, (e) => `${e.score} Leaders`);
@@ -199,6 +131,82 @@ async function buildPlayerNameMap(DB) {
     map[r.id] = r.name;
   }
   return map;
+}
+
+// Stored-or-live podium: live computation wins while the active season's data
+// is still moving; stored (materialized at close) is authoritative afterwards.
+async function resolveStoredOrLive(DB, awardsMap, awardKey, useLive, liveCompute, seasonId) {
+  if (useLive) {
+    const live = await liveCompute(DB, seasonId);
+    return live.length > 0 ? assignStandardRanks(live) : null;
+  }
+  const stored = awardsMap[awardKey] || null;
+  return stored ? assignStandardRanks(stored) : null;
+}
+
+function maskAmbassadorCallsigns(ambassador, isLive) {
+  if (!isLive || !ambassador) return;
+  ambassador.forEach((entry, i) => {
+    entry.name = AMBASSADOR_CALLSIGNS[i] || `Vanguard-${i + 1}`;
+    delete entry.playerId;
+  });
+}
+
+async function resolveRuler(DB, awardsMap, ctx) {
+  const { seasonId, isActiveSeason, seasonEnded, votingOpen, currentWeek } = ctx;
+  const ruler = awardsMap['Galactic Ruler'] || null;
+  if (ruler && ruler.length > 0) return assignStandardRanks(ruler);
+  if (!isActiveSeason) return ruler ? assignStandardRanks(ruler) : null;
+
+  const season = await DB.prepare('SELECT length, top_results FROM seasons WHERE id = ?').bind(seasonId).first();
+  const seasonLength = season?.length || 11;
+  const round = resolveLiveRound(seasonEnded, seasonLength, votingOpen, currentWeek);
+  const standings = await DB.prepare(
+    'SELECT player_id, rank, match_points FROM season_standings WHERE season_id = ? AND round = ?'
+  ).bind(seasonId, round).all();
+  const rows = (standings.results || []).sort((a, b) => (a.rank || 999) - (b.rank || 999));
+  const top3 = rows.filter(s => s.rank != null && s.rank <= 3).slice(0, 3);
+  return top3.length > 0 ? assignStandardRanks(top3.map(s => ({
+    playerId: s.player_id,
+    score: s.match_points || 0,
+    name: '',
+  }))) : null;
+}
+
+async function resolveNewHope(DB, awardsMap, ctx) {
+  const { seasonId, isActiveSeason, seasonEnded, votingOpen, currentWeek } = ctx;
+  const newHope = awardsMap['A New Hope'] || null;
+  if (newHope && newHope.length > 0) return assignStandardRanks(newHope);
+  if (!isActiveSeason) return newHope ? assignStandardRanks(newHope) : null;
+
+  const season = await DB.prepare('SELECT length, top_results FROM seasons WHERE id = ?').bind(seasonId).first();
+  const seasonLength = season?.length || 11;
+  const topResults = season?.top_results || 7;
+
+  // Final: derived season table (best-X)
+  const finalRound = resolveLiveRound(seasonEnded, seasonLength, votingOpen, currentWeek);
+  const allStandings = await DB.prepare(
+    'SELECT round, player_id, wins, losses, draws, match_points, rank FROM season_standings WHERE season_id = ? AND round <= ?'
+  ).bind(seasonId, finalRound).all();
+
+  const nights = (allStandings.results || []).map(s => ({
+    playerId: s.player_id,
+    round: s.round,
+    wins: s.wins || 0,
+    draws: s.draws || 0,
+    losses: s.losses || 0,
+    rank: s.rank,
+  }));
+
+  const seasonTable = computeSeasonTable(nights, topResults);
+  const finalRankMap = new Map(seasonTable.map(r => [r.playerId, r.rank]));
+
+  const climbers = await computeNewHopeClimbers(DB, seasonId, finalRankMap, seasonLength);
+  return climbers.length > 0 ? assignStandardRanks(climbers.map(c => ({
+    playerId: c.playerId,
+    score: c.climb,
+    name: '',
+  }))) : null;
 }
 
 function resolveNames(items, nameMap) {

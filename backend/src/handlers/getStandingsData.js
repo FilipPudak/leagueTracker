@@ -61,6 +61,28 @@ export async function handleGetStandingsData(body, env) {
 
   const table = computeSeasonTable(nights, topResults);
 
+  const rounds = buildRoundSections(tournamentList, allStandingsList);
+
+  const allRegularRounds = tournamentList
+    .filter(t => t.phase === 'regular')
+    .map(t => ({ round: t.round, name: t.name }))
+    .sort((a, b) => b.round - a.round);
+
+  const { championCounts, rulerCounts } = await loadTitleCounts(DB, seasonId);
+
+  return {
+    seasonId,
+    table,
+    rounds,
+    allRegularRounds,
+    asOfRound: effectiveAsOf,
+    championCounts,
+    rulerCounts,
+  };
+}
+
+// Per-night sections (cut/side/regular labeled), newest first within phase.
+function buildRoundSections(tournamentList, allStandingsList) {
   const roundMap = new Map();
   for (const t of tournamentList) {
     if (!roundMap.has(t.round)) {
@@ -89,18 +111,17 @@ export async function handleGetStandingsData(body, env) {
     }
   }
 
-  const rounds = [...roundMap.values()].sort((a, b) => {
+  return [...roundMap.values()].sort((a, b) => {
     const pa = PHASE_DISPLAY_ORDER[a.phase] ?? 2;
     const pb = PHASE_DISPLAY_ORDER[b.phase] ?? 2;
     if (pa !== pb) return pa - pb;
     return b.round - a.round;
   });
+}
 
-  const allRegularRounds = tournamentList
-    .filter(t => t.phase === 'regular')
-    .map(t => ({ round: t.round, name: t.name }))
-    .sort((a, b) => b.round - a.round);
-
+// ★ = Champion titles (all seasons); Ruler titles exclude the viewed season
+// (the in-season podium already shows that placement).
+async function loadTitleCounts(DB, seasonId) {
   const championTitleRows = await DB.prepare(
     'SELECT player_id FROM awards WHERE award_name = ?'
   ).bind('Galactic Champion').all();
@@ -117,13 +138,5 @@ export async function handleGetStandingsData(body, env) {
     rulerCounts[r.player_id] = 1;
   }
 
-  return {
-    seasonId,
-    table,
-    rounds,
-    allRegularRounds,
-    asOfRound: effectiveAsOf,
-    championCounts,
-    rulerCounts,
-  };
+  return { championCounts, rulerCounts };
 }

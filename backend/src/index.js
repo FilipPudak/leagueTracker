@@ -50,6 +50,28 @@ function checkRateLimit(ip, action) {
   return entry.count <= max;
 }
 
+// Central session resolution for token-gated actions: validates the token
+// against the session store, touches activity (rolling TTL) via waitUntil,
+// and hard-rejects required actions when no valid session exists.
+async function resolveRequestSession(DB, action, token, ctx) {
+  let session = null;
+  if (TOKEN_REQUIRED.includes(action) || TOKEN_OPTIONAL.includes(action)) {
+    if (token) {
+      session = await findSessionByToken(DB, token);
+      if (session) {
+        const touch = touchSessionTimestamp(DB, token).catch(() => {});
+        if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(touch);
+      }
+    }
+    if (TOKEN_REQUIRED.includes(action) && !session) {
+      const err = new Error('Session expired. Please re-link to continue.');
+      err.status = 401;
+      throw err;
+    }
+  }
+  return session;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const origin = new URL(request.url).hostname;
@@ -124,21 +146,7 @@ export default {
 
     try {
       // Centralized session resolution
-      let session = null;
-      if (TOKEN_REQUIRED.includes(action) || TOKEN_OPTIONAL.includes(action)) {
-        if (token) {
-          session = await findSessionByToken(env.DB, token);
-          if (session) {
-            const touch = touchSessionTimestamp(env.DB, token).catch(() => {});
-            if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(touch);
-          }
-        }
-        if (TOKEN_REQUIRED.includes(action) && !session) {
-          const err = new Error('Session expired. Please re-link to continue.');
-          err.status = 401;
-          throw err;
-        }
-      }
+      const session = await resolveRequestSession(env.DB, action, token, ctx);
 
       const result = await handler(body, env, session);
       return new Response(JSON.stringify({ success: true, data: result }), {
