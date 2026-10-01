@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.13.2';
+const APP_VERSION = '4.13.3';
 
 const appState = {
   status: 'unlinked',
@@ -685,27 +685,10 @@ function switchTab(tabId) {
       showSpinner(false);
       setActiveView('vote-view');
       const votedCard = $('already-voted-card');
-      const notAttendedCard = $('not-attended-card');
       if (!appState.votingOpen && votedCard && votedCard.style.display !== 'block') {
         showStatus('Voting is currently closed for this week.', false);
-      } else if (appState.attended === false && notAttendedCard) {
-        notAttendedCard.style.display = 'block';
       }
-      callApi('getWeeklyParticipation', {}).then((res) => {
-        if (res && res.weeklyParticipation) {
-          const wpCard = $('weekly-participation-card');
-          const wpText = $('weekly-participation-text');
-          if (wpCard && wpText) {
-            if (res.weeklyParticipation.total > 0) {
-              wpText.textContent = res.weeklyParticipation.voted + ' of ' + res.weeklyParticipation.total + ' players have voted this week';
-              wpCard.style.display = 'block';
-            } else {
-              wpCard.style.display = 'none';
-            }
-          }
-        }
-        applyVoteTabRefresh(res);
-      }).catch(() => {});
+      refreshVoteTab();
     } else {
       openSignIn();
     }
@@ -778,10 +761,57 @@ function restoreVoteSelection() {
 function changeVote() {
   const voteForm = $('vote-form');
   const votedCard = $('already-voted-card');
+  appState.editingVote = true;
   if (voteForm) voteForm.style.display = '';
   if (votedCard) votedCard.style.display = 'none';
   clearStatus();
   restoreVoteSelection();
+}
+
+let voteTabRefreshSeq = 0;
+
+function refreshVoteTab() {
+  const seq = ++voteTabRefreshSeq;
+  callApi('getWeeklyParticipation', {}).then((res) => {
+    if (seq !== voteTabRefreshSeq) return;
+    if (res && res.weeklyParticipation) {
+      const wpCard = $('weekly-participation-card');
+      const wpText = $('weekly-participation-text');
+      if (wpCard && wpText) {
+        if (res.weeklyParticipation.total > 0) {
+          wpText.textContent = res.weeklyParticipation.voted + ' of ' + res.weeklyParticipation.total + ' players have voted this week';
+          wpCard.style.display = 'block';
+        } else {
+          wpCard.style.display = 'none';
+        }
+      }
+    }
+    applyVoteTabRefresh(res);
+  }).catch(() => {});
+}
+
+function adoptServerVote(res) {
+  if (typeof res.alreadySubmitted !== 'boolean') return;
+  appState.currentVote = res.alreadySubmitted && res.currentVote ? res.currentVote : null;
+}
+
+function syncAttendanceCard(notAttendedCard, gated) {
+  if (notAttendedCard) notAttendedCard.style.display = gated ? 'block' : 'none';
+}
+
+function syncVotedCardView(hasVoted) {
+  const voteForm = $('vote-form');
+  const votedCard = $('already-voted-card');
+  const changeBtn = $('btn-change-vote');
+  if (hasVoted) {
+    if (!appState.editingVote) {
+      if (voteForm) voteForm.style.display = 'none';
+      if (votedCard) votedCard.style.display = 'block';
+    }
+    if (changeBtn) changeBtn.style.display = appState.votingOpen ? 'inline-block' : 'none';
+  } else if (votedCard) {
+    votedCard.style.display = 'none';
+  }
 }
 
 function applyVoteTabRefresh(res) {
@@ -790,10 +820,29 @@ function applyVoteTabRefresh(res) {
   const votedCard = $('already-voted-card');
   const notAttendedCard = $('not-attended-card');
   const voteCta = $('vote-cta');
-  const hasVoted = votedCard && votedCard.style.display === 'block';
-  const canVote = appState.votingOpen && !hasVoted;
+
+  if (typeof res.votingOpen === 'boolean') appState.votingOpen = res.votingOpen;
+
+  const domHasVoted = votedCard && votedCard.style.display === 'block';
+  const hasVoted = typeof res.alreadySubmitted === 'boolean'
+    ? res.alreadySubmitted
+    : domHasVoted;
+
+  adoptServerVote(res);
 
   if (typeof res.attended === 'boolean') appState.attended = res.attended;
+
+  const weekChanged = res.week && appState.week !== res.week;
+  const filterChanged = Boolean(res.facedOnly) !== appState.playersFiltered;
+  if (res.players && (weekChanged || filterChanged)) {
+    appState.players = res.players;
+    appState.playersFiltered = Boolean(res.facedOnly);
+    appState.week = res.week || appState.week;
+    populateVotingDropdowns(appState.leaders, res.players, appState.linkedPlayer.id);
+    restoreVoteSelection();
+  }
+
+  const canVote = appState.votingOpen && !hasVoted;
   const gated = res.attended === false && canVote;
 
   if (voteCta) {
@@ -805,19 +854,11 @@ function applyVoteTabRefresh(res) {
     });
     voteCta.style.display = showCta ? 'block' : 'none';
   }
-  if (notAttendedCard) notAttendedCard.style.display = gated ? 'block' : 'none';
-  if (voteForm && canVote) voteForm.style.display = gated ? 'none' : '';
-  if (gated || !canVote) return;
+  syncAttendanceCard(notAttendedCard, gated);
+  syncVotedCardView(hasVoted);
 
-  const weekChanged = res.week && appState.week !== res.week;
-  const filterChanged = Boolean(res.facedOnly) !== appState.playersFiltered;
-  if (res.players && (weekChanged || filterChanged)) {
-    appState.players = res.players;
-    appState.playersFiltered = Boolean(res.facedOnly);
-    appState.week = res.week || appState.week;
-    populateVotingDropdowns(appState.leaders, res.players, appState.linkedPlayer.id);
-    restoreVoteSelection();
-  }
+  if (voteForm && canVote) voteForm.style.display = gated ? 'none' : '';
+  if (voteForm && !appState.votingOpen) voteForm.style.display = 'none';
 }
 
 let voteInFlight = false;
@@ -845,7 +886,7 @@ function submitVotes(isRetry) {
     if (btn) btn.disabled = false;
     showSpinner(false, 'vote');
   }
-  function showVoteRecorded() {
+  function showVoteRecorded(skipVoteStamp) {
     const vForm = $('vote-form');
     const vCard = $('already-voted-card');
     const voteCta = $('vote-cta');
@@ -855,9 +896,14 @@ function submitVotes(isRetry) {
     const changeBtn = $('btn-change-vote');
     if (changeBtn) changeBtn.style.display = appState.votingOpen ? 'inline-block' : 'none';
     clearStatus();
+    appState.editingVote = false;
     appState.leaderboardCache = {};
     appState.mystatsCache = {};
-    appState.currentVote = { leaderId: l1, opponentId: opp };
+    if (skipVoteStamp) {
+      appState.currentVote = null;
+    } else {
+      appState.currentVote = { leaderId: l1, opponentId: opp };
+    }
   }
 
   const action = LeagueCore.voteSubmitAction(appState.currentVote);
@@ -885,7 +931,8 @@ function submitVotes(isRetry) {
         appState.currentVote = null;
         submitVotes(true);
       } else if (msg.includes('already submitted votes for this week')) {
-        showVoteRecorded();
+        showVoteRecorded(true);
+        refreshVoteTab();
       } else {
         showStatus(msg || 'Vote submission failed.', false);
       }
@@ -1532,6 +1579,13 @@ document.addEventListener('DOMContentLoaded', () => {
   initTabKeyboard();
   initModalKeys();
   window.addEventListener('hashchange', handleHashRoute);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (!appState.linkedPlayer) return;
+    if (window.location.hash !== '#vote') return;
+    refreshVoteTab();
+  });
 
   const desktopQuery = window.matchMedia('(min-width: 1024px)');
   desktopQuery.addEventListener('change', (e) => {

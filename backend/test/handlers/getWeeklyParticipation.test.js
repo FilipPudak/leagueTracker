@@ -144,7 +144,26 @@ describe('handleGetWeeklyParticipation', () => {
       assert.equal(result.week, 3);
     });
 
-    it('returns null attended and null week when no active season', async () => {
+    it('returns alreadySubmitted true and currentVote for a player who voted', async () => {
+      const result = await handleGetWeeklyParticipation({}, env, session);
+      assert.equal(result.alreadySubmitted, true);
+      assert.deepEqual(result.currentVote, { leaderId: '1', opponentId: 'P002' });
+    });
+
+    it('returns alreadySubmitted false and null currentVote for a player who has not voted', async () => {
+      const noVoteSession = { token: 'test-token-bob', player_id: 'P002', device_id: 'dev-bob', email: 'bob@test.com' };
+      const result = await handleGetWeeklyParticipation({}, env, noVoteSession);
+      assert.equal(result.alreadySubmitted, false);
+      assert.equal(result.currentVote, null);
+    });
+
+    it('returns null alreadySubmitted and null currentVote when no session', async () => {
+      const result = await handleGetWeeklyParticipation({}, env, null);
+      assert.equal(result.alreadySubmitted, null);
+      assert.equal(result.currentVote, null);
+    });
+
+    it('returns null alreadySubmitted and null week when no active season', async () => {
       const tables = tablesWithWeek3();
       tables.settings = tables.settings.filter(s => s.key !== 'ACTIVE_SEASON_ID');
       const db = createMockDb(tables);
@@ -152,6 +171,8 @@ describe('handleGetWeeklyParticipation', () => {
       assert.equal(result.attended, null);
       assert.equal(result.week, null);
       assert.equal(result.weeklyParticipation, null);
+      assert.equal(result.alreadySubmitted, null);
+      assert.equal(result.currentVote, null);
     });
   });
 });

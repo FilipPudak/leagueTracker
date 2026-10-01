@@ -1,4 +1,4 @@
-import { getPlayerById, getPlayerByEmail, getAllSeasons, getSettings, isVotingOpen, isSeasonPaused, parseWeek, parseSeasonId } from '../db/queries.js';
+import { getPlayerById, getPlayerByEmail, getAllSeasons, getSettings, isVotingOpen, isSeasonPaused, parseWeek, parseSeasonId, getCurrentVote } from '../db/queries.js';
 import { createSession, findSessionByPlayerAndDevice } from '../lib/auth.js';
 import { getWeeklyParticipation, getAttendedStatus } from '../lib/participation.js';
 import { filterFacedOpponents } from '../lib/voteValidation.js';
@@ -89,13 +89,8 @@ export async function handleLinkAccount(body, env) {
   let alreadyVoted = false;
   let currentVote = null;
   if (activeSeasonId && weekNum) {
-    const vote = await DB.prepare(
-      'SELECT leader_id, opponent_id FROM votes WHERE season_id = ? AND week = ? AND player_id = ?'
-    ).bind(activeSeasonId, weekNum, playerId).first();
-    if (vote) {
-      alreadyVoted = true;
-      currentVote = { leaderId: vote.leader_id, opponentId: vote.opponent_id };
-    }
+    currentVote = await getCurrentVote(DB, activeSeasonId, weekNum, playerId);
+    alreadyVoted = Boolean(currentVote);
   }
 
   // Get leaders and players for the response. The opponent picker is narrowed to

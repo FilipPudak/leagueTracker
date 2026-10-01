@@ -1,4 +1,4 @@
-import { getSettings, getPlayerById, getAllActiveLeaders, getAllSeasons, parseSeasonId, parseWeek, isVotingOpen, isSeasonPaused, hasPlayerVotedThisWeek } from '../db/queries.js';
+import { getSettings, getPlayerById, getAllActiveLeaders, getAllSeasons, parseSeasonId, parseWeek, isVotingOpen, isSeasonPaused, getCurrentVote } from '../db/queries.js';
 import { getWeeklyParticipation, getAttendedStatus } from '../lib/participation.js';
 import { filterFacedOpponents } from '../lib/voteValidation.js';
 
@@ -16,10 +16,8 @@ async function resolveLinkStatus(DB, session, token, activeSeasonId, currentWeek
       status = 'linked';
       linkedPlayer = { id: player.id, name: player.name, email: player.email };
       if (activeSeasonId && currentWeek) {
-        alreadySubmitted = await hasPlayerVotedThisWeek(DB, activeSeasonId, currentWeek, player.id);
-        if (alreadySubmitted) {
-          currentVote = await loadCurrentVote(DB, activeSeasonId, currentWeek, player.id);
-        }
+        currentVote = await getCurrentVote(DB, activeSeasonId, currentWeek, player.id);
+        alreadySubmitted = Boolean(currentVote);
       }
     } else {
       status = 'invalid-token';
@@ -29,14 +27,6 @@ async function resolveLinkStatus(DB, session, token, activeSeasonId, currentWeek
   }
 
   return { status, linkedPlayer, alreadySubmitted, currentVote };
-}
-
-async function loadCurrentVote(DB, activeSeasonId, currentWeek, playerId) {
-  const vote = await DB.prepare(
-    'SELECT leader_id, opponent_id FROM votes WHERE season_id = ? AND week = ? AND player_id = ?'
-  ).bind(activeSeasonId, currentWeek, playerId).first();
-  const currentVote = vote ? { leaderId: vote.leader_id, opponentId: vote.opponent_id } : null;
-  return currentVote;
 }
 
 export async function handleGetAppData(body, env, session) {

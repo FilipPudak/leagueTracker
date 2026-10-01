@@ -1,4 +1,4 @@
-import { getSettings, parseSeasonId, parseWeek, isVotingOpen, isSeasonPaused } from '../db/queries.js';
+import { getSettings, parseSeasonId, parseWeek, isVotingOpen, isSeasonPaused, getCurrentVote } from '../db/queries.js';
 import { getWeeklyParticipation as getWeeklyParticipationCount, getAttendedStatus } from '../lib/participation.js';
 import { filterFacedOpponents } from '../lib/voteValidation.js';
 
@@ -11,7 +11,10 @@ export async function handleGetWeeklyParticipation(body, env, session) {
   const votingOpen = isVotingOpen(settings.VOTING_OPEN) && !isSeasonPaused(settings.SEASON_PAUSED);
 
   if (!activeSeasonId || !currentWeek) {
-    return { weeklyParticipation: null, attended: null, players: null, facedOnly: false, votingOpen, week: null };
+    return {
+      weeklyParticipation: null, attended: null, players: null, facedOnly: false,
+      votingOpen, week: null, alreadySubmitted: null, currentVote: null,
+    };
   }
 
   const weeklyParticipation = await getWeeklyParticipationCount(DB, activeSeasonId, currentWeek);
@@ -19,9 +22,13 @@ export async function handleGetWeeklyParticipation(body, env, session) {
   let attended = null;
   let players = null;
   let facedOnly = false;
+  let alreadySubmitted = null;
+  let currentVote = null;
 
   if (session) {
     attended = await getAttendedStatus(DB, activeSeasonId, currentWeek, session.player_id);
+    currentVote = await getCurrentVote(DB, activeSeasonId, currentWeek, session.player_id);
+    alreadySubmitted = Boolean(currentVote);
 
     const allPlayersResult = await DB.prepare('SELECT * FROM players').all();
     const allPlayers = allPlayersResult.results || [];
@@ -33,5 +40,8 @@ export async function handleGetWeeklyParticipation(body, env, session) {
     facedOnly = filtered.facedOnly;
   }
 
-  return { weeklyParticipation, attended, players, facedOnly, votingOpen, week: currentWeek };
+  return {
+    weeklyParticipation, attended, players, facedOnly, votingOpen, week: currentWeek,
+    alreadySubmitted, currentVote,
+  };
 }

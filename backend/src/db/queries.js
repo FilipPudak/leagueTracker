@@ -117,6 +117,14 @@ export async function hasPlayerVotedThisWeek(db, seasonId, week, playerId) {
   return !!row;
 }
 
+// Own-vote lookup: the caller's current vote for a week (own data only).
+export async function getCurrentVote(db, seasonId, week, playerId) {
+  const row = await db.prepare(
+    'SELECT leader_id, opponent_id FROM votes WHERE season_id = ? AND week = ? AND player_id = ?'
+  ).bind(seasonId, week, playerId).first();
+  return row ? { leaderId: row.leader_id, opponentId: row.opponent_id } : null;
+}
+
 // Most played leaders
 export async function getMostPlayedLeaders(db, seasonId) {
   return db.prepare(`
