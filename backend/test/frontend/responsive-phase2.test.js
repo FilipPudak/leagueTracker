@@ -11,7 +11,7 @@ function readCSS() {
   return readFileSync(CSS_FILE, 'utf8');
 }
 
-describe('Phase 2: Responsive breakpoints', () => {
+describe('Responsive: breakpoints', () => {
   it('has tablet breakpoint at 768px', () => {
     const css = readCSS();
     assert.ok(css.includes('(min-width: 768px)'), 'Must have @media (min-width: 768px) breakpoint');
@@ -51,7 +51,7 @@ describe('Phase 2: Responsive breakpoints', () => {
   });
 });
 
-describe('Phase 2: Responsive typography', () => {
+describe('Responsive: typography', () => {
   it('title font-size increases at tablet', () => {
     const css = readCSS();
     const tabletMatch = css.match(/@media\s*\(min-width:\s*768px\)\s*\{[^}]*--font-size-title:\s*([\d.]+)rem/);

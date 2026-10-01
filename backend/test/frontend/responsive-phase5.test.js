@@ -11,7 +11,7 @@ function readCSS() {
   return readFileSync(CSS_FILE, 'utf8');
 }
 
-describe('Phase 5: My Stats persistent layout', () => {
+describe('My Stats: persistent layout', () => {
   it('myseason-view sits inside the left column wrapper at desktop', () => {
     const css = readCSS();
     const match = css.match(/\.col-left\s*\{[^}]*grid-column:\s*1/);
@@ -25,7 +25,7 @@ describe('Phase 5: My Stats persistent layout', () => {
   });
 });
 
-describe('Phase 5: My Stats responsive grids', () => {
+describe('My Stats: responsive grids', () => {
   it('.career-record-grid has responsive column override', () => {
     const css = readCSS();
     assert.ok(
@@ -43,7 +43,7 @@ describe('Phase 5: My Stats responsive grids', () => {
   });
 });
 
-describe('Phase 5: Modal responsive sizing', () => {
+describe('Modal: responsive sizing', () => {
   it('modal max-width increases at tablet', () => {
     const css = readCSS();
     assert.ok(

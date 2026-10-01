@@ -177,12 +177,12 @@ describe('handleGetPlayerProfile', () => {
     assert.equal(result.career.championCount, 1);
   });
 
-  it('returns awards only for closed seasons', async () => {
+  it('active season: profile season awards are empty', async () => {
     const result = await handleGetPlayerProfile({ playerId: 'P001', seasonId: 6 }, env);
     assert.deepEqual(result.season.awards, []);
   });
 
-  it('returns awards for closed seasons', async () => {
+  it('historical season: profile returns materialized awards', async () => {
     const tables = makeTables({
       settings: [
         { key: 'ACTIVE_SEASON_ID', value: '7' },

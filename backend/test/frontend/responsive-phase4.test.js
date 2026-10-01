@@ -11,7 +11,7 @@ const JS_FILE = join(__dirname, '../../../docs/app/app.js');
 function readCSS() { return readFileSync(CSS_FILE, 'utf8'); }
 function readJS() { return readFileSync(JS_FILE, 'utf8'); }
 
-describe('Phase 4: Desktop 2-panel CSS Grid', () => {
+describe('Layout: desktop 2-panel CSS Grid', () => {
   it('desktop-columns has display:grid at desktop', () => {
     const css = readCSS();
     assert.ok(
@@ -37,7 +37,7 @@ describe('Phase 4: Desktop 2-panel CSS Grid', () => {
   });
 });
 
-describe('Phase 4: boot view routing', () => {
+describe('Boot: view routing', () => {
   it('applyBoot routes linked users through the hash router', () => {
     const js = readJS();
     assert.ok(
@@ -55,7 +55,7 @@ describe('Phase 4: boot view routing', () => {
   });
 });
 
-describe('Phase 4: Vote CTA on standings', () => {
+describe('Standings: vote CTA', () => {
   it('vote-cta element exists in HTML', () => {
     const html = readFileSync(join(__dirname, '../../../docs/app/index.html'), 'utf8');
     assert.ok(html.includes('vote-cta'), 'Must have #vote-cta element');

@@ -4,7 +4,7 @@ import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables } from '../helpers/fixtures.js';
 import { handleBackfillFromMelee } from '../../src/handlers/handleBackfillFromMelee.js';
 
-describe('handleBackfillFromMelee', () => {
+describe('handleBackfillFromMelee (admin wrapper)', () => {
   let DB;
   let env;
 

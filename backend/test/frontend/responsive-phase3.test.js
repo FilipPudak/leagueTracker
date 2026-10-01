@@ -11,7 +11,7 @@ function readCSS() {
   return readFileSync(CSS_FILE, 'utf8');
 }
 
-describe('Phase 3: Tablet portrait navigation', () => {
+describe('Navigation: tablet portrait', () => {
   it('nav-tabs positioned at bottom on tablet portrait', () => {
     const css = readCSS();
     assert.ok(
@@ -37,7 +37,7 @@ describe('Phase 3: Tablet portrait navigation', () => {
   });
 });
 
-describe('Phase 3: Desktop navigation', () => {
+describe('Navigation: desktop', () => {
   it('.nav-tabs is visible at desktop (flex layout)', () => {
     const css = readCSS();
     const match = css.match(/\.nav-tabs\s*\{\s*display:\s*flex/);

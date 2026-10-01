@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { assignStandardRanks, computeSchemer, computeAmbassador, computeChampion, computeBountyHunter, computeNewHopeClimbers, writePodiumBlock, AWARD_NAMES } from '../../src/lib/awards.js';
+import { assignStandardRanks, computeSchemer, computeAmbassador, computeChampion, computeBountyHunter, computeNewHopeClimbers, writePodiumBlock } from '../../src/lib/awards.js';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables, emptyTables } from '../helpers/fixtures.js';
 
@@ -292,21 +292,6 @@ describe('writePodiumBlock', () => {
     const insertCalls = calls.filter(c => c.sql.toUpperCase().startsWith('INSERT'));
     assert.equal(deleteCalls.length, 1);
     assert.equal(insertCalls.length, 3);
-  });
-});
-
-describe('AWARD_NAMES', () => {
-  it('contains expected award names', () => {
-    assert.ok(Array.isArray(AWARD_NAMES));
-    assert.ok(AWARD_NAMES.includes('Galactic Ruler'));
-    assert.ok(AWARD_NAMES.includes('Galactic Schemer'));
-    assert.ok(AWARD_NAMES.includes('Galactic Ambassador'));
-    assert.ok(AWARD_NAMES.includes('A New Hope'));
-    assert.ok(AWARD_NAMES.includes('Bounty Hunter'));
-  });
-
-  it('has exactly 5 award names', () => {
-    assert.equal(AWARD_NAMES.length, 5);
   });
 });
 

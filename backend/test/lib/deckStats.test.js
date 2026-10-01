@@ -15,7 +15,7 @@ function leaderRow(id, name, setCode = 'SHD') {
   return { id, name, set: setCode };
 }
 
-describe('lib/careerStats computeDeckWinRates', () => {
+describe('computeDeckWinRates — deck win-rate edge cases', () => {
 
   it('returns empty array when no votes or matches', async () => {
     const db = createMockDb({ votes: [], match_results: [], leaders: [] });

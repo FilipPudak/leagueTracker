@@ -10,7 +10,7 @@ const JS_FILE = join(__dirname, '../../../docs/app/app.js');
 function readCSS() { return readFileSync(CSS_FILE, 'utf8'); }
 function readJS() { return readFileSync(JS_FILE, 'utf8'); }
 
-describe('Shortcut fixes: Wide desktop breakpoint', () => {
+describe('Responsive: wide desktop breakpoint', () => {
   it('has 1280px media query', () => {
     const css = readCSS();
     assert.ok(
@@ -20,7 +20,7 @@ describe('Shortcut fixes: Wide desktop breakpoint', () => {
   });
 });
 
-describe('Shortcut fixes: Resize listener', () => {
+describe('Responsive: resize listener', () => {
   it('has matchMedia listener for desktop breakpoint', () => {
     const js = readJS();
     assert.ok(
@@ -38,7 +38,7 @@ describe('Shortcut fixes: Resize listener', () => {
   });
 });
 
-describe('Shortcut fixes: Vote-cta hide after vote', () => {
+describe('Vote CTA: hide after vote', () => {
   it('vote-cta is hidden after vote submission', () => {
     const js = readJS();
     assert.ok(
@@ -48,7 +48,7 @@ describe('Shortcut fixes: Vote-cta hide after vote', () => {
   });
 });
 
-describe('Shortcut fixes: My Stats tab hidden on desktop', () => {
+describe('My Stats: tab hidden on desktop', () => {
   it('myseason tab has display:none on desktop (persistent panel)', () => {
     const css = readCSS();
     const match = css.match(/\.nav-tabs\s+\.tab-btn\[aria-controls="myseason-view"\]\s*\{[^}]*display:\s*none/);
@@ -56,7 +56,7 @@ describe('Shortcut fixes: My Stats tab hidden on desktop', () => {
   });
 });
 
-describe('Shortcut fixes: Remove dead tabIndex param', () => {
+describe('Cleanup: dead tabIndex param', () => {
   it('setActiveView does not use tabIndex parameter for tab matching', () => {
     const js = readJS();
     const match = js.match(/function setActiveView\(viewId/);

@@ -13,7 +13,7 @@ function readCSS() { return readFileSync(CSS_FILE, 'utf8'); }
 function readJS() { return readFileSync(JS_FILE, 'utf8'); }
 function readHTML() { return readFileSync(HTML_FILE, 'utf8'); }
 
-describe('Layout v3: Identity chip in header status row', () => {
+describe('Header: identity chip in status row', () => {
   it('identity-chip is inside header', () => {
     const html = readHTML();
     const chipIdx = html.indexOf('id="identity-chip"');
@@ -54,7 +54,7 @@ describe('Layout v3: Identity chip in header status row', () => {
   });
 });
 
-describe('Layout v3: Desktop 2-panel', () => {
+describe('Layout: desktop 2-panel', () => {
   it('desktop uses a two-item grid of column wrappers', () => {
     const css = readCSS();
     const desktop = css.match(/\.desktop-columns\s*\{[^}]*display:\s*grid[^}]*grid-template-columns/);
@@ -124,7 +124,7 @@ describe('Layout v3: Desktop 2-panel', () => {
   });
 });
 
-describe('Layout v3: Boot flow', () => {
+describe('Boot: flow', () => {
   it('standings loads via switchTab (fetches data), not bare setActiveView', () => {
     const js = readJS();
     assert.ok(
@@ -159,7 +159,7 @@ describe('Layout v3: Boot flow', () => {
   });
 });
 
-describe('Layout v3: No hardcoded active tab in HTML', () => {
+describe('Tabs: no hardcoded active tab in HTML', () => {
   it('no tab button is active by default in HTML', () => {
     const html = readHTML();
     const tabsStart = html.indexOf('class="nav-tabs"');
@@ -177,7 +177,7 @@ describe('Layout v3: No hardcoded active tab in HTML', () => {
   });
 });
 
-describe('Layout v3: Gap fix', () => {
+describe('Layout: gap fix', () => {
   it('header margin-bottom is reduced', () => {
     const css = readCSS();
     const match = css.match(/\.header\s*\{[^}]*margin-bottom:\s*(\d+)px/);
@@ -195,7 +195,7 @@ describe('Layout v3: Gap fix', () => {
   });
 });
 
-describe('Layout v3: My Stats panel heading', () => {
+describe('My Stats: panel heading', () => {
   it('myseason-view has a heading as its first child', () => {
     const html = readHTML();
     const panelIdx = html.indexOf('id="myseason-view"');
@@ -214,7 +214,7 @@ describe('Layout v3: My Stats panel heading', () => {
   });
 });
 
-describe('Layout v3: Unlinked desktop', () => {
+describe('Desktop: unlinked view', () => {
   it('applyBoot toggles is-linked body class from boot status', () => {
     const js = readJS();
     assert.ok(
@@ -261,7 +261,7 @@ describe('Layout v3: Unlinked desktop', () => {
   });
 });
 
-describe('Layout v5: Review-fix guards', () => {
+describe('Review guards: layout regressions', () => {
   it('vote-cta uses a real design-system class (no phantom .btn/.btn-primary)', () => {
     const html = readHTML();
     assert.ok(!html.includes('btn btn-primary'), 'no button may use undefined .btn/.btn-primary classes');
@@ -287,7 +287,7 @@ describe('Layout v5: Review-fix guards', () => {
   });
 });
 
-describe('Layout v4: Asset cache-busting stamps', () => {
+describe('Assets: cache-busting stamps', () => {
   it('all local asset links carry a ?v= stamp', () => {
     const html = readHTML();
     ['styles.css', 'app-core.js', 'app.js'].forEach((asset) => {
@@ -308,7 +308,7 @@ describe('Layout v4: Asset cache-busting stamps', () => {
   });
 });
 
-describe('Layout v3: aria-labelledby targets exist', () => {
+describe('Accessibility: aria-labelledby targets exist', () => {
   it('every panel aria-labelledby id matches a tab button id', () => {
     const html = readHTML();
     const labels = [...html.matchAll(/aria-labelledby="(tab-[\w-]+)"/g)].map((m) => m[1]);
@@ -319,7 +319,7 @@ describe('Layout v3: aria-labelledby targets exist', () => {
   });
 });
 
-describe('v4.8.0: Style and symmetry pins', () => {
+describe('Style: symmetry pins', () => {
   it('global .not-you base rule exists (no more unstyled browser-default buttons)', () => {
     const css = readCSS();
     const block = css.match(/\.not-you\s*\{[^}]*\}/);
@@ -352,7 +352,7 @@ describe('v4.8.0: Style and symmetry pins', () => {
   });
 });
 
-describe('v4.8.5: modal and profile UX guards', () => {
+describe('Modal & profile: UX guards', () => {
   it('player modal is a dialog with close affordances', () => {
     const html = readHTML();
     assert.ok(html.includes('id="player-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true"'), 'overlay must declare dialog semantics');
@@ -396,7 +396,7 @@ describe('v4.8.5: modal and profile UX guards', () => {
   });
 });
 
-describe('v4.9.0: flow and accessibility guards', () => {
+describe('Flow & accessibility: guards', () => {
   it('vote opponent hint reflects faced-only filtering', () => {
     const html = readHTML();
     const js = readJS();
@@ -440,7 +440,7 @@ describe('v4.9.0: flow and accessibility guards', () => {
   });
 });
 
-describe('v4.9.1: badge tap fix and modal a11y finishing', () => {
+describe('Badges & modal: tap target and a11y', () => {
   it('badge tap suppresses the synthetic click that used to re-toggle the tooltip', () => {
     const js = readJS();
     assert.match(js, /function onTouchEnd\(ev\)/, 'touchend handler must receive its own event');
@@ -465,7 +465,7 @@ describe('v4.9.1: badge tap fix and modal a11y finishing', () => {
   });
 });
 
-describe('v4.9.2: tooltip lifecycle and modal season context', () => {
+describe('Tooltips & modal: lifecycle and season context', () => {
   it('badge tooltips dismiss on scroll or resize', () => {
     const js = readJS();
     assert.ok(js.includes("window.addEventListener('scroll', dismissTooltips"), 'scroll must dismiss tooltips');
@@ -487,7 +487,7 @@ describe('v4.9.2: tooltip lifecycle and modal season context', () => {
   });
 });
 
-describe('v4.9.3: season switch lands on the latest night', () => {
+describe('Season switch: lands on the latest night', () => {
   it('standings request drops the stale round on season change', () => {
     const js = readJS();
     assert.ok(js.includes('LeagueCore.resolveStandingsAsOf('), 'request must go through the as-of resolver');
@@ -496,7 +496,7 @@ describe('v4.9.3: season switch lands on the latest night', () => {
   });
 });
 
-describe('v4.10.0: sign-in modal, guest banner, header sizing', () => {
+describe('Sign-in & guest: modal, banner, header sizing', () => {
   it('sign-in is a dialog with full dismissal affordances', () => {
     const html = readHTML();
     assert.ok(html.includes('id="link-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true"'), 'sign-in must be a dialog');
@@ -591,7 +591,7 @@ describe('v4.10.0: sign-in modal, guest banner, header sizing', () => {
   });
 });
 
-describe('v4.11.0: champion stars, shared atoms, overlay focus parity', () => {
+describe('Champion stars, shared atoms, overlay focus', () => {
   it('award badges appear at the three identity surfaces', () => {
     const js = readJS();
     const css = readCSS();

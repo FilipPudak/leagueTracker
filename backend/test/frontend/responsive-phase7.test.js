@@ -17,7 +17,7 @@ function readCSS() {
   return readFileSync(CSS_FILE, 'utf8');
 }
 
-describe('Phase 7: JS inline style cleanup', () => {
+describe('JS: inline style cleanup', () => {
   it('app.js has no inline display:grid styles', () => {
     const js = readJS();
     const matches = js.match(/style="[^"]*display:\s*grid/g);

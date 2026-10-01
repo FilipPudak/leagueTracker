@@ -17,7 +17,7 @@ function readHTML() {
   return readFileSync(HTML_FILE, 'utf8');
 }
 
-describe('Phase 1: CSS extraction', () => {
+describe('Styles: external stylesheet extraction', () => {
   it('styles.css exists', () => {
     assert.ok(existsSync(CSS_FILE), 'styles.css must exist');
   });
@@ -46,7 +46,7 @@ describe('Phase 1: CSS extraction', () => {
   });
 });
 
-describe('Phase 1: Touch target fixes', () => {
+describe('Accessibility: touch target fixes', () => {
   it('.btn-ghost has min-height >= 44px', () => {
     const css = readCSS();
     const varMatch = css.match(/\.btn-ghost\s*\{[^}]*min-height:\s*var\(--touch-target-min\)/);
@@ -84,7 +84,7 @@ describe('Phase 1: Touch target fixes', () => {
   });
 });
 
-describe('Phase 1: Accessibility improvements', () => {
+describe('Accessibility: misc improvements', () => {
   it('has focus-visible styles', () => {
     const css = readCSS();
     assert.ok(css.includes(':focus-visible'), 'styles.css must include :focus-visible rules');

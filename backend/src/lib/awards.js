@@ -1,13 +1,5 @@
 import { computeSeasonTable } from './seasonTable.js';
 
-const AWARD_NAMES = [
-  'Galactic Ruler',
-  'Galactic Schemer',
-  'Galactic Ambassador',
-  'A New Hope',
-  'Bounty Hunter',
-];
-
 // Standard competition ranking (1224 ranking)
 export function assignStandardRanks(items) {
   if (!items || items.length === 0) return [];
@@ -238,5 +230,3 @@ async function countWinsAgainstTop4(db, seasonId, top4Set) {
   }
   return wins;
 }
-
-export { AWARD_NAMES };

@@ -116,7 +116,7 @@ describe('frontend/app-core', () => {
     });
   });
 
-  describe('mapSettings (R7: backend sends UPPER_SNAKE keys)', () => {
+  describe('mapSettings (backend sends UPPER_SNAKE keys)', () => {
     it('maps WEEKLY_DEADLINE_DAY/TIME and TIMEZONE to camelCase', () => {
       const mapped = core.mapSettings({
         WEEKLY_DEADLINE_DAY: 'Wednesday',
@@ -140,7 +140,7 @@ describe('frontend/app-core', () => {
     });
   });
 
-  describe('computeSubtitle (R9: Season Ended was unreachable)', () => {
+  describe('computeSubtitle (Season Ended handling)', () => {
     it('renders week for live season', () => {
       assert.equal(core.computeSubtitle({ seasonName: 'Season 7', week: 3 }), 'Season 7 • Night 3');
     });
@@ -196,7 +196,7 @@ describe('frontend/app-core', () => {
     });
   });
 
-  describe('resolvePlayerChoices (CONTEXT: all roster players are shown in the link picker)', () => {
+  describe('resolvePlayerChoices (link picker shows full roster)', () => {
     it('uses the full players roster', () => {
       const boot = { players: [{ id: 'P001', name: 'Alice' }, { id: 'P003', name: 'Charlie' }], unlinkedPlayers: [{ id: 'P004', name: 'Diana' }] };
       assert.equal(core.resolvePlayerChoices(boot).length, 2);

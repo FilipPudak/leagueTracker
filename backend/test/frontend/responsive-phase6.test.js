@@ -11,7 +11,7 @@ function readHTML() {
   return readFileSync(HTML_FILE, 'utf8');
 }
 
-describe('Phase 6: Tab ARIA roles', () => {
+describe('Tabs: ARIA roles', () => {
   it('nav-tabs has role="tablist"', () => {
     const html = readHTML();
     assert.ok(html.includes('role="tablist"'), 'nav-tabs must have role="tablist"');
@@ -36,7 +36,7 @@ describe('Phase 6: Tab ARIA roles', () => {
   });
 });
 
-describe('Phase 6: Semantic round-header', () => {
+describe('Standings: semantic round header', () => {
   it('round-header uses button element or has role="button"', () => {
     const html = readHTML();
     const jsSrc = readFileSync(join(__dirname, '../../../docs/app/app.js'), 'utf8');
