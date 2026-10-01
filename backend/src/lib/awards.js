@@ -1,4 +1,5 @@
 import { computeSeasonTable } from './seasonTable.js';
+import { PHASE, DEFAULT_TOP_RESULTS } from './constants.js';
 
 // Standard competition ranking (1224 ranking)
 export function assignStandardRanks(items) {
@@ -70,7 +71,7 @@ export async function computeNewHopeClimbers(db, seasonId, finalRankMap, seasonL
 
   const regularRoundsForMid = await db.prepare(
     'SELECT DISTINCT round FROM melee_tournaments WHERE season_id = ? AND phase = ? AND round <= ?'
-  ).bind(seasonId, 'regular', midRound).all();
+  ).bind(seasonId, PHASE.REGULAR, midRound).all();
   const regularMidRoundSet = new Set((regularRoundsForMid.results || []).map(r => r.round));
 
   const midStandings = await db.prepare(
@@ -125,7 +126,7 @@ export async function writePodiumBlock(db, seasonId, awardName, entries) {
 export async function computeChampion(db, seasonId) {
   const lastCutTournament = await db.prepare(
     'SELECT melee_id, round FROM melee_tournaments WHERE season_id = ? AND phase = ? ORDER BY date DESC, melee_id DESC LIMIT 1'
-  ).bind(seasonId, 'cut').first();
+  ).bind(seasonId, PHASE.CUT).first();
 
   if (!lastCutTournament) return [];
 
@@ -164,11 +165,11 @@ export async function computeBountyHunter(db, seasonId) {
 // raw per-round standings). Empty when the season has no regular rounds.
 async function loadPrevSeasonTop4(db, prevSeasonId) {
   const season = await db.prepare('SELECT top_results FROM seasons WHERE id = ?').bind(prevSeasonId).first();
-  const topResults = season?.top_results || 7;
+  const topResults = season?.top_results || DEFAULT_TOP_RESULTS;
 
   const regularRounds = await db.prepare(
     'SELECT DISTINCT round FROM melee_tournaments WHERE season_id = ? AND phase = ?'
-  ).bind(prevSeasonId, 'regular').all();
+  ).bind(prevSeasonId, PHASE.REGULAR).all();
   const regularRoundSet = new Set((regularRounds.results || []).map(r => r.round));
 
   if (regularRoundSet.size === 0) return [];
@@ -220,7 +221,7 @@ async function countWinsAgainstTop4(db, seasonId, top4Set) {
     if (m.is_bye || !m.winner_id) continue;
     const round = matchToTournament.get(m.melee_match_id);
     const phase = tournamentRoundToPhase.get(round);
-    if (phase !== 'regular') continue;
+    if (phase !== PHASE.REGULAR) continue;
     if (m.winner_id === m.player1_id && top4Set.has(m.player2_id)) {
       wins.set(m.player1_id, (wins.get(m.player1_id) || 0) + 1);
     }

@@ -1,16 +1,11 @@
 import { getMaxSeasonId, updateSettingsBatch, parseSeasonId } from '../db/queries.js';
-import { constantTimeEqual } from '../lib/auth.js';
+import { requireAdmin } from '../lib/auth.js';
 import { badRequest } from '../lib/errors.js';
+import { SETTINGS_KEY, WEEK_PREFIX, SET_TRUE, SET_FALSE } from '../lib/constants.js';
 
 export async function handleStartNewSeason(body, env) {
   const { DB } = env;
-  const { adminToken } = body;
-
-  if (!adminToken || !constantTimeEqual(adminToken, env.ADMIN_SECRET || '')) {
-    const err = new Error('Unauthorized. Invalid admin token.');
-    err.status = 403;
-    throw err;
-  }
+  requireAdmin(body, env);
 
   const { seasonId: requestedId } = body;
   const maxId = await getMaxSeasonId(DB);
@@ -34,10 +29,10 @@ export async function handleStartNewSeason(body, env) {
   }
 
   await updateSettingsBatch(DB, [
-    ['ACTIVE_SEASON_ID', String(nextSeasonId)],
-    ['CURRENT_WEEK', 'Week 1'],
-    ['VOTING_OPEN', 'FALSE'],
-    ['SEASON_STARTED', 'TRUE'],
+    [SETTINGS_KEY.ACTIVE_SEASON_ID, String(nextSeasonId)],
+    [SETTINGS_KEY.CURRENT_WEEK, `${WEEK_PREFIX}1`],
+    [SETTINGS_KEY.VOTING_OPEN, SET_FALSE],
+    [SETTINGS_KEY.SEASON_STARTED, SET_TRUE],
   ]);
 
   return { seasonId: nextSeasonId, seasonName: nextSeasonName };

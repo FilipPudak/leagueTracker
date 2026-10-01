@@ -34,7 +34,7 @@ Lint-style test (`test/privacy/privacyGuard.test.js`) asserts:
 
 - Require `adminToken` in request body matching `ADMIN_SECRET` env var
 - **Constant-time comparison** — prevents timing side-channel
-- Actions: `startNewSeason`, `syncNow`, `pauseCurrentSeason`, `resumeCurrentSeason`, `materializePastAwards`, leader management
+- Actions: `startNewSeason`, `triggerWeeklyCycle`, `pauseCurrentSeason`, `resumeCurrentSeason`, `materializePastAwards`, leader management
 
 ## Rate Limiting
 

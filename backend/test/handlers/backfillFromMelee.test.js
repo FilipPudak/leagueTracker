@@ -2,7 +2,7 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables } from '../helpers/fixtures.js';
-import { handleBackfillFromMelee } from '../../src/handlers/handleBackfillFromMelee.js';
+import { handleBackfillFromMelee } from '../../src/handlers/backfillFromMelee.js';
 
 describe('handleBackfillFromMelee (admin wrapper)', () => {
   let DB;

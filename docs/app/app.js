@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.13.3';
+const APP_VERSION = '4.14.0';
 
 const appState = {
   status: 'unlinked',
@@ -26,14 +26,14 @@ const appState = {
   votingOpen: false,
   settings: {},
   seasons: [],
-  leaderboardCache: {},
+  awardsCache: {},
   mystatsCache: {},
   standingsCache: {},
-  leaderboardToken: 0,
+  awardsToken: 0,
   mystatsToken: 0,
   standingsToken: 0,
-  leaderboardInFlight: false,
-  leaderboardInFlightSeason: null,
+  awardsInFlight: false,
+  awardsInFlightSeason: null,
   mystatsInFlight: false,
   mystatsInFlightSeason: null,
   careerCache: {},
@@ -253,7 +253,7 @@ function applyBoot(boot) {
   appState.status = boot.status || 'unlinked';
   document.body.classList.toggle('is-linked', boot.status === 'linked');
   appState.settings = LeagueCore.mapSettings(boot.settings);
-  appState.linkedPlayer = boot.currentPlayer || boot.linkedPlayer || null;
+  appState.linkedPlayer = boot.linkedPlayer || null;
   appState.votingOpen = Boolean(boot.votingOpen);
   appState.seasons = boot.seasons || [];
   appState.players = boot.players || [];
@@ -283,7 +283,7 @@ function applyBoot(boot) {
 
   const seasonIds = (boot.seasons || []).map((s) => String(s.id));
   const storedBrowsing = localStorage.getItem(KEY_BROWSING_SEASON) || '';
-  const defaultSeasonId = String(seasonIds.includes(storedBrowsing) ? storedBrowsing : (boot.seasonId || appState.settings.activeSeasonId || ''));
+  const defaultSeasonId = String(seasonIds.includes(storedBrowsing) ? storedBrowsing : (boot.seasonId || ''));
   appState.browsingSeasonId = defaultSeasonId;
 
   ['season-filter', 'myseason-season-filter', 'standings-season-filter'].forEach((id) => {
@@ -299,7 +299,7 @@ function applyBoot(boot) {
     });
   });
 
-  appState.activeSeasonId = boot.seasonId || appState.settings.activeSeasonId;
+  appState.activeSeasonId = boot.seasonId;
   updateSeasonSummaryText();
 
   const wpCard = $('weekly-participation-card');
@@ -331,7 +331,7 @@ function applyBoot(boot) {
     voteCta.style.display = LeagueCore.shouldShowVoteCta({
       votingOpen: appState.votingOpen,
       linked: boot.status === 'linked',
-      alreadyVoted: Boolean(boot.alreadySubmitted || boot.alreadyVoted),
+      alreadyVoted: Boolean(boot.alreadyVoted),
       attended: boot.attended,
     }) ? 'block' : 'none';
   }
@@ -362,7 +362,7 @@ function applyBoot(boot) {
     if (appState.votingOpen) {
       populateVotingDropdowns(boot.leaders, boot.players, appState.linkedPlayer.id);
     }
-    if (boot.alreadySubmitted || boot.alreadyVoted) {
+    if (boot.alreadyVoted) {
       if (voteForm) voteForm.style.display = 'none';
       if (votedCard) votedCard.style.display = 'block';
       const changeBtn = $('btn-change-vote');
@@ -519,15 +519,15 @@ function submitAccountLink() {
 
   callApi('linkAccount', { playerId: playerId, email: email })
     .then((res) => {
-      appState.linkedPlayer = res.linkedPlayer || res.player;
+      appState.linkedPlayer = res.linkedPlayer;
       setSession(appState.linkedPlayer, res.token || '');
 
       const boot = {
         status: 'linked',
         votingOpen: res.votingOpen,
-        alreadySubmitted: res.alreadyVoted,
+        alreadyVoted: res.alreadyVoted,
         currentVote: res.currentVote || null,
-        linkedPlayer: res.linkedPlayer || res.player,
+        linkedPlayer: res.linkedPlayer,
         leaders: res.leaders,
         players: res.players,
         roster: res.roster || res.players,
@@ -698,16 +698,16 @@ function switchTab(tabId) {
     setActiveView('standings-view');
     appState.lastView = 'standings-view';
     loadStandingsData();
-  } else if (tabId === 'leaderboard-view') {
+  } else if (tabId === 'awards-view') {
     if (!appState.linkedPlayer) {
       openSignIn();
       return;
     }
     clearStatus();
     showSpinner(false);
-    setActiveView('leaderboard-view');
-    appState.lastView = 'leaderboard-view';
-    loadLeaderboardData();
+    setActiveView('awards-view');
+    appState.lastView = 'awards-view';
+    loadAwardsData();
   } else if (tabId === 'myseason-view') {
     if (appState.linkedPlayer) {
       clearStatus();
@@ -772,7 +772,7 @@ let voteTabRefreshSeq = 0;
 
 function refreshVoteTab() {
   const seq = ++voteTabRefreshSeq;
-  callApi('getWeeklyParticipation', {}).then((res) => {
+  callApi('getVoteBootstrap', {}).then((res) => {
     if (seq !== voteTabRefreshSeq) return;
     if (res && res.weeklyParticipation) {
       const wpCard = $('weekly-participation-card');
@@ -791,8 +791,8 @@ function refreshVoteTab() {
 }
 
 function adoptServerVote(res) {
-  if (typeof res.alreadySubmitted !== 'boolean') return;
-  appState.currentVote = res.alreadySubmitted && res.currentVote ? res.currentVote : null;
+  if (typeof res.alreadyVoted !== 'boolean') return;
+  appState.currentVote = res.alreadyVoted && res.currentVote ? res.currentVote : null;
 }
 
 function syncAttendanceCard(notAttendedCard, gated) {
@@ -824,8 +824,8 @@ function applyVoteTabRefresh(res) {
   if (typeof res.votingOpen === 'boolean') appState.votingOpen = res.votingOpen;
 
   const domHasVoted = votedCard && votedCard.style.display === 'block';
-  const hasVoted = typeof res.alreadySubmitted === 'boolean'
-    ? res.alreadySubmitted
+  const hasVoted = typeof res.alreadyVoted === 'boolean'
+    ? res.alreadyVoted
     : domHasVoted;
 
   adoptServerVote(res);
@@ -897,7 +897,7 @@ function submitVotes(isRetry) {
     if (changeBtn) changeBtn.style.display = appState.votingOpen ? 'inline-block' : 'none';
     clearStatus();
     appState.editingVote = false;
-    appState.leaderboardCache = {};
+    appState.awardsCache = {};
     appState.mystatsCache = {};
     if (skipVoteStamp) {
       appState.currentVote = null;
@@ -988,7 +988,7 @@ function awardBadge(type, count) {
   const markup = LeagueCore.awardBadgeMarkup(type, count);
   if (!markup) return '';
   const title = LeagueCore.awardBadgeTitle(type, count);
-  return ' <span class="champ-star" role="img" aria-label="' + title + '" title="' + title + '">' + markup + '</span>';
+  return ' <span class="award-badge-mark" role="img" aria-label="' + title + '" title="' + title + '">' + markup + '</span>';
 }
 
 function renderStandings(res) {
@@ -1109,48 +1109,48 @@ function renderRoundResults(rounds) {
   }).join('');
 }
 
-/* ----------------------------------------------------------- leaderboard --- */
+/* ------------------------------------------------------------- awards --- */
 
-function loadLeaderboardData() {
+function loadAwardsData() {
   const sel = $('season-filter');
   const selectedSeasonId = sel ? sel.value : '';
-  if (isFreshCache(appState.leaderboardCache, selectedSeasonId)) {
-    renderLeaderboard(appState.leaderboardCache[selectedSeasonId].data);
+  if (isFreshCache(appState.awardsCache, selectedSeasonId)) {
+    renderAwards(appState.awardsCache[selectedSeasonId].data);
     return;
   }
 
-  if (appState.leaderboardInFlight && appState.leaderboardInFlightSeason === selectedSeasonId) {
-    showSpinner(true, 'leaderboard');
+  if (appState.awardsInFlight && appState.awardsInFlightSeason === selectedSeasonId) {
+    showSpinner(true, 'awards');
     return;
   }
 
-  const token = ++appState.leaderboardToken;
-  appState.leaderboardInFlight = true;
-  appState.leaderboardInFlightSeason = selectedSeasonId;
-  showSpinner(true, 'leaderboard');
+  const token = ++appState.awardsToken;
+  appState.awardsInFlight = true;
+  appState.awardsInFlightSeason = selectedSeasonId;
+  showSpinner(true, 'awards');
 
-  callApi('getLeaderboardData', { seasonId: selectedSeasonId })
+  callApi('getAwardsData', { seasonId: selectedSeasonId })
     .then((res) => {
-      if (token !== appState.leaderboardToken) return;
-      appState.leaderboardInFlight = false;
-      appState.leaderboardInFlightSeason = null;
-      showSpinner(false, 'leaderboard');
-      appState.leaderboardCache[selectedSeasonId] = { data: res, ts: Date.now() };
-      renderLeaderboard(res);
+      if (token !== appState.awardsToken) return;
+      appState.awardsInFlight = false;
+      appState.awardsInFlightSeason = null;
+      showSpinner(false, 'awards');
+      appState.awardsCache[selectedSeasonId] = { data: res, ts: Date.now() };
+      renderAwards(res);
     })
     .catch((err) => {
-      if (token !== appState.leaderboardToken) return;
-      appState.leaderboardInFlight = false;
-      appState.leaderboardInFlightSeason = null;
-      showSpinner(false, 'leaderboard');
+      if (token !== appState.awardsToken) return;
+      appState.awardsInFlight = false;
+      appState.awardsInFlightSeason = null;
+      showSpinner(false, 'awards');
       showStatus(err.userMessage || err.message || 'Could not load awards.', false);
     });
 }
 
-function renderLeaderboard(res) {
+function renderAwards(res) {
   listExpanded = {};
-  const lpCard = $('leaderboard-participation-card');
-  const lpText = $('leaderboard-participation-text');
+  const lpCard = $('awards-participation-card');
+  const lpText = $('awards-participation-text');
   if (lpCard && lpText) {
     const p = res.participation;
     if (p && p.totalVotes > 0) {
@@ -1161,24 +1161,24 @@ function renderLeaderboard(res) {
     }
   }
 
-  renderStatsList('most-played-container', res.leaderLeaderboard || [], {
+  renderStatsList('most-played-container', res.topLeaders || [], {
     getTitle: (item) => LeagueCore.leaderOptionLabel(item),
     getScore: (item) => item.score,
     getSubtitle: (item) => item.subtitle,
     limit: 5,
     expandable: true
   });
-  renderLeaderboardSection('schemer-section', 'schemer-container', res, 'schemer');
-  renderLeaderboardSection('ambassador-section', 'ambassador-container', res, 'ambassador');
-  renderLeaderboardSection('ruler-section', 'ruler-container', res, 'ruler');
-  renderLeaderboardSection('champion-section', 'champion-container', res, 'champion');
-  renderLeaderboardSection('new-hope-section', 'new-hope-container', res, 'newHope');
-  renderLeaderboardSection('bounty-hunter-section', 'bounty-hunter-container', res, 'bountyHunter');
-  const content = $('leaderboard-content');
+  renderAwardsSection('schemer-section', 'schemer-container', res, 'schemer');
+  renderAwardsSection('ambassador-section', 'ambassador-container', res, 'ambassador');
+  renderAwardsSection('ruler-section', 'ruler-container', res, 'ruler');
+  renderAwardsSection('champion-section', 'champion-container', res, 'champion');
+  renderAwardsSection('new-hope-section', 'new-hope-container', res, 'newHope');
+  renderAwardsSection('bounty-hunter-section', 'bounty-hunter-container', res, 'bountyHunter');
+  const content = $('awards-content');
   if (content) content.style.display = 'block';
 }
 
-function renderLeaderboardSection(sectionId, containerId, res, field) {
+function renderAwardsSection(sectionId, containerId, res, field) {
   const section = $(sectionId);
   if (!section) return;
   const items = res[field];
@@ -1546,11 +1546,11 @@ function renderStatsList(containerId, items, config) {
 let bootRetry = true;
 
 async function fetchInitialAppData() {
-  appState.leaderboardInFlight = false;
-  appState.leaderboardInFlightSeason = null;
+  appState.awardsInFlight = false;
+  appState.awardsInFlightSeason = null;
   appState.mystatsInFlight = false;
   appState.mystatsInFlightSeason = null;
-  appState.leaderboardToken = 0;
+  appState.awardsToken = 0;
   appState.mystatsToken = 0;
   showSpinner(true); clearStatus();
   try {
@@ -1783,8 +1783,8 @@ function initBadgeTooltips() {
 
 /* --------------------------------------------------------- routing/hash -- */
 
-const VIEW_HASHES = { 'vote-view': 'vote', 'standings-view': 'standings', 'leaderboard-view': 'awards', 'myseason-view': 'mystats' };
-const HASH_VIEWS = { vote: 'vote-view', standings: 'standings-view', awards: 'leaderboard-view', mystats: 'myseason-view' };
+const VIEW_HASHES = { 'vote-view': 'vote', 'standings-view': 'standings', 'awards-view': 'awards', 'myseason-view': 'mystats' };
+const HASH_VIEWS = { vote: 'vote-view', standings: 'standings-view', awards: 'awards-view', mystats: 'myseason-view' };
 const OVERLAY_IDS = ['player-modal-overlay', 'link-modal-overlay', 'unlink-confirm'];
 let routingFromHash = false;
 let overlayProgrammaticPop = false;

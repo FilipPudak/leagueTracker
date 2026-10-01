@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap" as="style">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="styles.css?v=4.13.3">
+  <link rel="stylesheet" href="styles.css?v=4.14.0">
 </head>
 <body>
   <script>document.body.classList.toggle('is-linked',!!localStorage.getItem('lt_token'))</script>
@@ -46,7 +46,7 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         <span>Standings</span>
       </button>
-      <button type="button" id="tab-leaderboard" class="tab-btn" role="tab" tabindex="-1" aria-selected="false" aria-controls="leaderboard-view" onclick="switchTab('leaderboard-view')">
+      <button type="button" id="tab-awards" class="tab-btn" role="tab" tabindex="-1" aria-selected="false" aria-controls="awards-view" onclick="switchTab('awards-view')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
         <span>Awards</span>
       </button>
@@ -146,18 +146,18 @@
       </div>
     </div>
 
-    <!-- LEADERBOARD PANEL -->
-    <div id="leaderboard-view" class="view-panel" role="tabpanel" aria-labelledby="tab-leaderboard">
+    <!-- AWARDS PANEL -->
+    <div id="awards-view" class="view-panel" role="tabpanel" aria-labelledby="tab-awards">
       <div class="form-group">
         <label for="season-filter">Select Season</label>
-        <select id="season-filter" onchange="onSeasonFilterChange('season-filter'); loadLeaderboardData()"></select>
+        <select id="season-filter" onchange="onSeasonFilterChange('season-filter'); loadAwardsData()"></select>
       </div>
 
-      <div id="leaderboard-participation-card" class="card" style="display: none; margin-bottom: 16px; padding: 10px 14px; font-size: 0.85rem; color: #94a3b8;">
-        <span id="leaderboard-participation-text"></span>
+      <div id="awards-participation-card" class="card" style="display: none; margin-bottom: 16px; padding: 10px 14px; font-size: 0.85rem; color: #94a3b8;">
+        <span id="awards-participation-text"></span>
       </div>
 
-      <div id="leaderboard-content" style="display: none;">
+      <div id="awards-content" style="display: none;">
         <div id="champion-section" style="margin-top: 16px;">
           <h3 class="section-heading">Galactic Champion</h3>
           <div id="champion-container"></div>
@@ -354,7 +354,7 @@
     </div>
   </div>
 
-  <script src="app-core.js?v=4.13.3"></script>
-<script src="app.js?v=4.13.3"></script>
+  <script src="app-core.js?v=4.14.0"></script>
+<script src="app.js?v=4.14.0"></script>
 </body>
 </html>

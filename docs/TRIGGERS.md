@@ -38,7 +38,7 @@ All require `adminToken` matching `ADMIN_SECRET` env var.
 
 | Action | What it does |
 |--------|--------------|
-| `syncNow` | Runs sync immediately, bypasses time gate, honors LAST_ADVANCED marker |
+| `triggerWeeklyCycle` | Runs sync immediately, bypasses time gate, honors LAST_ADVANCED marker |
 | `pauseCurrentSeason` | Sets `SEASON_PAUSED=TRUE` — sync continues, no advance |
 | `resumeCurrentSeason` | Sets `SEASON_PAUSED=FALSE` |
 | `startNewSeason` | Creates new season row, sets `SEASON_STARTED=TRUE`, `CURRENT_WEEK='Week 1'`, `VOTING_OPEN=FALSE` |
@@ -65,7 +65,7 @@ All require `adminToken` matching `ADMIN_SECRET` env var.
 # Trigger sync immediately
 curl -X POST https://league-tracker.filip-pudak.workers.dev \
   -H "Content-Type: application/json" \
-  -d '{"action":"syncNow","adminToken":"YOUR_SECRET"}'
+  -d '{"action":"triggerWeeklyCycle","adminToken":"YOUR_SECRET"}'
 
 # Start new season
 curl -X POST https://league-tracker.filip-pudak.workers.dev \

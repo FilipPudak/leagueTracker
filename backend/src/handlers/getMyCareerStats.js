@@ -1,6 +1,7 @@
 import { getSetting, parseSeasonId, parseWeek } from '../db/queries.js';
 import { buildRivalry, buildCareerRecord, buildSeasonProgression } from '../lib/careerStats.js';
 import { computeBadges } from '../lib/badges.js';
+import { PHASE } from '../lib/constants.js';
 
 export async function handleGetMyCareerStats(body, env, session) {
   const { DB } = env;
@@ -26,8 +27,8 @@ export async function handleGetMyCareerStats(body, env, session) {
   const myMatches = [...(asP1.results || []), ...(asP2.results || [])];
 
   const tournamentsResult = await DB.prepare(
-    "SELECT season_id, round FROM melee_tournaments WHERE phase = 'regular'"
-  ).all();
+    'SELECT season_id, round FROM melee_tournaments WHERE phase = ?'
+  ).bind(PHASE.REGULAR).all();
   const regularRoundsBySeason = new Map();
   for (const t of tournamentsResult.results || []) {
     if (!regularRoundsBySeason.has(t.season_id)) regularRoundsBySeason.set(t.season_id, new Set());

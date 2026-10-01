@@ -10,10 +10,10 @@ To keep the experience smooth:
 - Errors are surfaced in the UI with a useful message.
 
 The static page shell is served immediately by GitHub Pages; only the live data (season
-selector, dropdowns, leaderboard) is populated once the backend responds. The Standings,
-Leaderboard, and My Stats tabs are lazy-loaded on first click and cached per season with a
+selector, dropdowns, awards) is populated once the backend responds. The Standings,
+Awards, and My Stats tabs are lazy-loaded on first click and cached per season with a
 short (15-second) freshness window, so flicking between tabs doesn't re-fetch while genuine
-returns still get fresh data. A successful vote clears the leaderboard cache.
+returns still get fresh data. A successful vote clears the awards cache.
 All displayed data is derived from the D1 database (Melee.gg sync); there are no runtime
 calls to third-party sites. When a section has no data yet, the backend sends `null` for it
 and the UI hides that section, keeping the rest of the board up.

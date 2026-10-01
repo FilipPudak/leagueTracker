@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMatchResult, buildRivalry, buildCareerRecord, buildSeasonProgression, computeDeckWinRates } from '../../src/lib/careerStats.js';
+import { parseMatchResult, buildRivalry, buildCareerRecord, buildSeasonProgression, computeLeaderWinRates } from '../../src/lib/careerStats.js';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables } from '../helpers/fixtures.js';
 
@@ -205,12 +205,12 @@ describe('lib/careerStats buildSeasonProgression', () => {
   });
 });
 
-describe('lib/careerStats computeDeckWinRates', () => {
+describe('lib/careerStats computeLeaderWinRates', () => {
   it('returns empty array when player has no matches', async () => {
     const tables = basicTables();
     tables.match_results = [];
     const db = createMockDb(tables);
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.deepEqual(rates, []);
   });
 
@@ -225,7 +225,7 @@ describe('lib/careerStats computeDeckWinRates', () => {
       { season_id: 6, round: 2, player1_id: 'P001', player2_id: 'P002', winner_id: 'P002', result: '1-2-0', is_bye: 0 },
     ];
     const db = createMockDb(tables);
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.equal(rates.length, 2);
     const vader = rates.find(r => r.leaderId === '1');
     assert.equal(vader.wins, 1);
@@ -245,7 +245,7 @@ describe('lib/careerStats computeDeckWinRates', () => {
       { season_id: 6, round: 1, player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: '2-0-0', is_bye: 1 },
     ];
     const db = createMockDb(tables);
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.equal(rates.length, 0);
   });
 
@@ -258,7 +258,7 @@ describe('lib/careerStats computeDeckWinRates', () => {
       { season_id: 6, round: 1, player1_id: 'P001', player2_id: 'P002', winner_id: null, result: '1-1-0', is_bye: 0 },
     ];
     const db = createMockDb(tables);
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.equal(rates.length, 1);
     assert.equal(rates[0].draws, 1);
     assert.equal(rates[0].winPct, null);
@@ -277,7 +277,7 @@ describe('lib/careerStats computeDeckWinRates', () => {
       { season_id: 6, round: 3, player1_id: 'P001', player2_id: 'P002', winner_id: 'P002', result: '0-2-0', is_bye: 0 },
     ];
     const db = createMockDb(tables);
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.equal(rates.length, 1);
     assert.equal(rates[0].wins, 2);
     assert.equal(rates[0].losses, 1);
@@ -297,7 +297,7 @@ describe('lib/careerStats computeDeckWinRates', () => {
       { season_id: 6, round: 3, player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: '2-0-0', is_bye: 0 },
     ];
     const db = createMockDb(tables);
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.equal(rates[0].leaderId, '1');
     assert.equal(rates[0].played, 2);
     assert.equal(rates[1].leaderId, '2');
@@ -313,7 +313,7 @@ describe('lib/careerStats computeDeckWinRates', () => {
       { season_id: 6, round: 1, player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: '2-0-0', is_bye: 0 },
     ];
     const db = createMockDb(tables);
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.equal(rates[0].leaderName, 'Darth Vader');
   });
 });

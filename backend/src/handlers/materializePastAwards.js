@@ -1,19 +1,15 @@
-import { constantTimeEqual } from '../lib/auth.js';
+import { requireAdmin } from '../lib/auth.js';
 import { computeChampion, computeBountyHunter, computeNewHopeClimbers, writePodiumBlock } from '../lib/awards.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';
 import { parseSeasonId } from '../db/queries.js';
 import { badRequest } from '../lib/errors.js';
+import { AWARD, PHASE, DEFAULT_TOP_RESULTS, DEFAULT_SEASON_LENGTH } from '../lib/constants.js';
 
 export async function handleMaterializePastAwards(body, env) {
-  const { DB, ADMIN_SECRET } = env;
-  const { adminToken, seasonId: rawSeasonId, dryRun } = body;
+  const { DB } = env;
+  requireAdmin(body, env);
 
-  if (!adminToken || !constantTimeEqual(adminToken, ADMIN_SECRET || '')) {
-    const err = new Error('Unauthorized. Invalid admin token.');
-    err.status = 403;
-    throw err;
-  }
-
+  const { seasonId: rawSeasonId, dryRun } = body;
   const seasonId = parseSeasonId(rawSeasonId);
   if (seasonId == null) throw badRequest('Invalid or missing seasonId.');
 
@@ -27,7 +23,7 @@ export async function handleMaterializePastAwards(body, env) {
 
   const regularRounds = await DB.prepare(
     'SELECT DISTINCT round FROM melee_tournaments WHERE season_id = ? AND phase = ?'
-  ).bind(seasonId, 'regular').all();
+  ).bind(seasonId, PHASE.REGULAR).all();
   const regularRoundSet = new Set((regularRounds.results || []).map(r => r.round));
 
   const allStandings = await DB.prepare(
@@ -35,7 +31,7 @@ export async function handleMaterializePastAwards(body, env) {
   ).bind(seasonId).all();
 
   const season = await DB.prepare('SELECT length, top_results FROM seasons WHERE id = ?').bind(seasonId).first();
-  const topResults = season?.top_results || 7;
+  const topResults = season?.top_results || DEFAULT_TOP_RESULTS;
 
   const nights = (allStandings.results || [])
     .filter(s => regularRoundSet.has(s.round))
@@ -50,27 +46,27 @@ export async function handleMaterializePastAwards(body, env) {
 
   const seasonTable = computeSeasonTable(nights, topResults);
 
-  podiums['Galactic Ruler'] = seasonTable
+  podiums[AWARD.RULER] = seasonTable
     .filter(r => r.rank <= 3)
     .map(r => ({ playerId: r.playerId, score: r.points }));
 
   const champion = await computeChampion(DB, seasonId);
-  podiums['Galactic Champion'] = champion;
+  podiums[AWARD.CHAMPION] = champion;
 
   const bountyHunter = await computeBountyHunter(DB, seasonId);
-  podiums['Bounty Hunter'] = bountyHunter;
+  podiums[AWARD.BOUNTY_HUNTER] = bountyHunter;
 
   if (seasonId > 1) {
-    const seasonLength = season?.length || 11;
+    const seasonLength = season?.length || DEFAULT_SEASON_LENGTH;
     const finalRankMap = new Map(seasonTable.map(r => [r.playerId, r.rank]));
     const climbers = await computeNewHopeClimbers(DB, seasonId, finalRankMap, seasonLength);
-    podiums['A New Hope'] = climbers.map(c => ({ playerId: c.playerId, score: c.climb }));
+    podiums[AWARD.NEW_HOPE] = climbers.map(c => ({ playerId: c.playerId, score: c.climb }));
   } else {
-    podiums['A New Hope'] = [];
+    podiums[AWARD.NEW_HOPE] = [];
   }
 
-  podiums['Galactic Schemer'] = [];
-  podiums['Galactic Ambassador'] = [];
+  podiums[AWARD.SCHEMER] = [];
+  podiums[AWARD.AMBASSADOR] = [];
 
   if (!dryRun) {
     for (const [awardName, entries] of Object.entries(podiums)) {

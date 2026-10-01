@@ -4,6 +4,7 @@ import { computeSchemer, computeAmbassador, computeChampion, computeBountyHunter
 import { fetchLeagueTournaments, buildWeekMap, createPlayerFinder } from '../lib/meleeLeague.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';
 import { auditVotesForWeek } from '../lib/voteAudit.js';
+import { AWARD, PHASE, SETTINGS_KEY, SEASON_ENDED_WEEK, WEEK_PREFIX, SET_TRUE, SET_FALSE, DEFAULT_TOP_RESULTS, DEFAULT_SEASON_LENGTH, GATE_WEEKDAY, GATE_MINUTES, PRIMARY_CUTOFF_MINUTES } from '../lib/constants.js';
 
 function stockholmTimeParts(isoNow) {
   const parts = new Intl.DateTimeFormat('en-GB', {
@@ -26,13 +27,13 @@ function stockholmTimeParts(isoNow) {
 // (primary) may defer lifecycle moves while the week's data is unpublished;
 // the second always acts, so a week can never be lost to late publishing.
 export function isPrimaryFire(isoNow) {
-  return stockholmTimeParts(isoNow).minutes < 23 * 60 + 10;
+  return stockholmTimeParts(isoNow).minutes < PRIMARY_CUTOFF_MINUTES;
 }
 
 export function shouldAdvance(isoNow, marker) {
   const { weekday, minutes } = stockholmTimeParts(isoNow);
-  const isLeagueNight = weekday === 'Wed';
-  const isLateEnough = minutes >= 22 * 60 + 10;
+  const isLeagueNight = weekday === GATE_WEEKDAY;
+  const isLateEnough = minutes >= GATE_MINUTES;
   const today = isoNow.split('T')[0];
   const notYetAdvanced = marker !== today;
   return isLeagueNight && isLateEnough && notYetAdvanced;
@@ -80,8 +81,8 @@ export async function syncFromMelee(env, deps = {}) {
   }
 
   const season = await DB.prepare('SELECT length, top_results FROM seasons WHERE id = ?').bind(activeSeasonId).first();
-  const seasonLength = season?.length || 11;
-  const topResults = season?.top_results || 7;
+  const seasonLength = season?.length || DEFAULT_SEASON_LENGTH;
+  const topResults = season?.top_results || DEFAULT_TOP_RESULTS;
 
   const weekMap = buildWeekMap(matchedTournaments, existingRoundMap);
 
@@ -90,7 +91,7 @@ export async function syncFromMelee(env, deps = {}) {
     try {
       await DB.prepare(
         'INSERT OR IGNORE INTO melee_tournaments (melee_id, season_id, round, name, date, phase) VALUES (?, ?, ?, ?, ?, ?)'
-      ).bind(meleeId, activeSeasonId, info.round, info.name, info.date, info.phase || 'regular').run();
+      ).bind(meleeId, activeSeasonId, info.round, info.name, info.date, info.phase || PHASE.REGULAR).run();
     } catch (err) {
       console.error(`[SyncFromMelee] Failed to insert tournament ${meleeId}: ${err.message}`);
     }
@@ -112,12 +113,12 @@ export async function syncFromMelee(env, deps = {}) {
 
   if (seasonEnded) {
     const championRow = await DB.prepare(
-      "SELECT 1 FROM awards WHERE season_id = ? AND award_name = 'Galactic Champion' AND player_id != '' LIMIT 1"
-    ).bind(activeSeasonId).first();
+      "SELECT 1 FROM awards WHERE season_id = ? AND award_name = ? AND player_id != '' LIMIT 1"
+    ).bind(activeSeasonId, AWARD.CHAMPION).first();
     if (!championRow) {
       const champion = await computeChampion(DB, activeSeasonId);
       if (champion.length > 0) {
-        await writePodiumBlock(DB, activeSeasonId, 'Galactic Champion', champion);
+        await writePodiumBlock(DB, activeSeasonId, AWARD.CHAMPION, champion);
         console.log('[SyncFromMelee] Post-close: Galactic Champion materialized.');
       }
     }
@@ -126,22 +127,22 @@ export async function syncFromMelee(env, deps = {}) {
 
   const schemer = await computeSchemer(DB, activeSeasonId);
   if (schemer.length > 0) {
-    await writePodiumBlock(DB, activeSeasonId, 'Galactic Schemer', schemer);
+    await writePodiumBlock(DB, activeSeasonId, AWARD.SCHEMER, schemer);
   }
 
   const ambassador = await computeAmbassador(DB, activeSeasonId);
   if (ambassador.length > 0) {
-    await writePodiumBlock(DB, activeSeasonId, 'Galactic Ambassador', ambassador);
+    await writePodiumBlock(DB, activeSeasonId, AWARD.AMBASSADOR, ambassador);
   }
 
   const bountyHunter = await computeBountyHunter(DB, activeSeasonId);
   if (bountyHunter.length > 0) {
-    await writePodiumBlock(DB, activeSeasonId, 'Bounty Hunter', bountyHunter);
+    await writePodiumBlock(DB, activeSeasonId, AWARD.BOUNTY_HUNTER, bountyHunter);
   }
 
   const regularRounds = await DB.prepare(`
-    SELECT DISTINCT round FROM melee_tournaments WHERE season_id = ? AND phase = 'regular'
-  `).bind(activeSeasonId).all();
+    SELECT DISTINCT round FROM melee_tournaments WHERE season_id = ? AND phase = ?
+  `).bind(activeSeasonId, PHASE.REGULAR).all();
   const regularRoundSet = new Set((regularRounds.results || []).map(r => r.round));
 
   const allStandings = await DB.prepare(
@@ -166,7 +167,7 @@ export async function syncFromMelee(env, deps = {}) {
     .map(r => ({ playerId: r.playerId, score: r.points, name: '', rank: r.rank }));
 
   if (rulerEntries.length > 0) {
-    await writePodiumBlock(DB, activeSeasonId, 'Galactic Ruler', rulerEntries);
+    await writePodiumBlock(DB, activeSeasonId, AWARD.RULER, rulerEntries);
   }
 
   const finalRankMap = new Map(seasonTable.map(r => [r.playerId, r.rank]));
@@ -174,7 +175,7 @@ export async function syncFromMelee(env, deps = {}) {
   const climbers = await computeNewHopeClimbers(DB, activeSeasonId, finalRankMap, seasonLength);
 
   if (climbers.length > 0) {
-    await writePodiumBlock(DB, activeSeasonId, 'A New Hope', climbers.map(c => ({
+    await writePodiumBlock(DB, activeSeasonId, AWARD.NEW_HOPE, climbers.map(c => ({
       playerId: c.playerId, score: c.climb, name: '',
     })));
   }
@@ -211,7 +212,7 @@ export async function syncFromMelee(env, deps = {}) {
       return { status: 'synced-deferred', action: 'open', targetWeek: currentWeek };
     }
     if (canAdvance || weekDataPresent) {
-      await updateSettingsBatch(DB, [['VOTING_OPEN', 'TRUE'], ['LAST_ADVANCED', today]]);
+      await updateSettingsBatch(DB, [[SETTINGS_KEY.VOTING_OPEN, SET_TRUE], [SETTINGS_KEY.LAST_ADVANCED, today]]);
       console.log(canAdvance
         ? '[SyncFromMelee] First run — voting opened.'
         : '[SyncFromMelee] Week data present — voting opened by retry fire.');
@@ -222,9 +223,9 @@ export async function syncFromMelee(env, deps = {}) {
     if (nextWeek > seasonLength) {
       const champion = await computeChampion(DB, activeSeasonId);
       if (champion.length > 0) {
-        await writePodiumBlock(DB, activeSeasonId, 'Galactic Champion', champion);
+        await writePodiumBlock(DB, activeSeasonId, AWARD.CHAMPION, champion);
       }
-      await updateSettingsBatch(DB, [['CURRENT_WEEK', 'Season Ended'], ['VOTING_OPEN', 'FALSE'], ['SEASON_STARTED', 'FALSE']]);
+      await updateSettingsBatch(DB, [[SETTINGS_KEY.CURRENT_WEEK, SEASON_ENDED_WEEK], [SETTINGS_KEY.VOTING_OPEN, SET_FALSE], [SETTINGS_KEY.SEASON_STARTED, SET_FALSE]]);
       console.log('[SyncFromMelee] Season ended.');
       return { status: 'season-ended' };
     }
@@ -236,7 +237,7 @@ export async function syncFromMelee(env, deps = {}) {
       console.log('[SyncFromMelee] Try-1 with no new-round data; deferring advance to the retry fire.');
       return { status: 'synced-deferred', action: 'advance', targetWeek: nextWeek };
     }
-    await updateSettingsBatch(DB, [['CURRENT_WEEK', `Week ${nextWeek}`], ['LAST_ADVANCED', today]]);
+    await updateSettingsBatch(DB, [[SETTINGS_KEY.CURRENT_WEEK, `${WEEK_PREFIX}${nextWeek}`], [SETTINGS_KEY.LAST_ADVANCED, today]]);
     console.log(`[SyncFromMelee] Advanced to Week ${nextWeek}.`);
     return { status: 'advanced', week: nextWeek };
   }
@@ -274,7 +275,7 @@ async function syncRoundRecords(DB, client, weekMap, activeSeasonId) {
     if (!attendedThisRound) continue;
 
     roundAttendance.set(info.round, attendedThisRound);
-    roundPhases.set(info.round, info.phase || 'regular');
+    roundPhases.set(info.round, info.phase || PHASE.REGULAR);
 
     const matchesOk = await syncMatchesForRound(DB, client, finder, activeSeasonId, meleeId, info);
     if (!matchesOk) continue;
@@ -406,7 +407,7 @@ function decideWinner(p1Wins, p2Wins, p1Id, p2Id) {
 
 async function recordRegularAttendance(DB, activeSeasonId, roundAttendance, roundPhases) {
   for (const [round, players] of roundAttendance) {
-    if (roundPhases.get(round) !== 'regular') continue;
+    if (roundPhases.get(round) !== PHASE.REGULAR) continue;
     for (const playerId of players) {
       try {
         await DB.prepare(

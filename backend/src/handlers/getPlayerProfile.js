@@ -1,8 +1,9 @@
 import { getSetting, parseSeasonId, parseWeek, getPlayerById, getAwardsForSeason } from '../db/queries.js';
-import { buildCareerRecord, buildSeasonProgression, computeDeckWinRates } from '../lib/careerStats.js';
+import { buildCareerRecord, buildSeasonProgression, computeLeaderWinRates } from '../lib/careerStats.js';
 import { computeBadges } from '../lib/badges.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';
 import { badRequest } from '../lib/errors.js';
+import { AWARD, PHASE, DEFAULT_TOP_RESULTS } from '../lib/constants.js';
 
 // Explicit seasonId wins; missing/empty falls back to the active season.
 function resolveSeasonId(rawSeasonId, activeSeasonId) {
@@ -74,17 +75,17 @@ export async function handleGetPlayerProfile(body, env) {
       GROUP BY l.id, l.name, l."set"
       ORDER BY play_count DESC
     `).bind(sid, playerId).all(),
-    computeDeckWinRates(DB, playerId, sid),
-    DB.prepare("SELECT COUNT(*) as cnt FROM attendance a JOIN melee_tournaments t ON t.season_id = a.season_id AND t.round = a.week WHERE a.season_id = ? AND a.player_id = ? AND t.phase = 'regular'").bind(sid, playerId).first(),
-    DB.prepare("SELECT COUNT(DISTINCT round) as cnt FROM melee_tournaments WHERE season_id = ? AND phase = 'regular'").bind(sid).first(),
+    computeLeaderWinRates(DB, playerId, sid),
+    DB.prepare("SELECT COUNT(*) as cnt FROM attendance a JOIN melee_tournaments t ON t.season_id = a.season_id AND t.round = a.week WHERE a.season_id = ? AND a.player_id = ? AND t.phase = ?").bind(sid, playerId, PHASE.REGULAR).first(),
+    DB.prepare("SELECT COUNT(DISTINCT round) as cnt FROM melee_tournaments WHERE season_id = ? AND phase = ?").bind(sid, PHASE.REGULAR).first(),
     DB.prepare('SELECT top_results FROM seasons WHERE id = ?').bind(sid).first(),
     DB.prepare('SELECT season_id, round, player_id, wins, losses, draws, rank FROM season_standings WHERE season_id = ?').bind(sid).all(),
-    DB.prepare('SELECT season_id FROM awards WHERE award_name = ? AND player_id = ?').bind('Galactic Champion', playerId).all(),
-    DB.prepare('SELECT DISTINCT season_id FROM awards WHERE award_name = ? AND player_id = ? AND rank = 1').bind('Galactic Ruler', playerId).all(),
+    DB.prepare('SELECT season_id FROM awards WHERE award_name = ? AND player_id = ?').bind(AWARD.CHAMPION, playerId).all(),
+    DB.prepare('SELECT DISTINCT season_id FROM awards WHERE award_name = ? AND player_id = ? AND rank = 1').bind(AWARD.RULER, playerId).all(),
   ]);
 
   const regularRoundSet = new Set(
-    (seasonTournamentsResult.results || []).filter(t => t.phase === 'regular').map(t => t.round)
+    (seasonTournamentsResult.results || []).filter(t => t.phase === PHASE.REGULAR).map(t => t.round)
   );
   const seasonStandings = (seasonStandingsResult.results || []).filter(s => regularRoundSet.has(s.round));
 
@@ -92,7 +93,7 @@ export async function handleGetPlayerProfile(body, env) {
   const awardsWon = await loadAwardsWon(DB, sid, playerId, isCurrentSeason);
   const nightsAttended = nightsAttendedResult ? nightsAttendedResult.cnt : 0;
   const totalNights = totalNightsResult ? totalNightsResult.cnt : 0;
-  const topResults = (seasonRow && seasonRow.top_results) || 7;
+  const topResults = (seasonRow && seasonRow.top_results) || DEFAULT_TOP_RESULTS;
   const allSeasonStandings = (allSeasonStandingsResult.results || []).filter(s => regularRoundSet.has(s.round));
 
   const seasonTableEntries = allSeasonStandings.map(s => ({
@@ -175,7 +176,7 @@ async function loadCareerData(DB, playerId, activeSeasonId) {
     DB.prepare('SELECT season_id, round, player_id, wins, losses, draws, rank FROM season_standings').all(),
     DB.prepare(`SELECT ${MATCH_COLS} FROM match_results WHERE player1_id = ?`).bind(playerId).all(),
     DB.prepare(`SELECT ${MATCH_COLS} FROM match_results WHERE player2_id = ?`).bind(playerId).all(),
-    DB.prepare("SELECT season_id, round FROM melee_tournaments WHERE phase = 'regular'").all(),
+    DB.prepare('SELECT season_id, round FROM melee_tournaments WHERE phase = ?').bind(PHASE.REGULAR).all(),
     DB.prepare('SELECT id, name, length, top_results FROM seasons ORDER BY id').all(),
   ]);
 

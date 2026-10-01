@@ -2,7 +2,7 @@ import { getSettings, parseSeasonId, parseWeek, isVotingOpen, isSeasonPaused, ge
 import { getWeeklyParticipation as getWeeklyParticipationCount, getAttendedStatus } from '../lib/participation.js';
 import { filterFacedOpponents } from '../lib/voteValidation.js';
 
-export async function handleGetWeeklyParticipation(body, env, session) {
+export async function handleGetVoteBootstrap(body, env, session) {
   const { DB } = env;
   const settings = await getSettings(DB);
   const rawSeasonId = settings.ACTIVE_SEASON_ID || '';
@@ -13,7 +13,7 @@ export async function handleGetWeeklyParticipation(body, env, session) {
   if (!activeSeasonId || !currentWeek) {
     return {
       weeklyParticipation: null, attended: null, players: null, facedOnly: false,
-      votingOpen, week: null, alreadySubmitted: null, currentVote: null,
+      votingOpen, week: null, alreadyVoted: null, currentVote: null,
     };
   }
 
@@ -22,13 +22,13 @@ export async function handleGetWeeklyParticipation(body, env, session) {
   let attended = null;
   let players = null;
   let facedOnly = false;
-  let alreadySubmitted = null;
+  let alreadyVoted = null;
   let currentVote = null;
 
   if (session) {
     attended = await getAttendedStatus(DB, activeSeasonId, currentWeek, session.player_id);
     currentVote = await getCurrentVote(DB, activeSeasonId, currentWeek, session.player_id);
-    alreadySubmitted = Boolean(currentVote);
+    alreadyVoted = Boolean(currentVote);
 
     const allPlayersResult = await DB.prepare('SELECT * FROM players').all();
     const allPlayers = allPlayersResult.results || [];
@@ -42,6 +42,6 @@ export async function handleGetWeeklyParticipation(body, env, session) {
 
   return {
     weeklyParticipation, attended, players, facedOnly, votingOpen, week: currentWeek,
-    alreadySubmitted, currentVote,
+    alreadyVoted, currentVote,
   };
 }

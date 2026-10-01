@@ -1,5 +1,6 @@
 import { MeleeClient } from '../lib/melee.js';
 import { fetchLeagueTournaments, buildWeekMap, createPlayerFinder } from '../lib/meleeLeague.js';
+import { PHASE } from '../lib/constants.js';
 
 export async function backfillFromMelee(env, deps = {}) {
   const { DB } = env;
@@ -59,7 +60,7 @@ export async function backfillFromMelee(env, deps = {}) {
         try {
           await DB.prepare(
             'INSERT OR IGNORE INTO melee_tournaments (melee_id, season_id, round, name, date, phase) VALUES (?, ?, ?, ?, ?, ?)'
-          ).bind(info.meleeId, seasonNum, info.round, info.name, info.date, info.phase || 'regular').run();
+          ).bind(info.meleeId, seasonNum, info.round, info.name, info.date, info.phase || PHASE.REGULAR).run();
           totalTournaments++;
         } catch (err) {
           console.error(`[Backfill] Failed to insert tournament ${info.meleeId}: ${err.message}`);
@@ -109,7 +110,7 @@ export async function backfillFromMelee(env, deps = {}) {
         if (playerId) attendedThisRound.add(playerId);
       }
 
-      if ((info.phase || 'regular') === 'regular') {
+      if ((info.phase || PHASE.REGULAR) === PHASE.REGULAR) {
         for (const playerId of attendedThisRound) {
           try {
             await DB.prepare(

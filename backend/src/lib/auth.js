@@ -10,6 +10,15 @@ export function constantTimeEqual(a, b) {
   return result === 0;
 }
 
+export function requireAdmin(body, env) {
+  const adminToken = body?.adminToken;
+  if (!adminToken || !constantTimeEqual(adminToken, env.ADMIN_SECRET || '')) {
+    const err = new Error('Unauthorized. Invalid admin token.');
+    err.status = 403;
+    throw err;
+  }
+}
+
 export async function findSessionByToken(db, token) {
   if (!token) return null;
   const row = await db.prepare(

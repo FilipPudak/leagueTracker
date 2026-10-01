@@ -2,7 +2,7 @@ import { getSetting, getAwardsForSeason, parseSeasonId } from '../db/queries.js'
 import { getStreaks, getRaffleTickets } from '../lib/participation.js';
 import { badRequest } from '../lib/errors.js';
 import { computeBadges } from '../lib/badges.js';
-import { computeDeckWinRates } from '../lib/careerStats.js';
+import { computeLeaderWinRates } from '../lib/careerStats.js';
 
 export async function handleGetMySeasonStats(body, env, session) {
   const { DB } = env;
@@ -69,7 +69,7 @@ export async function handleGetMySeasonStats(body, env, session) {
   const [raffleTickets, badges, deckWinRates] = await Promise.all([
     getRaffleTickets(DB, sid, playerId),
     computeBadges(DB, playerId, activeSeasonId, isCurrentSeason),
-    computeDeckWinRates(DB, playerId, sid),
+    computeLeaderWinRates(DB, playerId, sid),
   ]);
   const hasVoteData = raffleTickets > 0;
 

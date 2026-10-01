@@ -1,4 +1,5 @@
 import { computeSeasonTable } from './seasonTable.js';
+import { DEFAULT_TOP_RESULTS } from './constants.js';
 
 const WON_RE = /^(.*) won (\d+)-(\d+)-(\d+)$/;
 const DRAW_RE = /^(\d+)-(\d+)-(\d+) Draw$/;
@@ -128,7 +129,7 @@ export function buildSeasonProgression({ seasons, allStandings, regularRoundsByS
       losses: s.losses || 0,
       rank: s.rank,
     }));
-    const table = computeSeasonTable(nights, season.top_results || 7);
+    const table = computeSeasonTable(nights, season.top_results || DEFAULT_TOP_RESULTS);
     const mine = table.find(r => r.playerId === playerId);
     const entry = {
       seasonId: season.id,
@@ -152,7 +153,7 @@ export function buildSeasonProgression({ seasons, allStandings, regularRoundsByS
   return { progression, peak };
 }
 
-export async function computeDeckWinRates(db, playerId, seasonId) {
+export async function computeLeaderWinRates(db, playerId, seasonId) {
   const [votesRows, matchRows, leaderRows] = await Promise.all([
     db.prepare(
       'SELECT week, leader_id FROM votes WHERE player_id = ? AND season_id = ?'

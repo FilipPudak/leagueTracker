@@ -1,15 +1,10 @@
-import { constantTimeEqual } from '../lib/auth.js';
+import { requireAdmin } from '../lib/auth.js';
 import { badRequest } from '../lib/errors.js';
 
 export async function handleAddLeaders(body, env) {
-  const { DB, ADMIN_SECRET } = env;
-  const { adminToken, leaders } = body;
-
-  if (!adminToken || !constantTimeEqual(adminToken, ADMIN_SECRET || '')) {
-    const err = new Error('Unauthorized. Invalid admin token.');
-    err.status = 403;
-    throw err;
-  }
+  const { DB } = env;
+  requireAdmin(body, env);
+  const { leaders } = body;
 
   if (!Array.isArray(leaders)) throw badRequest('leaders must be an array.');
 
@@ -43,14 +38,9 @@ export async function handleAddLeaders(body, env) {
 }
 
 export async function handleSetLeadersActive(body, env) {
-  const { DB, ADMIN_SECRET } = env;
-  const { adminToken, leaderIds, active } = body;
-
-  if (!adminToken || !constantTimeEqual(adminToken, ADMIN_SECRET || '')) {
-    const err = new Error('Unauthorized. Invalid admin token.');
-    err.status = 403;
-    throw err;
-  }
+  const { DB } = env;
+  requireAdmin(body, env);
+  const { leaderIds, active } = body;
 
   if (!Array.isArray(leaderIds)) throw badRequest('leaderIds must be an array.');
 
@@ -62,14 +52,9 @@ export async function handleSetLeadersActive(body, env) {
 }
 
 export async function handleRemoveLeaders(body, env) {
-  const { DB, ADMIN_SECRET } = env;
-  const { adminToken, leaderIds } = body;
-
-  if (!adminToken || !constantTimeEqual(adminToken, ADMIN_SECRET || '')) {
-    const err = new Error('Unauthorized. Invalid admin token.');
-    err.status = 403;
-    throw err;
-  }
+  const { DB } = env;
+  requireAdmin(body, env);
+  const { leaderIds } = body;
 
   if (!Array.isArray(leaderIds)) throw badRequest('leaderIds must be an array.');
 

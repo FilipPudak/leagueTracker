@@ -105,11 +105,11 @@ describe('router/index.js – fetch handler', () => {
     assert.equal(json.data.linkedPlayer.id, 'P001');
   });
 
-  it('getWeeklyParticipation with valid token resolves session and returns attended', async () => {
+  it('getVoteBootstrap with valid token resolves session and returns attended', async () => {
     const tables = basicTables();
     tables.attendance.push({ season_id: 6, week: 3, player_id: 'P002' });
     const resp = await worker.fetch(
-      post({ action: 'getWeeklyParticipation', token: 'test-token-alice' }),
+      post({ action: 'getVoteBootstrap', token: 'test-token-alice' }),
       env(tables)
     );
 
@@ -120,9 +120,9 @@ describe('router/index.js – fetch handler', () => {
     assert.equal(json.data.attended, false, 'week 3 has data (P002) but P001 is absent');
   });
 
-  it('getWeeklyParticipation without token works and returns null attended', async () => {
+  it('getVoteBootstrap without token works and returns null attended', async () => {
     const resp = await worker.fetch(
-      post({ action: 'getWeeklyParticipation', token: '' }),
+      post({ action: 'getVoteBootstrap', token: '' }),
       env()
     );
 
@@ -327,9 +327,9 @@ describe('router/index.js – fetch handler', () => {
     assert.equal(json.data.linkedPlayer.id, 'P003');
   });
 
-  it('getLeaderboardData routes to handler', async () => {
+  it('getAwardsData routes to handler', async () => {
     const resp = await worker.fetch(
-      post({ action: 'getLeaderboardData', seasonId: 6 }),
+      post({ action: 'getAwardsData', seasonId: 6 }),
       env()
     );
 
@@ -339,9 +339,9 @@ describe('router/index.js – fetch handler', () => {
     assert.ok(json.data);
   });
 
-  it('getLeaderboardData without seasonId falls back to active season', async () => {
+  it('getAwardsData without seasonId falls back to active season', async () => {
     const resp = await worker.fetch(
-      post({ action: 'getLeaderboardData' }),
+      post({ action: 'getAwardsData' }),
       env()
     );
 

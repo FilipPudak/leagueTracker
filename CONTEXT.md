@@ -45,7 +45,7 @@ username that is literally a GUID (P022 "Sigge Maslov").
 | **Vote referent** | A vote for week N is about **night N as it just finished**. |
 | **Voting window** | Opens at night N's sync; closes when night N+1's sync advances the week. The stored weekly deadline (Wed 17:45) is **displayed only** — a courtesy reminder before games start — and never enforced. |
 | **Cron** | Fires **three times on Wednesday (20:15, 21:15 and 22:15 UTC)** and once on **Thursday (07:00 UTC)** — configured with `WED`/`THU` **abbreviations**, never numbers: Cloudflare counts weekdays 1=Sunday, so a numeric `3` is Tuesday (this exact trap silently disabled automatic week-advance until Sep 30 2026). Exactly **two** Wednesday fires are ever time-gate-eligible: they land at **22:15** (primary try) and **23:15** (retry) Stockholm in *both* DST states. The Thursday fire is a data-backed retry: if Wednesday's results weren't published in time, it opens voting early without advancing. |
-| **Advance gate** | Week-advance and voting-open happen only when computed Stockholm local day is **Wednesday** (league night) **and** local time ≥ 22:10 **and** the `LAST_ADVANCED` marker (YYYY-MM-DD) is not today's date — so a manual `syncNow` or any stray trigger on another day can never close a voting window early. The Thursday fire uses `weekDataPresent` (attendance row exists for current week) instead of the time gate. Data sync itself runs idempotently on *every* fire: late-published Melee results are picked up automatically. |
+| **Advance gate** | Week-advance and voting-open happen only when computed Stockholm local day is **Wednesday** (league night) **and** local time ≥ 22:10 **and** the `LAST_ADVANCED` marker (YYYY-MM-DD) is not today's date — so a manual `triggerWeeklyCycle` or any stray trigger on another day can never close a voting window early. The Thursday fire uses `weekDataPresent` (attendance row exists for current week) instead of the time gate. Data sync itself runs idempotently on *every* fire: late-published Melee results are picked up automatically. |
 | **Two-try open** | The primary Wednesday try (22:15) may act only if the night it opens/advances to has attendance data; a data-less primary defers (sync only, no lifecycle writes) and the retry try (23:15) **always** acts, with or without data — so voting opens every league night ~1 h later at worst and a week's votes are never lost. The season **close is never deferred**: its target is a cut round, which by definition produces no regular attendance. |
 | **Paused** | `SEASON_PAUSED=TRUE`: sync continues, but no advance, no voting open/close. Toggled by `pauseCurrentSeason` / `resumeCurrentSeason`. |
 
@@ -55,7 +55,7 @@ the third is always off-gate — pre-22:10 in CET, after midnight in CEST). The 
 "once per week, right after league night" reliable in every DST state and makes late data entry
 self-healing: an unpublished night defers 1 h instead of forcing a data-less open; if the organizer
 publishes after both fires, the retry still advances (voting opens with fallback to all players) and the
-week's `attended` state stays `null` (unknown ≠ didn't play) until data lands; an admin may run `syncNow`
+week's `attended` state stays `null` (unknown ≠ didn't play) until data lands; an admin may run `triggerWeeklyCycle`
 to pull results early.
 
 ## 4. Season Lifecycle
@@ -218,10 +218,11 @@ never per-player rankings.
   an as-of round picker) plus per-night results; championship/side events appear as clearly
   labeled rounds. Mirrors the league site's information architecture (cumulative table + round
   tabs), powered purely by Melee-derived data.
-- The site's ★ = count of cut wins (Champion count) — the app renders it: career Galactic
-  Champion titles as gold ★ next to player names in the season table, the player modal header, and
-  the profile header only. Glyphs repeat per title up to ★★★, `★★★+` beyond; exact count in
-  `aria-label`/`title` ("N× Galactic Champion"). Never on night-result rows, podium rows, or pickers.
+- **Award glyphs next to player names:** ★ = Galactic Ruler titles; 🏆 = Galactic Champion
+  titles. Rendered next to player names in the season table, the player modal header, and the
+  profile header only. Glyphs do not repeat — a single glyph per award type, with the exact
+  count in `aria-label`/`title` (e.g. "2× Galactic Champion"). Never on night-result rows,
+  podium rows, or pickers.
 - **Player profile (full page):** shows season stats, career record, progression, badges, and
   leader-use breakdown for any player. **Intentionally omits gamification** (milestones, raffle
   tickets, streaks — private to the linked player only) and **rivalry/versus** data (personal

@@ -72,7 +72,7 @@ describe('handleGetAppData', () => {
     assert.equal(result.votingOpen, false);
   });
 
-  it('detects alreadySubmitted when player voted this week', async () => {
+  it('detects alreadyVoted when player voted this week', async () => {
     const tables = basicTables();
     tables.votes.push({
       id: 100,
@@ -87,25 +87,13 @@ describe('handleGetAppData', () => {
     const db = createMockDb(tables);
     const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
     const result = await handleGetAppData({}, { DB: db }, session);
-    assert.equal(result.alreadySubmitted, true);
+    assert.equal(result.alreadyVoted, true);
   });
 
-  it('alreadySubmitted is false when player has not voted', async () => {
+  it('alreadyVoted is false when player has not voted', async () => {
     const session = { token: 'test-token-bob', player_id: 'P002', device_id: 'dev-bob', email: 'bob@test.com' };
     const result = await handleGetAppData({}, env, session);
-    assert.equal(result.alreadySubmitted, false);
-  });
-
-  it('returns currentPlayer alias for linkedPlayer', async () => {
-    const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
-    const result = await handleGetAppData({}, env, session);
-    assert.deepEqual(result.currentPlayer, result.linkedPlayer);
-  });
-
-  it('returns alreadyVoted alias for alreadySubmitted', async () => {
-    const session = { token: 'test-token-alice', player_id: 'P001', device_id: 'dev-alice', email: 'alice@test.com' };
-    const result = await handleGetAppData({}, env, session);
-    assert.equal(result.alreadyVoted, result.alreadySubmitted);
+    assert.equal(result.alreadyVoted, false);
   });
 
   it('returns unlinkedPlayers when user is unlinked', async () => {

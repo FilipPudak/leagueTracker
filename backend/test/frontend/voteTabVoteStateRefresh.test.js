@@ -16,11 +16,11 @@ function fnBody(name) {
 }
 
 describe('Vote tab vote-state refresh (cross-device sync)', () => {
-  it('applyVoteTabRefresh trusts the server alreadySubmitted flag over stale DOM', () => {
+  it('applyVoteTabRefresh trusts the server alreadyVoted flag over stale DOM', () => {
     const body = fnBody('applyVoteTabRefresh');
-    assert.ok(body.includes('res.alreadySubmitted'),
+    assert.ok(body.includes('res.alreadyVoted'),
       'must read the server flag, not only DOM state');
-    assert.ok(/typeof res\.alreadySubmitted === 'boolean'[\s\S]*?res\.alreadySubmitted[\s\S]*?domHasVoted/.test(body),
+    assert.ok(/typeof res\.alreadyVoted === 'boolean'[\s\S]*?res\.alreadyVoted[\s\S]*?domHasVoted/.test(body),
       'when the server reports a boolean, it must override the DOM fallback');
     assert.ok(!/serverVoted \|\| domHasVoted/.test(body),
       'must not OR server and DOM — a stale voted card must not outvote a fresh server "not voted"');
@@ -31,7 +31,7 @@ describe('Vote tab vote-state refresh (cross-device sync)', () => {
     assert.ok(/votedCard\.style\.display === 'block'/.test(body),
       'form restore must not clobber the already-voted card state');
     assert.ok(body.includes('domHasVoted'),
-      'DOM fallback must remain for responses without a boolean alreadySubmitted');
+      'DOM fallback must remain for responses without a boolean alreadyVoted');
   });
 
   it('adopts currentVote from the response and clears it when the server says not voted', () => {
@@ -39,9 +39,9 @@ describe('Vote tab vote-state refresh (cross-device sync)', () => {
     assert.ok(body.includes('adoptServerVote(res)'),
       'refresh must delegate vote adoption to the shared helper');
     const helper = fnBody('adoptServerVote');
-    assert.ok(helper.includes('typeof res.alreadySubmitted !== \'boolean\''),
+    assert.ok(helper.includes('typeof res.alreadyVoted !== \'boolean\''),
       'must ignore adoption when the server did not report vote state');
-    assert.ok(/appState\.currentVote = res\.alreadySubmitted && res\.currentVote \? res\.currentVote : null/.test(helper),
+    assert.ok(/appState\.currentVote = res\.alreadyVoted && res\.currentVote \? res\.currentVote : null/.test(helper),
       'must store the server-known vote, or null when the server says not voted');
   });
 

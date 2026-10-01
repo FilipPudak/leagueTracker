@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables } from '../helpers/fixtures.js';
-import { handleSyncNow } from '../../src/handlers/syncNow.js';
+import { handleTriggerWeeklyCycle } from '../../src/handlers/triggerWeeklyCycle.js';
 import { handlePauseSeason, handleResumeSeason } from '../../src/handlers/pauseSeason.js';
 import { handleAddLeaders, handleSetLeadersActive, handleRemoveLeaders } from '../../src/handlers/leaderManagement.js';
 import { handleMaterializePastAwards } from '../../src/handlers/materializePastAwards.js';
@@ -17,11 +17,11 @@ function adminTables() {
 
 const ADMIN_SECRET = 'test-admin-secret';
 
-describe('handleSyncNow', () => {
+describe('handleTriggerWeeklyCycle', () => {
   it('runs sync immediately with admin token', async () => {
     const db = createMockDb(adminTables());
     const mockSync = async () => {};
-    const result = await handleSyncNow(
+    const result = await handleTriggerWeeklyCycle(
       { adminToken: ADMIN_SECRET },
       { DB: db, ADMIN_SECRET, syncFromMelee: mockSync }
     );
@@ -31,7 +31,7 @@ describe('handleSyncNow', () => {
   it('rejects missing admin token', async () => {
     const db = createMockDb(adminTables());
     await assert.rejects(
-      () => handleSyncNow({}, { DB: db, ADMIN_SECRET }),
+      () => handleTriggerWeeklyCycle({}, { DB: db, ADMIN_SECRET }),
       (err) => {
         assert.equal(err.status, 403);
         return true;
@@ -42,7 +42,7 @@ describe('handleSyncNow', () => {
   it('rejects wrong admin token', async () => {
     const db = createMockDb(adminTables());
     await assert.rejects(
-      () => handleSyncNow({ adminToken: 'wrong' }, { DB: db, ADMIN_SECRET }),
+      () => handleTriggerWeeklyCycle({ adminToken: 'wrong' }, { DB: db, ADMIN_SECRET }),
       (err) => {
         assert.equal(err.status, 403);
         return true;

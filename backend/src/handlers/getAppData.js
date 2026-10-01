@@ -7,7 +7,7 @@ import { filterFacedOpponents } from '../lib/voteValidation.js';
 async function resolveLinkStatus(DB, session, token, activeSeasonId, currentWeek) {
   let status = 'unlinked';
   let linkedPlayer = null;
-  let alreadySubmitted = false;
+  let alreadyVoted = false;
   let currentVote = null;
 
   if (session) {
@@ -17,7 +17,7 @@ async function resolveLinkStatus(DB, session, token, activeSeasonId, currentWeek
       linkedPlayer = { id: player.id, name: player.name, email: player.email };
       if (activeSeasonId && currentWeek) {
         currentVote = await getCurrentVote(DB, activeSeasonId, currentWeek, player.id);
-        alreadySubmitted = Boolean(currentVote);
+        alreadyVoted = Boolean(currentVote);
       }
     } else {
       status = 'invalid-token';
@@ -26,7 +26,7 @@ async function resolveLinkStatus(DB, session, token, activeSeasonId, currentWeek
     status = 'invalid-token';
   }
 
-  return { status, linkedPlayer, alreadySubmitted, currentVote };
+  return { status, linkedPlayer, alreadyVoted, currentVote };
 }
 
 export async function handleGetAppData(body, env, session) {
@@ -48,7 +48,7 @@ export async function handleGetAppData(body, env, session) {
     DB, allPlayers, votingOpen, activeSeasonId, currentWeek, session && session.player_id
   );
 
-  const { status, linkedPlayer, alreadySubmitted, currentVote } = await resolveLinkStatus(
+  const { status, linkedPlayer, alreadyVoted, currentVote } = await resolveLinkStatus(
     DB, session, token, activeSeasonId, currentWeek
   );
 
@@ -82,7 +82,6 @@ export async function handleGetAppData(body, env, session) {
   return {
     status,
     linkedPlayer,
-    currentPlayer: linkedPlayer,
     votingOpen,
     settings: safeSettings,
     seasons: seasons.results || [],
@@ -95,8 +94,7 @@ export async function handleGetAppData(body, env, session) {
     seasonName: seasons.results?.find(s => s.id === activeSeasonId)?.name,
     week: currentWeek,
     seasonId: activeSeasonId,
-    alreadySubmitted,
-    alreadyVoted: alreadySubmitted,
+    alreadyVoted,
     currentVote,
     weeklyParticipation,
     attended,

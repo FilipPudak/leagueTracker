@@ -16,10 +16,10 @@ function refreshFnBody() {
 }
 
 describe('Vote tab attendance refresh (applyVoteTabRefresh)', () => {
-  it('is wired into the vote-tab getWeeklyParticipation response', () => {
+  it('is wired into the vote-tab getVoteBootstrap response', () => {
     const js = readJS();
-    const block = js.match(/callApi\('getWeeklyParticipation'[\s\S]*?\.catch\(\(\) => \{\}\);/);
-    assert.ok(block, 'vote tab must call getWeeklyParticipation');
+    const block = js.match(/callApi\('getVoteBootstrap'[\s\S]*?\.catch\(\(\) => \{\}\);/);
+    assert.ok(block, 'vote tab must call getVoteBootstrap');
     assert.ok(block[0].includes('applyVoteTabRefresh(res)'),
       'attended must be refreshed per tab switch, not frozen at boot');
   });

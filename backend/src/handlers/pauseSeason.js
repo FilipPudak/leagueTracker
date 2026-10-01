@@ -1,30 +1,19 @@
 import { updateSetting } from '../db/queries.js';
-import { constantTimeEqual } from '../lib/auth.js';
+import { requireAdmin } from '../lib/auth.js';
+import { SETTINGS_KEY, SET_TRUE, SET_FALSE } from '../lib/constants.js';
 
 export async function handlePauseSeason(body, env) {
-  const { DB, ADMIN_SECRET } = env;
-  const { adminToken } = body;
+  const { DB } = env;
+  requireAdmin(body, env);
 
-  if (!adminToken || !constantTimeEqual(adminToken, ADMIN_SECRET || '')) {
-    const err = new Error('Unauthorized. Invalid admin token.');
-    err.status = 403;
-    throw err;
-  }
-
-  await updateSetting(DB, 'SEASON_PAUSED', 'TRUE');
+  await updateSetting(DB, SETTINGS_KEY.SEASON_PAUSED, SET_TRUE);
   return { paused: true };
 }
 
 export async function handleResumeSeason(body, env) {
-  const { DB, ADMIN_SECRET } = env;
-  const { adminToken } = body;
+  const { DB } = env;
+  requireAdmin(body, env);
 
-  if (!adminToken || !constantTimeEqual(adminToken, ADMIN_SECRET || '')) {
-    const err = new Error('Unauthorized. Invalid admin token.');
-    err.status = 403;
-    throw err;
-  }
-
-  await updateSetting(DB, 'SEASON_PAUSED', 'FALSE');
+  await updateSetting(DB, SETTINGS_KEY.SEASON_PAUSED, SET_FALSE);
   return { resumed: true };
 }

@@ -477,7 +477,7 @@ describe('triggers/syncFromMelee', () => {
     assert.equal(settings.CURRENT_WEEK, 'Week 2', 'Week not advanced when LAST_ADVANCED matches today');
   });
 
-  it('does not advance on a non-league night even after 22:10 (manual syncNow guard)', async () => {
+  it('does not advance on a non-league night even after 22:10 (manual triggerWeeklyCycle guard)', async () => {
     const tables = withSeasonStarted(makeTables());
     tables.settings = tables.settings.map(s =>
       s.key === 'CURRENT_WEEK' ? { ...s, value: 'Week 2' } : s

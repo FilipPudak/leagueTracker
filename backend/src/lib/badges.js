@@ -1,4 +1,5 @@
 import { parseMatchResult } from './careerStats.js';
+import { AWARD, PHASE } from './constants.js';
 
 const TIER_THRESHOLDS = {
   nightWins:       { bronze: 5,  silver: 15, gold: 30 },
@@ -46,7 +47,7 @@ async function computeGiantSlayer(db, beatenOpponentIds) {
   if (beatenOpponentIds.size === 0) return false;
   const champAwards = await db.prepare(
     `SELECT DISTINCT player_id FROM awards
-     WHERE award_name IN ('Galactic Ruler', 'Galactic Champion')`
+     WHERE award_name IN ('${AWARD.RULER}', '${AWARD.CHAMPION}')`
   ).all();
   const champPlayerIds = new Set((champAwards.results || []).map(r => r.player_id));
   for (const oppId of beatenOpponentIds) {
@@ -101,7 +102,7 @@ function computeDeckMaster(matches, votes, playerId) {
 
 export async function computeBadges(db, playerId, activeSeasonId = null, isSeasonActive = false) {
   const [attendanceRows, standingsRows, matchRows, votesRows, votesReceivedRows, leaderCount, champAsP1, champAsP2] = await Promise.all([
-    db.prepare("SELECT a.season_id, a.week FROM attendance a JOIN melee_tournaments t ON t.season_id = a.season_id AND t.round = a.week WHERE a.player_id = ? AND t.phase = 'regular'").bind(playerId).all(),
+    db.prepare("SELECT a.season_id, a.week FROM attendance a JOIN melee_tournaments t ON t.season_id = a.season_id AND t.round = a.week WHERE a.player_id = ? AND t.phase = ?").bind(playerId, PHASE.REGULAR).all(),
     db.prepare('SELECT season_id, round, wins, losses, rank FROM season_standings WHERE player_id = ?').bind(playerId).all(),
     db.prepare(
       `SELECT player1_id, player2_id, winner_id, result, is_bye, season_id, round FROM match_results

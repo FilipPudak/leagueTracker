@@ -1,8 +1,9 @@
 import { computeSeasonTable } from '../lib/seasonTable.js';
 import { parseSeasonId } from '../db/queries.js';
 import { badRequest } from '../lib/errors.js';
+import { AWARD, PHASE, DEFAULT_TOP_RESULTS } from '../lib/constants.js';
 
-const PHASE_DISPLAY_ORDER = { cut: 0, side: 1, regular: 2 };
+const PHASE_DISPLAY_ORDER = { [PHASE.CUT]: 0, [PHASE.SIDE]: 1, [PHASE.REGULAR]: 2 };
 
 export async function handleGetStandingsData(body, env) {
   const { DB } = env;
@@ -28,7 +29,7 @@ export async function handleGetStandingsData(body, env) {
 
   let latestRegularRound = 0;
   for (const t of tournamentList) {
-    if (t.phase === 'regular' && t.round > latestRegularRound) {
+    if (t.phase === PHASE.REGULAR && t.round > latestRegularRound) {
       latestRegularRound = t.round;
     }
   }
@@ -42,12 +43,12 @@ export async function handleGetStandingsData(body, env) {
   const allStandingsList = allStandings.results || [];
 
   const season = await DB.prepare('SELECT length, top_results FROM seasons WHERE id = ?').bind(seasonId).first();
-  const topResults = season?.top_results || 7;
+  const topResults = season?.top_results || DEFAULT_TOP_RESULTS;
 
   const tableStandings = allStandingsList
     .filter(s => {
       const t = tournamentList.find(x => x.round === s.round);
-      return t && t.phase === 'regular' && s.round <= effectiveAsOf;
+      return t && t.phase === PHASE.REGULAR && s.round <= effectiveAsOf;
     });
 
   const nights = tableStandings.map(s => ({
@@ -64,7 +65,7 @@ export async function handleGetStandingsData(body, env) {
   const rounds = buildRoundSections(tournamentList, allStandingsList);
 
   const allRegularRounds = tournamentList
-    .filter(t => t.phase === 'regular')
+    .filter(t => t.phase === PHASE.REGULAR)
     .map(t => ({ round: t.round, name: t.name }))
     .sort((a, b) => b.round - a.round);
 
@@ -119,12 +120,12 @@ function buildRoundSections(tournamentList, allStandingsList) {
   });
 }
 
-// ★ = Champion titles (all seasons); Ruler titles exclude the viewed season
-// (the in-season podium already shows that placement).
+// ★ = Galactic Ruler titles (other seasons only — the in-season podium already
+// shows that placement); 🏆 = Galactic Champion titles (all seasons).
 async function loadTitleCounts(DB, seasonId) {
   const championTitleRows = await DB.prepare(
     'SELECT player_id FROM awards WHERE award_name = ?'
-  ).bind('Galactic Champion').all();
+  ).bind(AWARD.CHAMPION).all();
   const championCounts = {};
   for (const r of (championTitleRows.results || [])) {
     championCounts[r.player_id] = (championCounts[r.player_id] || 0) + 1;
@@ -132,7 +133,7 @@ async function loadTitleCounts(DB, seasonId) {
 
   const rulerTitleRows = await DB.prepare(
     'SELECT DISTINCT player_id FROM awards WHERE award_name = ? AND rank = 1 AND season_id != ?'
-  ).bind('Galactic Ruler', seasonId).all();
+  ).bind(AWARD.RULER, seasonId).all();
   const rulerCounts = {};
   for (const r of (rulerTitleRows.results || [])) {
     rulerCounts[r.player_id] = 1;

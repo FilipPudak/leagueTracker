@@ -1,13 +1,14 @@
-// Voting streaks and raffle tickets
+// Attendance, voting streaks, raffle tickets, and weekly/season participation
+import { PHASE } from './constants.js';
 
 // Get player's current and best voting streak for a season
 export async function getStreaks(db, seasonId, playerId) {
   const attendedWeeks = await db.prepare(`
     SELECT DISTINCT a.week FROM attendance a
     JOIN melee_tournaments t ON t.season_id = a.season_id AND t.round = a.week
-    WHERE a.season_id = ? AND a.player_id = ? AND t.phase = 'regular'
+    WHERE a.season_id = ? AND a.player_id = ? AND t.phase = ?
     ORDER BY a.week
-  `).bind(seasonId, playerId).all();
+  `).bind(seasonId, playerId, PHASE.REGULAR).all();
 
   if (!attendedWeeks.results || attendedWeeks.results.length === 0) {
     return { currentStreak: 0, bestStreak: 0 };
@@ -70,8 +71,8 @@ export async function getWeeklyParticipation(db, seasonId, week) {
   const attendance = await db.prepare(`
     SELECT DISTINCT a.player_id FROM attendance a
     JOIN melee_tournaments t ON t.season_id = a.season_id AND t.round = a.week
-    WHERE a.season_id = ? AND a.week = ? AND t.phase = 'regular'
-  `).bind(seasonId, week).all();
+    WHERE a.season_id = ? AND a.week = ? AND t.phase = ?
+  `).bind(seasonId, week, PHASE.REGULAR).all();
 
   return {
     voted: voted?.count || 0,
@@ -99,8 +100,8 @@ export async function getSeasonParticipation(db, seasonId) {
   const attendanceRows = await db.prepare(`
     SELECT DISTINCT a.player_id FROM attendance a
     JOIN melee_tournaments t ON t.season_id = a.season_id AND t.round = a.week
-    WHERE a.season_id = ? AND t.phase = 'regular'
-  `).bind(seasonId).all();
+    WHERE a.season_id = ? AND t.phase = ?
+  `).bind(seasonId, PHASE.REGULAR).all();
 
   const votedRows = await db.prepare(`
     SELECT DISTINCT player_id FROM votes WHERE season_id = ?

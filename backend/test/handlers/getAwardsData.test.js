@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables, emptyTables, closedVotingTables } from '../helpers/fixtures.js';
 import { installCryptoMock } from '../helpers/mock-crypto.js';
-import { handleGetLeaderboardData } from '../../src/handlers/getLeaderboardData.js';
+import { handleGetAwardsData } from '../../src/handlers/getAwardsData.js';
 
-function leaderboardTables() {
+function awardsTables() {
   const t = basicTables();
   t.settings = t.settings.map(s =>
     s.key === 'ACTIVE_SEASON_ID' ? { ...s, value: '6' } : s
@@ -14,7 +14,7 @@ function leaderboardTables() {
 }
 
 function tablesWithoutAwards() {
-  const t = leaderboardTables();
+  const t = awardsTables();
   t.awards = [];
   return t;
 }
@@ -43,19 +43,19 @@ function tablesWithStandings() {
   return t;
 }
 
-describe('handleGetLeaderboardData', () => {
+describe('handleGetAwardsData', () => {
   let DB;
   let env;
 
   beforeEach(() => {
     installCryptoMock();
-    const tables = leaderboardTables();
+    const tables = awardsTables();
     DB = createMockDb(tables);
     env = { DB };
   });
 
   it('returns stored awards with resolved player names', async () => {
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, env);
+    const result = await handleGetAwardsData({ seasonId: 6 }, env);
     assert.ok(result.schemer);
     assert.ok(result.schemer.length > 0);
     const first = result.schemer[0];
@@ -64,7 +64,7 @@ describe('handleGetLeaderboardData', () => {
   });
 
   it('scores formatted as "X Pts", "X Leaders", "X Votes", "+X Climb"', async () => {
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, env);
+    const result = await handleGetAwardsData({ seasonId: 6 }, env);
     if (result.schemer && result.schemer.length > 0) {
       assert.ok(/\d+ Leaders/.test(result.schemer[0].score), `schemer score: ${result.schemer[0].score}`);
     }
@@ -79,15 +79,15 @@ describe('handleGetLeaderboardData', () => {
     }
   });
 
-  it('empty leaderLeaderboard when no vote data', async () => {
+  it('empty topLeaders when no vote data', async () => {
     const db = createMockDb(emptyTables());
-    const result = await handleGetLeaderboardData({ seasonId: 1 }, { DB: db });
-    assert.ok(Array.isArray(result.leaderLeaderboard));
-    assert.equal(result.leaderLeaderboard.length, 0);
+    const result = await handleGetAwardsData({ seasonId: 1 }, { DB: db });
+    assert.ok(Array.isArray(result.topLeaders));
+    assert.equal(result.topLeaders.length, 0);
   });
 
   it('returns participation data', async () => {
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, env);
+    const result = await handleGetAwardsData({ seasonId: 6 }, env);
     assert.ok(result.participation);
     assert.equal(typeof result.participation.participationPct, 'number');
     assert.equal(typeof result.participation.totalPlayers, 'number');
@@ -95,17 +95,17 @@ describe('handleGetLeaderboardData', () => {
   });
 
   it('no season specified falls back to active season', async () => {
-    const result = await handleGetLeaderboardData({}, env);
+    const result = await handleGetAwardsData({}, env);
     assert.ok(result.schemer);
     assert.ok(result.participation);
   });
 
   it('invalid season → 400', async () => {
-    const tables = leaderboardTables();
+    const tables = awardsTables();
     tables.settings = tables.settings.filter((s) => s.key !== 'ACTIVE_SEASON_ID');
     const db = createMockDb(tables);
     await assert.rejects(
-      () => handleGetLeaderboardData({}, { DB: db }),
+      () => handleGetAwardsData({}, { DB: db }),
       (err) => {
         assert.equal(err.status, 400);
         return true;
@@ -116,7 +116,7 @@ describe('handleGetLeaderboardData', () => {
   it('live Schemer fallback when no stored award', async () => {
     const tables = tablesWithoutAwards();
     const db = createMockDb(tables);
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
+    const result = await handleGetAwardsData({ seasonId: 6 }, { DB: db });
     assert.ok(result.schemer, 'schemer present from live compute');
     assert.ok(result.schemer.length > 0, 'schemer has entries');
     assert.ok(result.schemer[0].name);
@@ -126,7 +126,7 @@ describe('handleGetLeaderboardData', () => {
   it('live Ambassador fallback when no stored award', async () => {
     const tables = tablesWithoutAwards();
     const db = createMockDb(tables);
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
+    const result = await handleGetAwardsData({ seasonId: 6 }, { DB: db });
     assert.ok(result.ambassador, 'ambassador present from live compute');
     assert.ok(result.ambassador.length > 0, 'ambassador has entries');
     assert.ok(result.ambassador[0].name);
@@ -136,11 +136,13 @@ describe('handleGetLeaderboardData', () => {
   it('live Ruler from season_standings when no stored award', async () => {
     const tables = tablesWithStandings();
     const db = createMockDb(tables);
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
+    const result = await handleGetAwardsData({ seasonId: 6 }, { DB: db });
     assert.ok(result.ruler, 'ruler present from DB');
     assert.ok(result.ruler.length > 0, 'ruler has entries');
     assert.ok(result.ruler[0].name);
-    assert.ok(/\d+ Pts/.test(result.ruler[0].score));
+    assert.ok(/\d+ Pts/.test(result.ruler[0].score), `ruler score: ${result.ruler[0].score}`);
+    assert.equal(result.ruler[0].playerId, 'P002', 'season-table leader takes live Ruler');
+    assert.equal(result.ruler[0].score, '9 Pts', 'live Ruler uses derived season points (3W+D), not night match_points');
   });
 
   it('live Ruler excludes rows with null rank', async () => {
@@ -149,7 +151,7 @@ describe('handleGetLeaderboardData', () => {
       { season_id: 6, round: 3, player_id: 'P004', wins: 0, losses: 0, draws: 0, match_points: 0, rank: null }
     );
     const db = createMockDb(tables);
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
+    const result = await handleGetAwardsData({ seasonId: 6 }, { DB: db });
     const ids = result.ruler.map(e => e.playerId);
     assert.ok(!ids.includes('P004'), 'null-rank player must not sneak onto podium');
     assert.ok(ids.includes('P002') && ids.includes('P003'), 'ranked players still present');
@@ -163,7 +165,7 @@ describe('handleGetLeaderboardData', () => {
       s.key === 'CURRENT_WEEK' ? { ...s, value: 'Season Ended' } : s
     );
     const db = createMockDb(tables);
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
+    const result = await handleGetAwardsData({ seasonId: 6 }, { DB: db });
     assert.ok(result.newHope, 'newHope present from DB');
     assert.ok(result.newHope.length > 0, 'newHope has entries');
     assert.ok(result.newHope[0].name);
@@ -171,7 +173,7 @@ describe('handleGetLeaderboardData', () => {
   });
 
   it('Bounty Hunter null when voting is live', async () => {
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, env);
+    const result = await handleGetAwardsData({ seasonId: 6 }, env);
     assert.equal(result.bountyHunter, null, 'bountyHunter hidden during live voting');
   });
 
@@ -181,7 +183,7 @@ describe('handleGetLeaderboardData', () => {
       s.key === 'ACTIVE_SEASON_ID' ? { ...s, value: '6' } : s
     );
     const db = createMockDb(tables);
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
+    const result = await handleGetAwardsData({ seasonId: 6 }, { DB: db });
     assert.ok(result.bountyHunter, 'bountyHunter present when voting closed');
     assert.ok(result.bountyHunter.length > 0, 'bountyHunter has entries');
     assert.ok(result.bountyHunter[0].name);
@@ -202,7 +204,7 @@ describe('handleGetLeaderboardData', () => {
       { season_id: 6, award_name: 'Bounty Hunter', player_id: 'P004', score: 4 }
     );
     const db = createMockDb(tables);
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
+    const result = await handleGetAwardsData({ seasonId: 6 }, { DB: db });
     const ranks = result.bountyHunter.map(e => e.displayRank);
     assert.deepEqual(ranks, [1, 2, 2, 2], 'standard competition ranking 1,2,2,2 for a score tie');
   });
@@ -210,7 +212,7 @@ describe('handleGetLeaderboardData', () => {
   it('Ambassador callsign masking when voting is live', async () => {
     const tables = tablesWithoutAwards();
     const db = createMockDb(tables);
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
+    const result = await handleGetAwardsData({ seasonId: 6 }, { DB: db });
     assert.ok(result.ambassador && result.ambassador.length > 0, 'live ambassador podium must be present');
     const callsigns = ['Gold Leader', 'Green Leader', 'Red Leader', 'Blade Eleven', 'Rogue One', 'Phoenix Leader'];
     for (const entry of result.ambassador) {
@@ -225,7 +227,7 @@ describe('handleGetLeaderboardData', () => {
       s.key === 'ACTIVE_SEASON_ID' ? { ...s, value: '6' } : s
     );
     const db = createMockDb(tables);
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
+    const result = await handleGetAwardsData({ seasonId: 6 }, { DB: db });
     if (result.ambassador && result.ambassador.length > 0) {
       const callsigns = ['Gold Leader', 'Green Leader', 'Red Leader', 'Blade Eleven', 'Rogue One', 'Phoenix Leader'];
       assert.ok(!callsigns.includes(result.ambassador[0].name), `ambassador name "${result.ambassador[0].name}" is real, not a callsign`);
@@ -235,7 +237,7 @@ describe('handleGetLeaderboardData', () => {
   it('no standings in DB → ruler and newHope null', async () => {
     const tables = tablesWithoutAwards();
     const db = createMockDb(tables);
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, { DB: db });
+    const result = await handleGetAwardsData({ seasonId: 6 }, { DB: db });
     assert.equal(result.ruler, null, 'ruler null when no standings');
     assert.equal(result.newHope, null, 'newHope null when no standings');
   });
@@ -246,7 +248,7 @@ describe('handleGetLeaderboardData', () => {
       { season_id: 5, award_name: 'Galactic Ruler', player_id: 'P001', score: 55 },
     ];
     const db = createMockDb(tables);
-    const result = await handleGetLeaderboardData({ seasonId: 5 }, { DB: db });
+    const result = await handleGetAwardsData({ seasonId: 5 }, { DB: db });
     assert.ok(result.ruler, 'ruler from stored award');
     assert.equal(result.ruler.length, 1);
   });
@@ -257,13 +259,13 @@ describe('handleGetLeaderboardData', () => {
       { season_id: 5, award_name: 'Galactic Schemer', player_id: 'P_NONEXISTENT', score: 5 },
     ];
     const db = createMockDb(tables);
-    const result = await handleGetLeaderboardData({ seasonId: 5 }, { DB: db });
+    const result = await handleGetAwardsData({ seasonId: 5 }, { DB: db });
     assert.ok(result.schemer);
     assert.equal(result.schemer[0].name, 'P_NONEXISTENT', 'falls back to raw playerId when not in nameMap');
   });
 
   it('score format strings match expected patterns', async () => {
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, env);
+    const result = await handleGetAwardsData({ seasonId: 6 }, env);
     if (result.schemer && result.schemer.length > 0) {
       assert.ok(/^\d+ Leaders$/.test(result.schemer[0].score), `schemer exact format: ${result.schemer[0].score}`);
     }
@@ -282,19 +284,19 @@ describe('handleGetLeaderboardData', () => {
   });
 
   it('response includes seasonId, seasonName, isActiveSeason', async () => {
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, env);
+    const result = await handleGetAwardsData({ seasonId: 6 }, env);
     assert.equal(result.seasonId, 6);
     assert.equal(typeof result.seasonName, 'string');
     assert.equal(typeof result.isActiveSeason, 'boolean');
   });
 
   it('isActiveSeason true when requesting active season', async () => {
-    const result = await handleGetLeaderboardData({ seasonId: 6 }, env);
+    const result = await handleGetAwardsData({ seasonId: 6 }, env);
     assert.equal(result.isActiveSeason, true);
   });
 
   it('isActiveSeason false when requesting historical season', async () => {
-    const result = await handleGetLeaderboardData({ seasonId: 5 }, env);
+    const result = await handleGetAwardsData({ seasonId: 5 }, env);
     assert.equal(result.isActiveSeason, false);
   });
 });

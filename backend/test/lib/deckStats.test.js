@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeDeckWinRates } from '../../src/lib/careerStats.js';
+import { computeLeaderWinRates } from '../../src/lib/careerStats.js';
 import { createMockDb } from '../helpers/mock-db.js';
 
 function voteRow(playerId, leaderId, week, seasonId = 6) {
@@ -15,11 +15,11 @@ function leaderRow(id, name, setCode = 'SHD') {
   return { id, name, set: setCode };
 }
 
-describe('computeDeckWinRates — deck win-rate edge cases', () => {
+describe('computeLeaderWinRates — leader win-rate edge cases', () => {
 
   it('returns empty array when no votes or matches', async () => {
     const db = createMockDb({ votes: [], match_results: [], leaders: [] });
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.deepEqual(rates, []);
   });
 
@@ -29,7 +29,7 @@ describe('computeDeckWinRates — deck win-rate edge cases', () => {
       match_results: [matchRow('P001', 'P002', 'P001', 1, 'Alice won 2-0-0')],
       leaders: [leaderRow('L1', 'Darth Vader')],
     });
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.equal(rates.length, 1);
     assert.equal(rates[0].leaderId, 'L1');
     assert.equal(rates[0].leaderName, 'Darth Vader');
@@ -46,7 +46,7 @@ describe('computeDeckWinRates — deck win-rate edge cases', () => {
       match_results: [matchRow('P001', 'P002', 'P002', 1, 'Bob won 2-0-0')],
       leaders: [leaderRow('L1', 'Darth Vader')],
     });
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.equal(rates[0].wins, 0);
     assert.equal(rates[0].losses, 1);
     assert.equal(rates[0].winPct, 0);
@@ -58,7 +58,7 @@ describe('computeDeckWinRates — deck win-rate edge cases', () => {
       match_results: [matchRow('P001', 'P002', null, 1, '1-1 Draw')],
       leaders: [leaderRow('L1', 'Darth Vader')],
     });
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.equal(rates[0].wins, 0);
     assert.equal(rates[0].losses, 0);
     assert.equal(rates[0].draws, 1);
@@ -79,7 +79,7 @@ describe('computeDeckWinRates — deck win-rate edge cases', () => {
       ],
       leaders: [leaderRow('L1', 'Darth Vader')],
     });
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.equal(rates.length, 1);
     assert.equal(rates[0].wins, 2);
     assert.equal(rates[0].losses, 1);
@@ -99,7 +99,7 @@ describe('computeDeckWinRates — deck win-rate edge cases', () => {
       ],
       leaders: [leaderRow('L1', 'Darth Vader'), leaderRow('L2', 'Luke Skywalker')],
     });
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.equal(rates.length, 2);
     const vader = rates.find(r => r.leaderId === 'L1');
     const luke = rates.find(r => r.leaderId === 'L2');
@@ -117,7 +117,7 @@ describe('computeDeckWinRates — deck win-rate edge cases', () => {
       ],
       leaders: [leaderRow('L1', 'Darth Vader')],
     });
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.equal(rates.length, 0);
   });
 
@@ -133,7 +133,7 @@ describe('computeDeckWinRates — deck win-rate edge cases', () => {
       ],
       leaders: [leaderRow('L1', 'Darth Vader')],
     });
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.equal(rates.length, 1);
     assert.equal(rates[0].played, 1);
   });
@@ -152,7 +152,7 @@ describe('computeDeckWinRates — deck win-rate edge cases', () => {
       ],
       leaders: [leaderRow('L1', 'Darth Vader'), leaderRow('L2', 'Luke Skywalker')],
     });
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.equal(rates[0].leaderId, 'L1');
     assert.equal(rates[0].played, 2);
     assert.equal(rates[1].leaderId, 'L2');
@@ -165,7 +165,7 @@ describe('computeDeckWinRates — deck win-rate edge cases', () => {
       match_results: [],
       leaders: [leaderRow('L1', 'Darth Vader')],
     });
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.equal(rates.length, 0);
   });
 
@@ -175,7 +175,7 @@ describe('computeDeckWinRates — deck win-rate edge cases', () => {
       match_results: [matchRow('P001', 'P002', null, 1, '1-1 Draw')],
       leaders: [leaderRow('L1', 'Darth Vader')],
     });
-    const rates = await computeDeckWinRates(db, 'P001', 6);
+    const rates = await computeLeaderWinRates(db, 'P001', 6);
     assert.equal(rates[0].winPct, null);
   });
 });

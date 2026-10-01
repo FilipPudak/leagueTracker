@@ -1,13 +1,15 @@
+import { PHASE } from './constants.js';
+
 const LEAGUE_REGEX = /^SWU Wednesday league(?: season (\d+))?(?:\s+\d{1,2}\/\d{1,2}|\s+(?:top [48]|best of the rest|playoff|championship|finale))/i;
 const EXCLUDED_KEYWORDS = ['prerelease', 'draft', 'clone', 'budget draft'];
 
-const PHASE_ORDER = { cut: 0, regular: 1, side: 2 };
+const PHASE_ORDER = { [PHASE.CUT]: 0, [PHASE.REGULAR]: 1, [PHASE.SIDE]: 2 };
 
 export function classifyPhase(name) {
   const lower = name.toLowerCase();
-  if (/best of the rest|finale/i.test(lower)) return 'side';
-  if (/top [48]|playoff|championship/i.test(lower)) return 'cut';
-  return 'regular';
+  if (/best of the rest|finale/i.test(lower)) return PHASE.SIDE;
+  if (/top [48]|playoff|championship/i.test(lower)) return PHASE.CUT;
+  return PHASE.REGULAR;
 }
 
 export function isLeagueTournament(name) {
@@ -81,7 +83,7 @@ export function buildWeekMap(tournaments, existingRoundMap = new Map()) {
   const specials = [];
   for (const t of tournaments) {
     const phase = t.phase || classifyPhase(t.Name);
-    if (phase === 'regular') regulars.push(t);
+    if (phase === PHASE.REGULAR) regulars.push(t);
     else specials.push(t);
   }
 
@@ -93,7 +95,7 @@ export function buildWeekMap(tournaments, existingRoundMap = new Map()) {
       round,
       name: t.Name,
       date: t.StartDate || t.LastPairDateTime || null,
-      phase: 'regular',
+      phase: PHASE.REGULAR,
     });
   }
 

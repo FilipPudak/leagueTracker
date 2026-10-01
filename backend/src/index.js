@@ -3,22 +3,22 @@ import { handleLinkAccount } from './handlers/linkAccount.js';
 import { handleUnlinkAccount } from './handlers/unlinkAccount.js';
 import { handleSubmitVote } from './handlers/submitVote.js';
 import { handleUpdateVote } from './handlers/updateVote.js';
-import { handleGetLeaderboardData } from './handlers/getLeaderboardData.js';
+import { handleGetAwardsData } from './handlers/getAwardsData.js';
 import { handleGetMySeasonStats } from './handlers/getMySeasonStats.js';
 import { handleGetMyCareerStats } from './handlers/getMyCareerStats.js';
 import { handleGetStandingsData } from './handlers/getStandingsData.js';
 import { handleGetPlayerProfile } from './handlers/getPlayerProfile.js';
 import { handleStartNewSeason } from './handlers/startNewSeason.js';
-import { handleBackfillFromMelee } from './handlers/handleBackfillFromMelee.js';
-import { handleSyncNow } from './handlers/syncNow.js';
+import { handleBackfillFromMelee } from './handlers/backfillFromMelee.js';
+import { handleTriggerWeeklyCycle } from './handlers/triggerWeeklyCycle.js';
 import { handlePauseSeason, handleResumeSeason } from './handlers/pauseSeason.js';
 import { handleAddLeaders, handleSetLeadersActive, handleRemoveLeaders } from './handlers/leaderManagement.js';
 import { handleMaterializePastAwards } from './handlers/materializePastAwards.js';
-import { handleGetWeeklyParticipation } from './handlers/getWeeklyParticipation.js';
+import { handleGetVoteBootstrap } from './handlers/getVoteBootstrap.js';
 import { findSessionByToken, touchSessionTimestamp } from './lib/auth.js';
 
 const TOKEN_REQUIRED = ['submitVote', 'updateVote', 'unlinkAccount', 'getMySeasonStats', 'getMyCareerStats'];
-const TOKEN_OPTIONAL = ['getAppData', 'getWeeklyParticipation'];
+const TOKEN_OPTIONAL = ['getAppData', 'getVoteBootstrap'];
 
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -119,21 +119,21 @@ export default {
       unlinkAccount: handleUnlinkAccount,
       submitVote: handleSubmitVote,
       updateVote: handleUpdateVote,
-      getLeaderboardData: handleGetLeaderboardData,
+      getAwardsData: handleGetAwardsData,
       getMySeasonStats: handleGetMySeasonStats,
       getMyCareerStats: handleGetMyCareerStats,
       getStandingsData: handleGetStandingsData,
       getPlayerProfile: handleGetPlayerProfile,
       startNewSeason: handleStartNewSeason,
       backfillFromMelee: handleBackfillFromMelee,
-      syncNow: handleSyncNow,
+      triggerWeeklyCycle: handleTriggerWeeklyCycle,
       pauseCurrentSeason: handlePauseSeason,
       resumeCurrentSeason: handleResumeSeason,
       addLeaders: handleAddLeaders,
       setLeadersActive: handleSetLeadersActive,
       removeLeaders: handleRemoveLeaders,
       materializePastAwards: handleMaterializePastAwards,
-      getWeeklyParticipation: handleGetWeeklyParticipation,
+      getVoteBootstrap: handleGetVoteBootstrap,
     };
 
     const handler = handlers[action];

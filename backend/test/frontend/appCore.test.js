@@ -302,7 +302,7 @@ describe('frontend wiring', () => {
     assert.ok(!/mostPlayedExpanded/.test(app), 'no shared expansion flag left');
     assert.match(app, /let listExpanded = \{\};/);
     assert.match(app, /listExpanded\[containerId\] = !expanded;/);
-    const sectionBody = app.slice(app.indexOf('function renderLeaderboardSection'));
+    const sectionBody = app.slice(app.indexOf('function renderAwardsSection'));
     assert.match(sectionBody.slice(0, 700), /expandable: true,\s*\n\s*noun: 'players'/);
   });
 

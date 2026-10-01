@@ -45,7 +45,7 @@ No code changes needed — the `API_URL` toggle is built in.
 - [Deployment & configuration](docs/DEPLOYMENT.md) — Worker deploy, GitHub Pages, D1 config.
 - [Database (D1 schema)](docs/DATABASE.md) — tables, columns, and award computation.
 - [Security model](docs/SECURITY.md) — how voting integrity is enforced.
-- [Load reliability](docs/PERFORMANCE.md) — retry logic, lazy-loaded leaderboard.
+- [Load reliability](docs/PERFORMANCE.md) — retry logic, lazy-loaded awards.
 - [Triggers & lifecycle](docs/TRIGGERS.md) — weekly automation schedule and lifecycle functions.
 
 ## Tests
@@ -60,7 +60,7 @@ cd backend && node --test "test/**/*.test.js"
 | Category | Files | Tests |
 |----------|-------|-------|
 | Library (awards, auth, badges, careerStats, melee, meleeLeague, participation, seasonTable, voteAudit) | 9 | 200+ |
-| Handlers (getAppData, submitVote, updateVote, linkAccount, unlinkAccount, getStandingsData, getLeaderboardData, getMySeasonStats, getMyCareerStats, getPlayerProfile, admin, etc.) | 12 | 200+ |
+| Handlers (getAppData, submitVote, updateVote, linkAccount, unlinkAccount, getStandingsData, getAwardsData, getMySeasonStats, getMyCareerStats, getPlayerProfile, admin, etc.) | 12 | 200+ |
 | Database (queries, schema) | 2 | 30+ |
 | Triggers (syncFromMelee, backfillFromMelee) | 2 | 45+ |
 | Router & rate limiter | 2 | 40+ |

@@ -59,7 +59,7 @@ export async function validateVote(db, { seasonId, week, playerId, leaderId, opp
   }
 }
 
-// Opponent picker scope shared by getAppData/linkAccount/getWeeklyParticipation:
+// Opponent picker scope shared by getAppData/linkAccount/getVoteBootstrap:
 // during open voting a linked player may only pick opponents they actually
 // faced; falls back to the full candidate list when match data is missing or
 // the faced list resolves empty.

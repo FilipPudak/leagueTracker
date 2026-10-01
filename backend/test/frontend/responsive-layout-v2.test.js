@@ -81,7 +81,7 @@ describe('Layout: desktop 2-panel', () => {
     const html = readHTML();
     const right = html.indexOf('class="col-right"');
     const left = html.indexOf('class="col-left"');
-    ['class="nav-tabs"', 'id="status-box"', 'id="retry-load"', 'id="loading-spinner"', 'id="vote-view"', 'id="standings-view"', 'id="leaderboard-view"', 'id="player-profile-view"'].forEach((marker) => {
+    ['class="nav-tabs"', 'id="status-box"', 'id="retry-load"', 'id="loading-spinner"', 'id="vote-view"', 'id="standings-view"', 'id="awards-view"', 'id="player-profile-view"'].forEach((marker) => {
       const idx = html.indexOf(marker);
       assert.ok(idx > right && idx < left, `${marker} must be inside .col-right`);
     });
@@ -557,7 +557,7 @@ describe('Sign-in & guest: modal, banner, header sizing', () => {
   it('tabs are hash routes so the phone back gesture walks views', () => {
     const js = readJS();
     assert.ok(js.includes("'standings-view': 'standings'"), 'view-hash route table must exist');
-    assert.ok(js.includes("'leaderboard-view': 'awards'"), 'awards must be addressable');
+    assert.ok(js.includes("'awards-view': 'awards'"), 'awards must be addressable');
     assert.ok(js.includes('function normalizeBootHash'), 'boot must seed the hash entry');
     assert.ok(js.includes('routingFromHash'), 'hash-driven switchTab must be loop-guarded');
   });
@@ -568,8 +568,8 @@ describe('Sign-in & guest: modal, banner, header sizing', () => {
       js.includes("if (view !== 'standings-view' && !appState.linkedPlayer)"),
       'gated deep links must fall back to standings for guests'
     );
-    const lb = js.match(/else if \(tabId === 'leaderboard-view'\)\s*\{[\s\S]{0,90}/);
-    assert.ok(lb && lb[0].includes('openSignIn'), 'leaderboard route must gate guests to sign-in');
+    const lb = js.match(/else if \(tabId === 'awards-view'\)\s*\{[\s\S]{0,90}/);
+    assert.ok(lb && lb[0].includes('openSignIn'), 'awards route must gate guests to sign-in');
     const ms = js.match(/else if \(tabId === 'myseason-view'\)\s*\{[\s\S]{0,90}/);
     assert.ok(ms && ms[0].includes('linkedPlayer'), 'myseason route must stay guarded');
   });
@@ -599,7 +599,7 @@ describe('Champion stars, shared atoms, overlay focus', () => {
     assert.ok(js.includes('appState.championCounts = res.championCounts'), 'champion counts feed the badge');
     assert.ok(js.includes('appState.rulerCounts = res.rulerCounts'), 'ruler counts feed the badge');
     assert.equal((js.match(/awardBadge\(/g) || []).length, 7, 'helper plus six call sites: 2 per surface (ruler + champion)');
-    assert.ok(css.includes('.champ-star'), 'gold star styling must exist');
+    assert.ok(css.includes('.award-badge-mark'), 'gold star styling must exist');
   });
 
   it('season progression renders from one shared function', () => {
