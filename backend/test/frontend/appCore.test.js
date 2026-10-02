@@ -242,6 +242,56 @@ describe('frontend/app-core', () => {
       assert.equal(core.shouldRetryAsNewVote('Voting is currently closed for this week.', false), false);
       assert.equal(core.shouldRetryAsNewVote(null, false), false);
     });
+
+    it('skips vote stamp on 409 duplicate-vote conflict', () => {
+      assert.equal(core.shouldSkipVoteStamp('You have already submitted votes for this week.'), true);
+      assert.equal(core.shouldSkipVoteStamp('No vote to update. Use submitVote instead.'), false);
+      assert.equal(core.shouldSkipVoteStamp(''), false);
+      assert.equal(core.shouldSkipVoteStamp(null), false);
+      assert.equal(core.shouldSkipVoteStamp(undefined), false);
+    });
+  });
+
+  describe('resolveHasVoted', () => {
+    it('server boolean wins over DOM state', () => {
+      assert.equal(core.resolveHasVoted(true, false), true);
+      assert.equal(core.resolveHasVoted(false, true), false);
+    });
+
+    it('falls back to DOM when server omits alreadyVoted', () => {
+      assert.equal(core.resolveHasVoted(undefined, true), true);
+      assert.equal(core.resolveHasVoted(undefined, false), false);
+      assert.equal(core.resolveHasVoted(null, true), true);
+      assert.equal(core.resolveHasVoted('yes', true), true);
+    });
+
+    it('handles both falsy', () => {
+      assert.equal(core.resolveHasVoted(false, false), false);
+      assert.equal(core.resolveHasVoted(undefined, false), false);
+    });
+  });
+
+  describe('resolveServerVote', () => {
+    const vote = { leaderId: '1', opponentId: 'P002' };
+
+    it('sets currentVote when server says voted with a vote object', () => {
+      assert.deepEqual(core.resolveServerVote(true, vote), vote);
+    });
+
+    it('clears currentVote when server says voted but has no vote object', () => {
+      assert.equal(core.resolveServerVote(true, null), null);
+      assert.equal(core.resolveServerVote(true, undefined), null);
+    });
+
+    it('clears currentVote when server says not voted', () => {
+      assert.equal(core.resolveServerVote(false, vote), null);
+    });
+
+    it('returns undefined (no change) when alreadyVoted is not a boolean', () => {
+      assert.equal(core.resolveServerVote(undefined, vote), undefined);
+      assert.equal(core.resolveServerVote(null, vote), undefined);
+      assert.equal(core.resolveServerVote('yes', vote), undefined);
+    });
   });
 });
 

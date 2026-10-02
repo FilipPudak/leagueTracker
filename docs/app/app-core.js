@@ -76,6 +76,19 @@ const LeagueCore = (() => {
     return !isRetry && typeof message === 'string' && message.includes('No vote to update');
   }
 
+  function shouldSkipVoteStamp(message) {
+    return typeof message === 'string' && message.includes('already submitted votes for this week');
+  }
+
+  function resolveHasVoted(serverAlreadyVoted, domHasVoted) {
+    return typeof serverAlreadyVoted === 'boolean' ? serverAlreadyVoted : domHasVoted;
+  }
+
+  function resolveServerVote(alreadyVoted, currentVote) {
+    if (typeof alreadyVoted !== 'boolean') return undefined;
+    return alreadyVoted && currentVote ? currentVote : null;
+  }
+
   // Nights do not correlate across seasons: switching season must show that
   // season's latest night, so the stale picker round is omitted on change.
   function resolveStandingsAsOf(seasonChanged, selectValue) {
@@ -100,7 +113,7 @@ const LeagueCore = (() => {
     return '';
   }
 
-  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, gamificationViewFor, leaderOptionLabel, visibleListSlice, listToggleLabel, voteSubmitAction, shouldShowVoteCta, shouldRetryAsNewVote, resolveStandingsAsOf, awardBadgeMarkup, awardBadgeTitle, GUEST_PITCH, CACHE_TTL_MS };
+  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, gamificationViewFor, leaderOptionLabel, visibleListSlice, listToggleLabel, voteSubmitAction, shouldShowVoteCta, shouldRetryAsNewVote, shouldSkipVoteStamp, resolveHasVoted, resolveServerVote, resolveStandingsAsOf, awardBadgeMarkup, awardBadgeTitle, GUEST_PITCH, CACHE_TTL_MS };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.LeagueCore = LeagueCore;

@@ -20,8 +20,8 @@ describe('Vote tab vote-state refresh (cross-device sync)', () => {
     const body = fnBody('applyVoteTabRefresh');
     assert.ok(body.includes('res.alreadyVoted'),
       'must read the server flag, not only DOM state');
-    assert.ok(/typeof res\.alreadyVoted === 'boolean'[\s\S]*?res\.alreadyVoted[\s\S]*?domHasVoted/.test(body),
-      'when the server reports a boolean, it must override the DOM fallback');
+    assert.ok(/LeagueCore\.resolveHasVoted\(\s*res\.alreadyVoted\s*,\s*domHasVoted\s*\)/.test(body),
+      'must delegate the server-overrides-DOM resolution to LeagueCore.resolveHasVoted');
     assert.ok(!/serverVoted \|\| domHasVoted/.test(body),
       'must not OR server and DOM — a stale voted card must not outvote a fresh server "not voted"');
   });
@@ -39,10 +39,10 @@ describe('Vote tab vote-state refresh (cross-device sync)', () => {
     assert.ok(body.includes('adoptServerVote(res)'),
       'refresh must delegate vote adoption to the shared helper');
     const helper = fnBody('adoptServerVote');
-    assert.ok(helper.includes('typeof res.alreadyVoted !== \'boolean\''),
-      'must ignore adoption when the server did not report vote state');
-    assert.ok(/appState\.currentVote = res\.alreadyVoted && res\.currentVote \? res\.currentVote : null/.test(helper),
-      'must store the server-known vote, or null when the server says not voted');
+    assert.ok(helper.includes('LeagueCore.resolveServerVote(res.alreadyVoted, res.currentVote)'),
+      'must delegate the set/clear decision to LeagueCore.resolveServerVote');
+    assert.ok(helper.includes('appState.currentVote = next'),
+      'must apply the resolved vote (or null) to appState');
   });
 
   it('flips a stale submit form to the voted card when the server says voted', () => {

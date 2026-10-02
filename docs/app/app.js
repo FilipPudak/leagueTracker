@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.14.1';
+const APP_VERSION = '4.14.2';
 
 const appState = {
   status: 'unlinked',
@@ -791,8 +791,8 @@ function refreshVoteTab() {
 }
 
 function adoptServerVote(res) {
-  if (typeof res.alreadyVoted !== 'boolean') return;
-  appState.currentVote = res.alreadyVoted && res.currentVote ? res.currentVote : null;
+  const next = LeagueCore.resolveServerVote(res.alreadyVoted, res.currentVote);
+  if (next !== undefined) appState.currentVote = next;
 }
 
 function syncAttendanceCard(notAttendedCard, gated) {
@@ -824,9 +824,7 @@ function applyVoteTabRefresh(res) {
   if (typeof res.votingOpen === 'boolean') appState.votingOpen = res.votingOpen;
 
   const domHasVoted = votedCard && votedCard.style.display === 'block';
-  const hasVoted = typeof res.alreadyVoted === 'boolean'
-    ? res.alreadyVoted
-    : domHasVoted;
+  const hasVoted = LeagueCore.resolveHasVoted(res.alreadyVoted, domHasVoted);
 
   adoptServerVote(res);
 
@@ -930,7 +928,7 @@ function submitVotes(isRetry) {
       if (LeagueCore.shouldRetryAsNewVote(msg, isRetry)) {
         appState.currentVote = null;
         submitVotes(true);
-      } else if (msg.includes('already submitted votes for this week')) {
+      } else if (LeagueCore.shouldSkipVoteStamp(msg)) {
         showVoteRecorded(true);
         refreshVoteTab();
       } else {
