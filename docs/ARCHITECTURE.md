@@ -158,25 +158,29 @@ erDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Season_Active : startNewSeason
+    direction TB
 
-    state "Season Active" as Season_Active {
-        [*] --> Voting_Closed
-        Voting_Closed --> Voting_Open : Wed fire, first run
-        Voting_Open --> Week_Advanced : Wed fire, N+1 ≤ length
-        Week_Advanced --> Voting_Open : Wed fire (next night)
-        Voting_Open --> Season_Closed : Wed fire, N+1 > length
-        Week_Advanced --> Season_Closed : Wed fire, N+1 > length
-    }
+    [*] --> Voting_Closed : startNewSeason (Week 1)
 
-    state "Season Active (Paused)" as Paused {
-        [*] --> Data_Synced_Only
-    }
+    state "Voting closed" as Voting_Closed
+    state "Voting open" as Voting_Open
+    state "Paused (sync only)" as Paused
+    state "Season ended" as Ended
 
-    Season_Active --> Paused : pauseCurrentSeason
-    Paused --> Season_Active : resumeCurrentSeason
-    Season_Closed --> [*]
+    Voting_Closed --> Voting_Open : first Wed fire opens
+    Voting_Open --> Ended : Wed fire closes (N+1 > length)
+
+    Voting_Closed --> Paused : pauseCurrentSeason
+    Voting_Open --> Paused : pauseCurrentSeason
+    Paused --> Voting_Closed : resume (was closed)
+    Paused --> Voting_Open : resume (was open)
+
+    Ended --> [*]
 ```
+
+**Advance (not a separate state):** while voting is open, each eligible Wed fire sets
+`CURRENT_WEEK` to `Week N+1` and records `LAST_ADVANCED`. `VOTING_OPEN` stays true —
+votes simply refer to the new week.
 
 **Advance gate:** week-advance and voting-open happen only when Stockholm local day is
 Wednesday AND local time ≥ 22:10 AND `LAST_ADVANCED` ≠ today. Thursday fire retries
