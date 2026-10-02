@@ -43,11 +43,15 @@ No code changes needed — the `API_URL` toggle is built in.
 ## Docs
 
 - [Domain language & invariants](CONTEXT.md) — ubiquitous language: people, time model, awards, voting rules.
+- [Architecture](docs/ARCHITECTURE.md) — system components, ER diagram, season lifecycle.
+- [API reference](docs/API.md) — Worker actions, auth levels, request/response envelopes.
 - [Deployment & configuration](docs/DEPLOYMENT.md) — Worker deploy, GitHub Pages, D1 config.
 - [Database (D1 schema)](docs/DATABASE.md) — tables, columns, and award computation.
+- [Melee.gg API notes](docs/MELEE.md) — external API quirks, pagination, field names.
 - [Security model](docs/SECURITY.md) — how voting integrity is enforced.
 - [Load reliability](docs/PERFORMANCE.md) — retry logic, lazy-loaded awards.
 - [Triggers & lifecycle](docs/TRIGGERS.md) — weekly automation schedule and lifecycle functions.
+- [Contributing](CONTRIBUTING.md) — commands, conventions, versioning, release flow.
 
 ## Lint
 

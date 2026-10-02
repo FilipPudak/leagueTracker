@@ -2,7 +2,8 @@
 
 Ubiquitous language for the Stockholm Star Wars Unlimited league app. Definitions only — no
 implementation. Code, docs, and tests must use these terms exactly. When a decision below looks
-surprising, the rationale section says why.
+surprising, the rationale section says why. Implementation shape, data relationships, and the
+sync lifecycle are documented in [`ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
 
