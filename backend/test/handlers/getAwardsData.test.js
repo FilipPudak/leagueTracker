@@ -86,6 +86,28 @@ describe('handleGetAwardsData', () => {
     assert.equal(result.topLeaders.length, 0);
   });
 
+  it('topLeaders uses dense ranking for tied play counts', async () => {
+    const t = awardsTables();
+    const now = new Date().toISOString();
+    t.votes = [
+      { id: 1, timestamp: now, updated_at: null, season_id: 6, week: 1, player_id: 'P001', leader_id: '1', opponent_id: 'P002' },
+      { id: 2, timestamp: now, updated_at: null, season_id: 6, week: 2, player_id: 'P002', leader_id: '1', opponent_id: 'P001' },
+      { id: 3, timestamp: now, updated_at: null, season_id: 6, week: 3, player_id: 'P003', leader_id: '1', opponent_id: 'P001' },
+      { id: 4, timestamp: now, updated_at: null, season_id: 6, week: 1, player_id: 'P002', leader_id: '2', opponent_id: 'P001' },
+      { id: 5, timestamp: now, updated_at: null, season_id: 6, week: 2, player_id: 'P001', leader_id: '2', opponent_id: 'P002' },
+      { id: 6, timestamp: now, updated_at: null, season_id: 6, week: 3, player_id: 'P003', leader_id: '2', opponent_id: 'P002' },
+      { id: 7, timestamp: now, updated_at: null, season_id: 6, week: 1, player_id: 'P001', leader_id: '3', opponent_id: 'P003' },
+    ];
+    const db = createMockDb(t);
+    const result = await handleGetAwardsData({ seasonId: 6 }, { DB: db });
+    assert.ok(Array.isArray(result.topLeaders));
+    assert.equal(result.topLeaders.length, 3);
+    const ranks = result.topLeaders.map(l => l.displayRank);
+    assert.deepEqual(ranks, [1, 1, 2], 'dense ranking: tied leaders share rank 1, next gets rank 2');
+    const scores = result.topLeaders.map(l => l.score);
+    assert.deepEqual(scores, [3, 3, 1], 'play counts sorted descending');
+  });
+
   it('returns participation data', async () => {
     const result = await handleGetAwardsData({ seasonId: 6 }, env);
     assert.ok(result.participation);

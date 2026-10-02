@@ -166,6 +166,11 @@ actual award winner; the podium shows the full top 3 for context.
 **Reveal gating (display rules):** Ambassador names are **callsigns** while voting is live
 ("Gold Leader", …); Bounty Hunter is hidden while voting is live; both resolve at close.
 
+**Most Played Leaders** (`topLeaders`) is not an award — it is a live popularity list recomputed
+on every read. It uses **dense ranking** (1, 2, 2, 3): ties share a rank and the next distinct
+count gets rank+1, without the gaps that competition ranking produces. Awards keep standard
+competition ranking.
+
 **Provenance by season:**
 
 | Seasons | How awards exist |

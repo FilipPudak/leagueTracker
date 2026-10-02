@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { assignStandardRanks, computeSchemer, computeAmbassador, computeChampion, computeBountyHunter, computeNewHopeClimbers, writePodiumBlock } from '../../src/lib/awards.js';
+import { assignStandardRanks, assignDenseRanks, computeSchemer, computeAmbassador, computeChampion, computeBountyHunter, computeNewHopeClimbers, writePodiumBlock } from '../../src/lib/awards.js';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables, emptyTables } from '../helpers/fixtures.js';
 
@@ -100,6 +100,107 @@ describe('assignStandardRanks', () => {
     assert.equal(result[0].displayRank, 1);
     assert.equal(result[1].displayRank, 1);
     assert.equal(result[2].displayRank, 1);
+  });
+});
+
+describe('assignDenseRanks', () => {
+  it('sorts items by score descending and assigns sequential ranks', () => {
+    const items = [
+      { id: 'A', score: 10 },
+      { id: 'B', score: 30 },
+      { id: 'C', score: 20 },
+    ];
+    const result = assignDenseRanks(items);
+    assert.equal(result.length, 3);
+    assert.equal(result[0].id, 'B');
+    assert.equal(result[0].displayRank, 1);
+    assert.equal(result[1].id, 'C');
+    assert.equal(result[1].displayRank, 2);
+    assert.equal(result[2].id, 'A');
+    assert.equal(result[2].displayRank, 3);
+  });
+
+  it('assigns same rank to tied scores, next rank is +1 (1,1,2,3)', () => {
+    const items = [
+      { id: 'A', score: 30 },
+      { id: 'B', score: 30 },
+      { id: 'C', score: 20 },
+      { id: 'D', score: 10 },
+    ];
+    const result = assignDenseRanks(items);
+    assert.equal(result[0].displayRank, 1);
+    assert.equal(result[1].displayRank, 1);
+    assert.equal(result[2].displayRank, 2);
+    assert.equal(result[3].displayRank, 3);
+  });
+
+  it('handles three-way tie for first', () => {
+    const items = [
+      { id: 'A', score: 50 },
+      { id: 'B', score: 50 },
+      { id: 'C', score: 50 },
+      { id: 'D', score: 10 },
+    ];
+    const result = assignDenseRanks(items);
+    assert.equal(result[0].displayRank, 1);
+    assert.equal(result[1].displayRank, 1);
+    assert.equal(result[2].displayRank, 1);
+    assert.equal(result[3].displayRank, 2);
+  });
+
+  it('returns empty array for empty input', () => {
+    assert.deepEqual(assignDenseRanks([]), []);
+  });
+
+  it('returns empty array for null input', () => {
+    assert.deepEqual(assignDenseRanks(null), []);
+  });
+
+  it('returns empty array for undefined input', () => {
+    assert.deepEqual(assignDenseRanks(undefined), []);
+  });
+
+  it('handles single item', () => {
+    const result = assignDenseRanks([{ id: 'A', score: 5 }]);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].displayRank, 1);
+    assert.equal(result[0].id, 'A');
+  });
+
+  it('handles items with missing score as 0', () => {
+    const items = [
+      { id: 'A' },
+      { id: 'B', score: 10 },
+    ];
+    const result = assignDenseRanks(items);
+    assert.equal(result[0].id, 'B');
+    assert.equal(result[0].displayRank, 1);
+    assert.equal(result[1].id, 'A');
+    assert.equal(result[1].displayRank, 2);
+  });
+
+  it('handles all same scores', () => {
+    const items = [
+      { id: 'A', score: 10 },
+      { id: 'B', score: 10 },
+      { id: 'C', score: 10 },
+    ];
+    const result = assignDenseRanks(items);
+    assert.equal(result[0].displayRank, 1);
+    assert.equal(result[1].displayRank, 1);
+    assert.equal(result[2].displayRank, 1);
+  });
+
+  it('dense ranks differ from competition ranks after a tie', () => {
+    const items = [
+      { id: 'A', score: 10 },
+      { id: 'B', score: 10 },
+      { id: 'C', score: 5 },
+    ];
+    const dense = assignDenseRanks(items);
+    assert.deepEqual(dense.map(i => i.displayRank), [1, 1, 2]);
+    const standard = assignStandardRanks(items);
+    assert.deepEqual(standard.map(i => i.displayRank), [1, 1, 3]);
   });
 });
 

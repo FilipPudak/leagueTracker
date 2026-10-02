@@ -1,5 +1,5 @@
 import { getSettings, getAwardsForSeason, getMostPlayedLeaders, parseSeasonId, parseWeek, isVotingOpen } from '../db/queries.js';
-import { computeSchemer, computeAmbassador, computeChampion, computeNewHopeClimbers, assignStandardRanks } from '../lib/awards.js';
+import { computeSchemer, computeAmbassador, computeChampion, computeNewHopeClimbers, assignStandardRanks, assignDenseRanks } from '../lib/awards.js';
 import { getSeasonParticipation } from '../lib/participation.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';
 import { AWARD, PHASE, SEASON_ENDED_WEEK, DEFAULT_TOP_RESULTS, DEFAULT_SEASON_LENGTH } from '../lib/constants.js';
@@ -48,9 +48,9 @@ export async function handleGetAwardsData(body, env) {
     if (a.player_id) awardsMap[a.award_name].push({ playerId: a.player_id, score: a.score });
   }
 
-  // Most Played Leaders (always live)
+  // Most Played Leaders (always live, dense ranking)
   const mostPlayedRaw = await getMostPlayedLeaders(DB, seasonId);
-  const topLeaders = assignStandardRanks(
+  const topLeaders = assignDenseRanks(
     (mostPlayedRaw.results || []).map(r => ({
       id: r.id, name: r.name, set: r.set, score: r.play_count,
     }))

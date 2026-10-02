@@ -252,7 +252,7 @@ function executeSelect(sql, params, store) {
           for (const [k, v] of Object.entries(lr)) joined[k] = v;
           for (const [k, v] of Object.entries(rr)) {
             if (!(k in joined)) joined[k] = v;
-            else joined[leftAlias + '_' + k] = v;
+            else joined[rightAlias + '_' + k] = v;
           }
           joinedRows.push(joined);
         }
@@ -297,7 +297,16 @@ function executeSelect(sql, params, store) {
     const hasGroupBy = /GROUP\s+BY/i.test(sql);
     if (hasGroupBy) {
       const groupMatch = sql.match(/GROUP\s+BY\s+([\w.",]+(?:\s*,\s*[\w.",]+)*)/i);
-      const groupCols = groupMatch[1].split(',').map(c => c.trim().split('.').pop().replace(/"/g, '').toLowerCase());
+      const rawGroupCols = groupMatch[1].split(',').map(c => c.trim().replace(/"/g, ''));
+      const groupCols = rawGroupCols.map(c => {
+        const parts = c.split('.');
+        if (parts.length === 2) return { alias: parts[0].toLowerCase(), col: parts[1].toLowerCase() };
+        return { alias: null, col: c.toLowerCase() };
+      });
+      const resolveCol = (ref, row) => {
+        const key = ref.alias ? ref.alias + '_' + ref.col : ref.col;
+        return key in row ? key : ref.col;
+      };
 
       const selectClause = sql.match(/SELECT\s+(.+?)\s+FROM/i);
       const colAliases = {};
@@ -321,7 +330,7 @@ function executeSelect(sql, params, store) {
       const hasCount = upper.includes('COUNT(');
       const groups = new Map();
       for (const row of joinedRows) {
-        const key = groupCols.map(c => row[c]).join('||');
+        const key = groupCols.map(ref => row[resolveCol(ref, row)]).join('||');
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(row);
       }
@@ -330,18 +339,24 @@ function executeSelect(sql, params, store) {
       for (const [, groupRows] of groups) {
         if (upper.includes('COUNT(DISTINCT')) {
           const distMatch = upper.match(/COUNT\(DISTINCT\s+(\w+(?:\.\w+)?)\)/i);
-          const col = distMatch[1].split('.').pop().replace(/"/g, '').toLowerCase();
+          const distParts = distMatch[1].split('.');
+          const distCol = distParts.length === 2 ? distParts[1].toLowerCase() : distParts[0].toLowerCase();
+          const distAlias = distParts.length === 2 ? distParts[0].toLowerCase() : null;
+          const distKey = distAlias ? distAlias + '_' + distCol : distCol;
+          const col = distKey in groupRows[0] ? distKey : distCol;
           const uniqueVals = new Set(groupRows.map(r => r[col]));
           const row = {};
           for (const gc of groupCols) {
-            row[colAliases[gc] || gc] = groupRows[0][gc];
+            const key = resolveCol(gc, groupRows[0]);
+            row[colAliases[gc.col] || gc.col] = groupRows[0][key];
           }
           row[countColAlias] = uniqueVals.size;
           joinedRows.push(row);
         } else if (hasCount) {
           const row = {};
           for (const gc of groupCols) {
-            row[colAliases[gc] || gc] = groupRows[0][gc];
+            const key = resolveCol(gc, groupRows[0]);
+            row[colAliases[gc.col] || gc.col] = groupRows[0][key];
           }
           row[countColAlias] = groupRows.length;
           joinedRows.push(row);

@@ -17,6 +17,22 @@ export function assignStandardRanks(items) {
   return sorted;
 }
 
+// Dense ranking (1223 ranking): ties share a rank, next distinct score gets rank+1
+export function assignDenseRanks(items) {
+  if (!items || items.length === 0) return [];
+  const sorted = [...items].sort((a, b) => (b.score || 0) - (a.score || 0));
+  let rank = 1;
+  let prevScore = null;
+  for (let i = 0; i < sorted.length; i++) {
+    if (sorted[i].score !== prevScore) {
+      if (i > 0) rank += 1;
+      prevScore = sorted[i].score;
+    }
+    sorted[i].displayRank = rank;
+  }
+  return sorted;
+}
+
 // Take top 3 with tie-aware boundary: if 4+ players share the 3rd-place score,
 // keep all tied at that level (up to a reasonable cap).
 function tieAwareTop3(items) {
