@@ -6,7 +6,7 @@ The backend uses a Cloudflare Worker with dual-cron triggers for DST-safe weekly
 
 ```toml
 [triggers]
-crons = ["15 20 * * 3", "15 21 * * 3", "0 7 * * 4", "15 */2 * * *"]
+crons = ["15 20,21,22 * * WED", "0 7 * * THU", "15 */2 * * *"]
 ```
 
 Two fires per Wednesday (20:15 and 21:15 UTC). Exactly one is 22:15 Stockholm in either DST state (summer UTC+2 / winter UTC+1). A Thursday 07:00 UTC fire retries data and opens voting if Wednesday's results weren't published in time.
@@ -43,6 +43,10 @@ All require `adminToken` matching `ADMIN_SECRET` env var.
 | `resumeCurrentSeason` | Sets `SEASON_PAUSED=FALSE` |
 | `startNewSeason` | Creates new season row, sets `SEASON_STARTED=TRUE`, `CURRENT_WEEK='Week 1'`, `VOTING_OPEN=FALSE` |
 | `materializePastAwards` | Computes awards for S1-S5 only; `dryRun` prints podiums first |
+| `backfillFromMelee` | Re-fetches historical Melee data for past rounds |
+| `addLeaders` | Adds leaders to the catalog |
+| `setLeadersActive` | Activates or deactivates leaders |
+| `removeLeaders` | Removes leaders from the catalog |
 
 ## Settings
 
@@ -63,17 +67,17 @@ All require `adminToken` matching `ADMIN_SECRET` env var.
 
 ```bash
 # Trigger sync immediately
-curl -X POST https://league-tracker.filip-pudak.workers.dev \
+curl -X POST YOUR_WORKER_URL \
   -H "Content-Type: application/json" \
   -d '{"action":"triggerWeeklyCycle","adminToken":"YOUR_SECRET"}'
 
 # Start new season
-curl -X POST https://league-tracker.filip-pudak.workers.dev \
+curl -X POST YOUR_WORKER_URL \
   -H "Content-Type: application/json" \
   -d '{"action":"startNewSeason","adminToken":"YOUR_SECRET"}'
 
 # Pause season
-curl -X POST https://league-tracker.filip-pudak.workers.dev \
+curl -X POST YOUR_WORKER_URL \
   -H "Content-Type: application/json" \
   -d '{"action":"pauseCurrentSeason","adminToken":"YOUR_SECRET"}'
 ```

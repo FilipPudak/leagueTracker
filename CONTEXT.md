@@ -12,7 +12,7 @@ surprising, the rationale section says why.
   organizes on Discord; the venue is Dragon's Lair Stockholm.
 - **Melee.gg is the sole source of truth** for everything that happened at the table: pairings,
   results, standings, attendance.
-- `stockholm.sw-unlimited.com` (the league results site, run by Fredrik Bergqvist) is **not a
+- `stockholm.sw-unlimited.com` (the league results site, run by the league organizer) is **not a
   source of truth**. Its final page ("week 12") wrongly folds championship-cut matches into the
   season tally. Its only role in this project: its published S6 week-11 table and embedded
   season config are captured **once, offline, as test fixtures** to reconcile the app's
@@ -33,7 +33,7 @@ surprising, the rationale section says why.
 
 **Fragile contract:** `players.melee_name` is *the* identity join key to all Melee data. A player
 renaming on Melee, or an organizer typo, silently orphans their results. The site has even seen a
-username that is literally a GUID (P022 "Sigge Maslov").
+username that is literally a GUID (P022).
 
 ## 3. Time Model
 
@@ -157,7 +157,7 @@ actual award winner; the podium shows the full top 3 for context.
 | Award | Definition | Tie-break |
 |---|---|---|
 | **Galactic Ruler** | #1 on the season table after the final **regular** week. Podium displays top 3; only rank=1 is the award winner. | points → undefeated-night count → night-rank sum → shared |
-| **Galactic Champion** | Rank 1 of the chronologically last **cut** event of the season (the bracket winner — may differ from Ruler; S6: Champion=Filip, Ruler=Dennis) | impossible (bracket rank is strict); if a season has no cut data, no row |
+| **Galactic Champion** | Rank 1 of the chronologically last **cut** event of the season (the bracket winner — may differ from Ruler; e.g. S6: Champion ≠ Ruler) | impossible (bracket rank is strict); if a season has no cut data, no row |
 | **Galactic Schemer** | Most distinct leaders played (from votes) | share podium |
 | **Galactic Ambassador** | Most favorite-opponent votes received | share podium |
 | **A New Hope** | Biggest rank climb from accumulated standings at end-of-round ⌊length/2⌋ to derived season table at final regular round; must appear in **both** snapshots. Mid-season snapshot uses raw accumulated points (not best-X). | ties share the victory |

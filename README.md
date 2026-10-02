@@ -42,11 +42,19 @@ No code changes needed — the `API_URL` toggle is built in.
 
 ## Docs
 
+- [Domain language & invariants](CONTEXT.md) — ubiquitous language: people, time model, awards, voting rules.
 - [Deployment & configuration](docs/DEPLOYMENT.md) — Worker deploy, GitHub Pages, D1 config.
 - [Database (D1 schema)](docs/DATABASE.md) — tables, columns, and award computation.
 - [Security model](docs/SECURITY.md) — how voting integrity is enforced.
 - [Load reliability](docs/PERFORMANCE.md) — retry logic, lazy-loaded awards.
 - [Triggers & lifecycle](docs/TRIGGERS.md) — weekly automation schedule and lifecycle functions.
+
+## Lint
+
+```sh
+npm run lint        # eslint + stylelint + html-validate (from repo root)
+npm run lint:fix    # auto-fix what's fixable
+```
 
 ## Tests
 
@@ -64,9 +72,9 @@ cd backend && node --test "test/**/*.test.js"
 | Database (queries, schema) | 2 | 30+ |
 | Triggers (syncFromMelee, backfillFromMelee) | 2 | 45+ |
 | Router & rate limiter | 2 | 40+ |
-| Frontend (app-core + responsive redesign phases 1–7 + shortcuts) | 10 | 130+ |
+| Frontend (app-core + responsive redesign + vote-state) | 12 | 200+ |
 | Privacy guard | 1 | 5+ |
-| **Total** | **41 files** | **715** |
+| **Total** | **44** | **866** |
 
 Test infrastructure: `backend/test/helpers/mock-db.js` (D1 mock), `mock-fetch.js`,
 `mock-crypto.js`, `fixtures.js`, `test-utils.js`.

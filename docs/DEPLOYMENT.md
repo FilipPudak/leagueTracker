@@ -16,14 +16,16 @@ All configuration lives in `backend/wrangler.toml` and the D1 `settings` table:
 
 | Setting | Location | Description |
 |---------|----------|-------------|
-| D1 Database ID | `wrangler.toml` | `ccf38d5e-1639-4eb3-8447-9f3644127e4b` |
-| Cron triggers | `wrangler.toml` | `15 20 * * 3` and `15 21 * * 3` (UTC) — dual Wednesday cron for DST handling |
+| D1 Database ID | `wrangler.toml` | See `backend/wrangler.toml` |
+| Cron triggers | `wrangler.toml` | `15 20,21,22 * * WED`, `0 7 * * THU`, `15 */2 * * *` (UTC) — three Wednesday fires + Thursday retry + 2h liveness probe |
 | `ACTIVE_SEASON_ID` | D1 `settings` table | Current season number |
 | `CURRENT_WEEK` | D1 `settings` table | e.g. `Week 3` or `Season Ended` |
 | `VOTING_OPEN` | D1 `settings` table | `TRUE` or `FALSE` |
 | `SEASON_STARTED` | D1 `settings` table | Gates whether the weekly sync runs |
 | `SEASON_PAUSED` | D1 `settings` table | Sync keeps running but week advance/open/close is skipped |
 | `LAST_ADVANCED` | D1 `settings` table | Date marker (`YYYY-MM-DD`) preventing double-advance on dual-cron Wednesdays |
+| `LAST_CRON_AT` | D1 `settings` table | ISO timestamp of last real cron fire |
+| `LAST_PROBE_AT` | D1 `settings` table | ISO timestamp of last liveness-probe fire |
 
 ## Deploying the backend (Cloudflare Workers)
 
@@ -46,8 +48,6 @@ npx wrangler dev
 npx wrangler d1 execute league-tracker --remote --file=schema.sql
 ```
 
-The Worker is live at `https://league-tracker.filip-pudak.workers.dev`.
-
 ## Deploying the static client (GitHub Pages)
 
 - Set the Pages source to branch `main`, folder `docs`.
@@ -58,8 +58,5 @@ The Worker is live at `https://league-tracker.filip-pudak.workers.dev`.
 
 The Worker URL is in `docs/app/app.js` as the `API_URL` constant. It auto-detects
 `localhost` and points to the local dev server — no flag needed for local development.
-For production, it uses the deployed Worker URL:
-
-```js
-const API_URL = 'https://league-tracker.filip-pudak.workers.dev';
-```
+For production, it uses the deployed Worker URL (see `backend/wrangler.toml` or the
+Cloudflare dashboard for your Worker's URL).
