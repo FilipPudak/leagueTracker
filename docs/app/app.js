@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.14.2';
+const APP_VERSION = '4.15.0';
 
 const appState = {
   status: 'unlinked',

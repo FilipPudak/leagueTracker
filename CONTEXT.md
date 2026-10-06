@@ -85,7 +85,7 @@ Per-season values live on the `seasons` row (`length`, `top_results`), set at `s
 
 | Season | Length (regular nights) | Top results | Source |
 |---|---|---|---|
-| S1 | 9 | 7 *(assumption — validate against the offline fixture at materialization)* | inferred |
+| S1 | 10 | 7 | `migrations/M2.sql` backfill — authoritative (live D1 value); the earlier inferred 9 was a pre-data guess |
 | S2 | 15 | 10 | organizer's rule |
 | S3 | 15 | 10 | organizer's rule |
 | S4 | 15 | 10 | organizer's rule |
@@ -125,6 +125,10 @@ ignored).
 | **Season table** | Derived, not stored: for each player, the **sum of their best `top_results` night results** (by night points; a tie at the boundary keeps the earlier night), then Played/Won/Drawn/Lost totals, Points = 3W + D. Ranks: points desc → undefeated-nights count → sum of night ranks (lower better) → **shared rank** if still tied. |
 | **Match result** | One BO3 set between two players: winner = higher `GameWins`; equal game wins ⇒ **draw** (`winner_id` NULL, result string kept). Byes are recorded (`is_bye=1`) but are never a "win against a person". |
 | **Attendance** | A player **attended week N** iff they appear in week N's regular standings. Regular nights only — cut/side attendance is not tracked. |
+
+**Backfill guard:** admin backfill of the *active* season (explicit season id, `allowActiveSeason`)
+never writes attendance beyond `CURRENT_WEEK` — re-importing a partially recorded season can only
+cap `attended` at "as far as the week actually is", never invent future attendance.
 
 ## 8. Voting
 

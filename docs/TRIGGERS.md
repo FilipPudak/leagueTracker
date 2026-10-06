@@ -18,7 +18,10 @@ Two fires per Wednesday (20:15 and 21:15 UTC). Exactly one is 22:15 Stockholm in
 **What it does:** The main weekly lifecycle function. Runs on every cron fire.
 
 1. **Gate:** Checks `SEASON_STARTED` — skips if FALSE
-2. **Sync:** Fetches tournaments from Melee.gg API, inserts new ones, syncs standings and matches for all unsynced rounds
+2. **Sync:** Fetches tournaments from Melee.gg API, then hands round data
+   (tournament inserts, standings, matches, attendance, optional vote audit,
+   player reactivation) to the shared engine `lib/leagueSync.js` — see
+   `syncSeasonData`. The lifecycle below is unchanged and stays inline here.
 3. **Attendance:** Rebuilt from regular standings
 4. **Awards:** Recomputes Schemer, Ambassador, Ruler, Champion, Bounty Hunter, A New Hope
 5. **Advance gate:** `shouldAdvance(isoNow, marker)` checks:
@@ -43,7 +46,7 @@ All require `adminToken` matching `ADMIN_SECRET` env var.
 | `resumeCurrentSeason` | Sets `SEASON_PAUSED=FALSE` |
 | `startNewSeason` | Creates new season row, sets `SEASON_STARTED=TRUE`, `CURRENT_WEEK='Week 1'`, `VOTING_OPEN=FALSE` |
 | `materializePastAwards` | Computes awards for S1-S5 only; `dryRun` prints podiums first |
-| `backfillFromMelee` | Re-fetches historical Melee data for past rounds |
+| `backfillFromMelee` | `seasonId?`, `maxTournaments?` (default 5), `resync?`, `allowActiveSeason?` — re-fetches historical Melee data. Shared engine, no vote audit, no reactivation. Refuses an explicit active season (`ACTIVE_SEASON_ID` + `SEASON_STARTED`) unless `allowActiveSeason: true`; sweeps are never refused. With the flag, active-season attendance writes are capped at `CURRENT_WEEK`. Tallies are row/insert counts. |
 | `addLeaders` | Adds leaders to the catalog |
 | `setLeadersActive` | Activates or deactivates leaders |
 | `removeLeaders` | Removes leaders from the catalog |

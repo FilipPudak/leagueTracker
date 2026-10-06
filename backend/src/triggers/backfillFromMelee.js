@@ -1,6 +1,7 @@
 import { MeleeClient } from '../lib/melee.js';
-import { fetchLeagueTournaments, buildWeekMap, createPlayerFinder } from '../lib/meleeLeague.js';
-import { PHASE } from '../lib/constants.js';
+import { getSettings, parseSeasonId, parseWeek, isSeasonStarted } from '../db/queries.js';
+import { fetchLeagueTournaments, buildWeekMap } from '../lib/meleeLeague.js';
+import { syncSeasonData } from '../lib/leagueSync.js';
 
 export async function backfillFromMelee(env, deps = {}) {
   const { DB } = env;
@@ -8,14 +9,30 @@ export async function backfillFromMelee(env, deps = {}) {
   const targetSeasonId = deps.seasonId || null;
   const maxTournaments = deps.maxTournaments || 5;
   const resync = deps.resync || false;
+  const allowActiveSeason = deps.allowActiveSeason || false;
 
   console.log('[Backfill] Starting backfill...');
+
+  const settings = await getSettings(DB);
+  const activeSeasonId = parseSeasonId(settings.ACTIVE_SEASON_ID);
+  const currentWeek = parseWeek(settings.CURRENT_WEEK);
+  const seasonRunning = isSeasonStarted(settings.SEASON_STARTED);
+
+  if (targetSeasonId != null && targetSeasonId === activeSeasonId && seasonRunning && !allowActiveSeason) {
+    console.log(`[Backfill] Refused: season ${targetSeasonId} is active; pass allowActiveSeason to backfill it anyway.`);
+    return {
+      seasonId: targetSeasonId,
+      refused: true,
+      reason: 'active-season',
+      tournaments: 0,
+      standings: 0,
+      matches: 0,
+    };
+  }
 
   const clientId = env.MELEE_CLIENT_ID || '';
   const clientSecret = env.MELEE_CLIENT_SECRET || '';
   const client = new ClientClass(clientId, clientSecret);
-
-  const finder = createPlayerFinder(DB);
 
   let allTournaments;
   try {
@@ -30,17 +47,19 @@ export async function backfillFromMelee(env, deps = {}) {
     if (!seasonGroups.has(t.seasonNum)) seasonGroups.set(t.seasonNum, []);
     seasonGroups.get(t.seasonNum).push(t);
   }
+  const orderedGroups = [...seasonGroups.entries()].sort((a, b) => b[0] - a[0]);
 
+  let budget = maxTournaments;
   let totalTournaments = 0;
   let totalStandings = 0;
   let totalMatches = 0;
-  let tournamentsProcessed = 0;
 
-  for (const [seasonNum, tournaments] of seasonGroups) {
+  for (const [seasonNum, tournaments] of orderedGroups) {
     await DB.prepare('INSERT OR IGNORE INTO seasons (id, name, created_date) VALUES (?, ?, ?)')
       .bind(seasonNum, `Season ${seasonNum}`, null).run();
 
-    if (resync && targetSeasonId === seasonNum) {
+    const isResyncTarget = resync && targetSeasonId === seasonNum;
+    if (isResyncTarget) {
       await DB.prepare('DELETE FROM melee_tournaments WHERE season_id = ?').bind(seasonNum).run();
       await DB.prepare('DELETE FROM season_standings WHERE season_id = ?').bind(seasonNum).run();
       await DB.prepare('DELETE FROM match_results WHERE season_id = ?').bind(seasonNum).run();
@@ -52,118 +71,26 @@ export async function backfillFromMelee(env, deps = {}) {
       'SELECT melee_id, round FROM melee_tournaments WHERE season_id = ?'
     ).bind(seasonNum).all();
     const existingRoundMap = new Map((existingTournaments.results || []).map(t => [t.melee_id, t.round]));
-
     const weekMap = buildWeekMap(tournaments, existingRoundMap);
 
-    for (const [, info] of weekMap) {
-      if (!existingRoundMap.has(info.meleeId)) {
-        try {
-          await DB.prepare(
-            'INSERT OR IGNORE INTO melee_tournaments (melee_id, season_id, round, name, date, phase) VALUES (?, ?, ?, ?, ?, ?)'
-          ).bind(info.meleeId, seasonNum, info.round, info.name, info.date, info.phase || PHASE.REGULAR).run();
-          totalTournaments++;
-        } catch (err) {
-          console.error(`[Backfill] Failed to insert tournament ${info.meleeId}: ${err.message}`);
-          continue;
-        }
-      }
+    const capActiveSeason = seasonNum === activeSeasonId && allowActiveSeason;
+    const maxAttendanceWeek = capActiveSeason && currentWeek != null ? currentWeek : Infinity;
 
-      if (!(resync && targetSeasonId === seasonNum)) {
-        const hasStanding = await DB.prepare(
-          'SELECT 1 FROM season_standings WHERE season_id = ? AND round = ? LIMIT 1'
-        ).bind(seasonNum, info.round).first();
-        const hasMatch = await DB.prepare(
-          'SELECT 1 FROM match_results WHERE season_id = ? AND round = ? LIMIT 1'
-        ).bind(seasonNum, info.round).first();
-        if (hasStanding && hasMatch) continue;
-      }
-      if (tournamentsProcessed >= maxTournaments) continue;
-      tournamentsProcessed++;
+    const engineResult = await syncSeasonData(DB, client, {
+      seasonId: seasonNum,
+      weekMap,
+      budget,
+      force: isResyncTarget,
+      reactivate: false,
+      auditVotes: false,
+      maxAttendanceWeek,
+      logPrefix: '[Backfill]',
+    });
 
-      let standingsResp;
-      try {
-        standingsResp = await client.getStandings(info.meleeId);
-      } catch (err) {
-        console.error(`[Backfill] Failed to get standings for ${info.meleeId}: ${err.message}`);
-        continue;
-      }
-
-      const attendedThisRound = new Set();
-      for (const s of (standingsResp.Content || [])) {
-        const username = s.Team?.Players?.[0]?.Username;
-        if (!username) continue;
-        const displayName = s.Team?.Players?.[0]?.DisplayName || s.Team?.Players?.[0]?.Name || username;
-        const playerId = await finder.find(username, displayName);
-
-        try {
-          await DB.prepare(
-            'DELETE FROM season_standings WHERE season_id = ? AND round = ? AND player_id = ?'
-          ).bind(seasonNum, info.round, playerId).run();
-          await DB.prepare(
-            'INSERT INTO season_standings (season_id, round, player_id, wins, losses, draws, match_points, rank) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-          ).bind(seasonNum, info.round, playerId, s.MatchWins || 0, s.MatchLosses || 0, s.MatchDraws || 0, s.Points || 0, s.Rank || null).run();
-          totalStandings++;
-        } catch (err) {
-          console.error(`[Backfill] Failed to insert standing: ${err.message}`);
-        }
-
-        if (playerId) attendedThisRound.add(playerId);
-      }
-
-      if ((info.phase || PHASE.REGULAR) === PHASE.REGULAR) {
-        for (const playerId of attendedThisRound) {
-          try {
-            await DB.prepare(
-              'INSERT OR IGNORE INTO attendance (season_id, week, player_id) VALUES (?, ?, ?)'
-            ).bind(seasonNum, info.round, playerId).run();
-          } catch (err) {
-            console.error(`[Backfill] Failed to record attendance: ${err.message}`);
-          }
-        }
-      }
-
-      let matchesResp;
-      try {
-        matchesResp = await client.getMatches(info.meleeId);
-      } catch (err) {
-        console.error(`[Backfill] Failed to get matches for ${info.meleeId}: ${err.message}`);
-        continue;
-      }
-
-      for (const m of (matchesResp.Content || [])) {
-        const comps = m.Competitors || [];
-        if (comps.length < 2) continue;
-
-        const p1Username = comps[0].Team?.Players?.[0]?.Username;
-        const p2Username = comps[1].Team?.Players?.[0]?.Username;
-        if (!p1Username || !p2Username) continue;
-
-        const p1Name = comps[0].Team?.Players?.[0]?.DisplayName || comps[0].Team?.Players?.[0]?.Name || p1Username;
-        const p2Name = comps[1].Team?.Players?.[0]?.DisplayName || comps[1].Team?.Players?.[0]?.Name || p2Username;
-        const p1Id = await finder.find(p1Username, p1Name);
-        const p2Id = await finder.find(p2Username, p2Name);
-        if (!p1Id || !p2Id) continue;
-
-        const p1Wins = comps[0].GameWins || 0;
-        const p2Wins = comps[1].GameWins || 0;
-        let winnerId = null;
-        if (p1Wins > p2Wins) winnerId = p1Id;
-        else if (p2Wins > p1Wins) winnerId = p2Id;
-
-        const matchGuid = m.Guid || m.ID;
-        try {
-          await DB.prepare(
-            'DELETE FROM match_results WHERE season_id = ? AND round = ? AND melee_match_id = ?'
-          ).bind(seasonNum, info.round, matchGuid).run();
-          await DB.prepare(
-            'INSERT INTO match_results (season_id, round, melee_match_id, player1_id, player2_id, winner_id, result, is_bye) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-          ).bind(seasonNum, info.round, matchGuid, p1Id, p2Id, winnerId, m.ResultString || null, m.ByeReason ? 1 : 0).run();
-          totalMatches++;
-        } catch (err) {
-          console.error(`[Backfill] Failed to insert match: ${err.message}`);
-        }
-      }
-    }
+    budget -= engineResult.roundsProcessed;
+    totalTournaments += engineResult.tournamentsInserted;
+    totalStandings += engineResult.standingsRows;
+    totalMatches += engineResult.matchesRows;
   }
 
   console.log(`[Backfill] Complete: ${totalTournaments} tournaments, ${totalStandings} standings, ${totalMatches} matches`);

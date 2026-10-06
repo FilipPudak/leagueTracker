@@ -60,3 +60,10 @@ The Worker URL is in `docs/app/app.js` as the `API_URL` constant. It auto-detect
 `localhost` and points to the local dev server — no flag needed for local development.
 For production, it uses the deployed Worker URL (see `backend/wrangler.toml` or the
 Cloudflare dashboard for your Worker's URL).
+
+## Backfill operations note
+
+`backfillFromMelee` refuses to run against the active season while `SEASON_STARTED=TRUE`
+unless the payload includes `allowActiveSeason: true` — backfilling a live season can
+create permanent attendance holes (capped at `CURRENT_WEEK` when the flag is used).
+A sweep (no `seasonId`) is never refused.

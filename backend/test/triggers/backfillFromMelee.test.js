@@ -425,3 +425,200 @@ describe('triggers/backfillFromMelee (engine)', () => {
     assert.equal(rounds.length, uniqueRounds.size, 'No duplicate round numbers');
   });
 });
+
+describe('backfillFromMelee P4 (wrapper contract)', () => {
+  let db;
+  let originalFetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  function trackedClient({ list, failList = false } = {}) {
+    const standingsCalls = [];
+    return {
+      standingsCalls,
+      class: class {
+        async listTournaments() {
+          if (failList) throw new Error('API down');
+          return { Content: list || ALL_TOURNAMENTS, TotalCount: (list || ALL_TOURNAMENTS).length };
+        }
+        async getStandings(id) {
+          standingsCalls.push(id);
+          return { Content: STANDINGS };
+        }
+        async getMatches() {
+          return { Content: MATCHES };
+        }
+      },
+    };
+  }
+
+  it('T4.5 refuses an explicit active-season backfill without allowActiveSeason', async () => {
+    db = createMockDb(makeTables({ settings: [...basicTables().settings, { key: 'SEASON_STARTED', value: 'TRUE' }] }));
+    const tracker = trackedClient();
+    let fetched = false;
+    globalThis.fetch = async (url) => {
+      fetched = true;
+      return buildMockFetch()(url);
+    };
+
+    const result = await backfillFromMelee({ DB: db }, { MeleeClient: tracker.class, seasonId: 6 });
+
+    assert.deepEqual(result, {
+      seasonId: 6,
+      refused: true,
+      reason: 'active-season',
+      tournaments: 0,
+      standings: 0,
+      matches: 0,
+    });
+    assert.equal(fetched, false, 'refused before any Melee fetch');
+    assert.equal(tracker.standingsCalls.length, 0, 'no data fetches on refusal');
+  });
+
+  it('T4.5b does not refuse a started season when only the sweep targets it', async () => {
+    db = createMockDb(makeTables({ settings: [...basicTables().settings, { key: 'SEASON_STARTED', value: 'TRUE' }] }));
+
+    const result = await backfillFromMelee({ DB: db }, { MeleeClient: makeMockClient(buildMockFetch()) });
+
+    assert.ok(!result.refused, 'sweep is never refused (D23), started season or not');
+    assert.equal(typeof result.tournaments, 'number');
+  });
+
+  it('T4.6 sweep (seasonId omitted) is never refused', async () => {
+    db = createMockDb(makeTables());
+
+    const result = await backfillFromMelee({ DB: db }, { MeleeClient: makeMockClient(buildMockFetch()) });
+
+    assert.ok(!result.refused, 'sweep must never be refused (D23)');
+    assert.equal(typeof result.tournaments, 'number');
+    assert.equal(typeof result.standings, 'number');
+    assert.equal(typeof result.matches, 'number');
+  });
+
+  it('T4.7 allowActiveSeason lets an explicit active-season backfill proceed', async () => {
+    db = createMockDb(makeTables({ settings: [...basicTables().settings, { key: 'SEASON_STARTED', value: 'TRUE' }] }));
+
+    const result = await backfillFromMelee({ DB: db }, {
+      MeleeClient: makeMockClient(buildMockFetch()),
+      seasonId: 6,
+      allowActiveSeason: true,
+    });
+
+    assert.ok(!result.refused, 'flag overrides the refusal of a live season');
+    assert.ok(result.tournaments > 0, 'season 6 tournaments inserted');
+    assert.ok(result.standings > 0, 'data fetched');
+  });
+
+  it('T4.8 list fetch failure keeps the byte-identical failure shape', async () => {
+    db = createMockDb(makeTables());
+    const tracker = trackedClient({ failList: true });
+
+    const result = await backfillFromMelee({ DB: db }, { MeleeClient: tracker.class, seasonId: 5 });
+
+    assert.deepEqual(result, {
+      seasonId: 5,
+      fetchFailed: true,
+      tournaments: 0,
+      standings: 0,
+      matches: 0,
+      error: 'API down',
+    });
+  });
+
+  it('T4.9 sweep order is season DESC and the budget is shared across seasons', async () => {
+    db = createMockDb(makeTables());
+    const tracker = trackedClient();
+
+    const result = await backfillFromMelee({ DB: db }, { MeleeClient: tracker.class, maxTournaments: 2 });
+
+    assert.deepEqual(tracker.standingsCalls, [102, 100], 'season 6 first (DESC), budget stops season 5 mid-way');
+    assert.equal(result.tournaments, 3, 'tournament INSERTs are not budget-gated (D14)');
+    assert.equal(result.standings, 4, 'exactly two rounds of standings rows');
+    assert.equal(result.matches, 2, 'exactly two rounds of match rows');
+  });
+
+  it('T4.10 emits no VoteAudit logs during backfill', async (t) => {
+    db = createMockDb(makeTables());
+    const logSpy = t.mock.method(console, 'log', () => {});
+    const warnSpy = t.mock.method(console, 'warn', () => {});
+
+    const result = await backfillFromMelee({ DB: db }, {
+      MeleeClient: makeMockClient(buildMockFetch()),
+      seasonId: 5,
+    });
+
+    assert.ok(result.standings > 0, 'data really synced (audit had something to run against)');
+    const auditLines = [...logSpy.mock.calls, ...warnSpy.mock.calls]
+      .map(c => String(c.arguments[0]))
+      .filter(s => s.includes('[VoteAudit]'));
+    assert.equal(auditLines.length, 0, 'auditVotes is off for backfill (D6)');
+  });
+
+  it('T4.11 resync wipes then re-fetches, tallies stay row/insert counts', async () => {
+    const tables = makeTables();
+    tables.season_standings = [
+      { season_id: 5, round: 1, player_id: 'P999', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+    ];
+    tables.match_results = [
+      { season_id: 5, round: 1, melee_match_id: 'old-match', player1_id: 'P999', player2_id: 'P002', winner_id: 'P999', result: '2-0', is_bye: 0 },
+    ];
+    tables.attendance = [
+      { season_id: 5, week: 1, player_id: 'P999' },
+    ];
+    db = createMockDb(tables);
+
+    const result = await backfillFromMelee({ DB: db }, {
+      MeleeClient: makeMockClient(buildMockFetch()),
+      seasonId: 5,
+      resync: true,
+    });
+
+    const store = db.getStore();
+    assert.equal(result.tournaments, 2, 'two season-5 tournaments re-inserted after wipe');
+    assert.equal(result.standings, 4, 'two rounds × two standing rows');
+    assert.equal(result.matches, 2, 'two rounds × one match row');
+    assert.ok(!store.season_standings.find(s => s.player_id === 'P999'), 'wiped standing not resurrected');
+    assert.ok(!store.match_results.find(m => m.melee_match_id === 'old-match'), 'wiped match not resurrected');
+    assert.ok(!store.attendance.find(a => a.player_id === 'P999'), 'wiped attendance not resurrected');
+  });
+
+  it('T4.12 caps attendance only for the active season when allowActiveSeason is set', async () => {
+    const settings = basicTables().settings.map(s =>
+      s.key === 'CURRENT_WEEK' ? { ...s, value: 'Week 1' } : s
+    );
+
+    const dbActive = createMockDb({ ...makeTables({ settings }), attendance: [] });
+    const activeResult = await backfillFromMelee({ DB: dbActive }, {
+      MeleeClient: makeMockClient(buildMockFetch()),
+      seasonId: 6,
+      allowActiveSeason: true,
+    });
+    assert.equal(dbActive.getStore().attendance.filter(a => a.season_id === 6).length, 0, 'round beyond CURRENT_WEEK writes no attendance');
+    assert.ok(activeResult.standings > 0, 'standings unaffected by the cap');
+
+    const dbPast = createMockDb({ ...makeTables({ settings }), attendance: [] });
+    await backfillFromMelee({ DB: dbPast }, {
+      MeleeClient: makeMockClient(buildMockFetch()),
+      seasonId: 5,
+    });
+    assert.ok(dbPast.getStore().attendance.filter(a => a.season_id === 5).length > 0, 'past season attendance is never capped');
+  });
+
+  it('T4.13 creates a bare season row for a season missing from the seasons table', async () => {
+    db = createMockDb(makeTables());
+    const s7 = [{ ID: 700, Name: 'SWU Wednesday league season 7 07/10 (week 1)', StartDate: '2026-10-07T18:00:00' }];
+    const tracker = trackedClient({ list: s7 });
+
+    await backfillFromMelee({ DB: db }, { MeleeClient: tracker.class, seasonId: 7 });
+
+    const row = db.getStore().seasons.find(s => s.id === 7);
+    assert.ok(row, 'bare seasons row created');
+    assert.equal(row.name, 'Season 7');
+  });
+});

@@ -94,6 +94,8 @@ Materialized award podiums. Written at season close or by `materializePastAwards
 
 Constraint: `PRIMARY KEY (season_id, award_name, player_id)`
 
+`rank` was added to the live table by `migrations/M4.sql`; `schema.sql` now declares it too — schema file and live table match.
+
 **Six awards:** Galactic Ruler, Galactic Schemer, Galactic Ambassador, A New Hope, Bounty Hunter, Galactic Champion.
 
 ### `attendance`

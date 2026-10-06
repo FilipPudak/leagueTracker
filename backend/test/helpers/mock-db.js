@@ -7,6 +7,8 @@ const UNIQUE_CONSTRAINTS = {
   votes: [['season_id', 'week', 'player_id']],
   melee_tournaments: [['season_id', 'round']],
   match_results: [['season_id', 'round', 'melee_match_id']],
+  season_standings: [['season_id', 'round', 'player_id']],
+  attendance: [['season_id', 'week', 'player_id']],
 };
 
 export function createMockDb(tables = {}) {
@@ -17,6 +19,11 @@ export function createMockDb(tables = {}) {
   }
 
   const calls = []; // track all queries for assertion
+
+  function tagCall(entry, stmt) {
+    if (stmt._viaBatch) entry.viaBatch = true;
+    return entry;
+  }
 
   function prepare(sql) {
     return new Statement(sql);
@@ -33,19 +40,19 @@ export function createMockDb(tables = {}) {
     }
 
     async all() {
-      calls.push({ sql: this._sql, params: [...this._params] });
+      calls.push(tagCall({ sql: this._sql, params: [...this._params] }, this));
       const { rows } = executeSelect(this._sql, this._params, store);
       return { results: rows, success: true };
     }
 
     async first() {
-      calls.push({ sql: this._sql, params: [...this._params] });
+      calls.push(tagCall({ sql: this._sql, params: [...this._params] }, this));
       const { rows } = executeSelect(this._sql, this._params, store);
       return rows.length > 0 ? rows[0] : undefined;
     }
 
     async run() {
-      calls.push({ sql: this._sql, params: [...this._params] });
+      calls.push(tagCall({ sql: this._sql, params: [...this._params] }, this));
       const upper = this._sql.toUpperCase().trim();
 
       if (upper.startsWith('INSERT')) {
@@ -65,9 +72,20 @@ export function createMockDb(tables = {}) {
   }
 
   async function batch(statements) {
+    const snapshot = {};
+    for (const [table, rows] of Object.entries(store)) {
+      snapshot[table] = rows.map(r => ({ ...r }));
+    }
     const results = [];
-    for (const stmt of statements) {
-      results.push(await stmt.run());
+    try {
+      for (const stmt of statements) {
+        stmt._viaBatch = true;
+        results.push(await stmt.run());
+      }
+    } catch (err) {
+      for (const table of Object.keys(store)) delete store[table];
+      for (const [table, rows] of Object.entries(snapshot)) store[table] = rows;
+      throw err;
     }
     return results;
   }

@@ -17,3 +17,11 @@ returns still get fresh data. A successful vote clears the awards cache.
 All displayed data is derived from the D1 database (Melee.gg sync); there are no runtime
 calls to third-party sites. When a section has no data yet, the backend sends `null` for it
 and the UI hides that section, keeping the rest of the board up.
+
+## Backend write efficiency (Free tier)
+
+Per-round sync writes (standings replace, attendance, matches replace) go through
+`DB.batch()` — D1 batches are transactional and count as a single internal call, keeping a
+typical sync around 250–370 internal calls (limit 1,000). The backfill's `maxTournaments`
+budget (default 5) bounds Melee fetches (2 per round, limit 50 external per invocation);
+the weekly sync normally fetches only 0–2 new rounds.

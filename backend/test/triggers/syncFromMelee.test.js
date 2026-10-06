@@ -937,4 +937,35 @@ describe('triggers/syncFromMelee', () => {
 
     assert.equal(db.getStore().players.find(p => p.id === 'P002').active, 1, 'bob55 attended → reactivated');
   });
+
+  it('T3.3 logs auto-created players in the exact current format', async (t) => {
+    db = createMockDb(withSeasonStarted(makeTables()));
+    const logSpy = t.mock.method(console, 'log', () => {});
+    const ghostStandings = [
+      { Rank: 1, Points: 9, MatchWins: 3, MatchDraws: 0, MatchLosses: 0, Team: { Players: [{ Username: 'alice42' }] } },
+      { Rank: 2, Points: 6, MatchWins: 2, MatchDraws: 0, MatchLosses: 1, Team: { Players: [{ Username: 'ghost_player', DisplayName: 'Ghost Display' }] } },
+    ];
+    const ghostMatches = [
+      { ID: 900, Competitors: [
+        { Team: { Players: [{ Username: 'ghost_player', DisplayName: 'Ghost Display' }] }, GameWins: 2 },
+        { Team: { Players: [{ Username: 'nobody_here' }] }, GameWins: 0 },
+      ], ByeReason: null },
+    ];
+    const { mockFetch } = buildMockFetch({ tournaments: TOURNAMENTS.slice(0, 1), standings: ghostStandings, matches: ghostMatches });
+    globalThis.fetch = mockFetch;
+
+    await syncFromMelee({ DB: db }, { MeleeClient: makeMockClient(mockFetch), now: '2026-07-01T15:00:00Z' });
+
+    const store = db.getStore();
+    const ghost = store.players.find(p => p.melee_name === 'ghost_player');
+    const nobody = store.players.find(p => p.melee_name === 'nobody_here');
+    const autoCreateCall = logSpy.mock.calls
+      .map(c => String(c.arguments[0]))
+      .find(line => line.includes('Auto-created'));
+    assert.ok(autoCreateCall, 'auto-create log emitted');
+    assert.equal(
+      autoCreateCall,
+      `[SyncFromMelee] Auto-created 2 player(s) from Melee data: ${ghost.id} (ghost_player), ${nobody.id} (nobody_here)`
+    );
+  });
 });

@@ -63,7 +63,24 @@ All require `adminToken` matching `ADMIN_SECRET`.
 | `triggerWeeklyCycle` | — | Manually invokes the sync lifecycle (idempotent). |
 | `pauseCurrentSeason` | — | Sets `SEASON_PAUSED=TRUE` — sync continues, no advance/open/close. |
 | `resumeCurrentSeason` | — | Sets `SEASON_PAUSED=FALSE`. |
-| `backfillFromMelee` | `seasonId?`, `maxTournaments?`, `resync?` | Historical Melee backfill (bounded batch — Workers 50-subrequest limit). |
+| `backfillFromMelee` | `seasonId?`, `maxTournaments?`, `resync?`, `allowActiveSeason?` | Historical Melee backfill (bounded batch — see limits below). |
+
+### Backfill semantics
+
+- **Tallies are row/insert counts, not round counts:** `tournaments` = `melee_tournaments`
+  INSERTs that changed a row; `standings` / `matches` = rows written this invocation.
+- **Budget:** `maxTournaments` (default 5) bounds *rounds with Melee data fetches*,
+  shared across seasons in a sweep; tournament INSERTs are never budget-gated.
+  Each fetched round costs 2 external fetches (standings + matches), plus one
+  list-fetch for the whole invocation.
+- **Refusal:** an explicit `seasonId` equal to `ACTIVE_SEASON_ID` while
+  `SEASON_STARTED=TRUE` returns
+  `{ seasonId, refused: true, reason: 'active-season', tournaments: 0, standings: 0, matches: 0 }`
+  unless `allowActiveSeason: true` is passed. A sweep (no `seasonId`) is never refused.
+- **Active-season cap:** with `allowActiveSeason: true`, attendance writes for the
+  active season are capped at `CURRENT_WEEK` (past seasons are uncapped).
+- **Response shape on list-fetch failure:** `{ seasonId, fetchFailed: true,
+  tournaments: 0, standings: 0, matches: 0, error }`.
 | `materializePastAwards` | `seasonId` (required), `dryRun?` | One-time award materialization for S1–S5 only. |
 | `addLeaders` | `leaders: [{ name, set? }]` | Inserts non-duplicate leaders. Returns `{ added, skipped }`. |
 | `setLeadersActive` | `leaderIds: []`, `active: bool` | Activates or deactivates leaders. |
@@ -74,3 +91,13 @@ All require `adminToken` matching `ADMIN_SECRET`.
 - Sessions are per (player, device). Token is a UUID minted at link time.
 - 90-day rolling TTL from `last_active` — refreshed on each authenticated request.
 - Unlink is device-scoped; other devices of the same player are untouched.
+
+## Platform limits (Cloudflare Workers Free)
+
+| Limit | Free tier | How this codebase stays inside it |
+|-------|-----------|-----------------------------------|
+| External fetches / invocation | 50 | Typical weekly sync 4–7; backfill's `maxTournaments` budget bounds multi-round fetches (2 per round + 1 list fetch) |
+| Internal service (D1) calls / invocation | 1,000 | Per-round standings/matches/attendance writes go through `DB.batch()` — one internal call per table per round instead of one per row |
+| CPU / cron invocation | 10 ms | I/O wait is free; JSON parsing is the main CPU cost |
+
+A retried Melee request counts as an additional external fetch (retries are not free).

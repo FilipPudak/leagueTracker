@@ -23,7 +23,13 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for how sync fits into the system.
 - Query params: `variables.page` (1-based) and `variables.pageSize`
 - **Not** `Skip` / `Take` (common wrong assumption)
 - Response fields: `HasMore`, `RecordsTotal`, `Content`
-- Client uses `pageSize=25`, max 20 pages (runaway-loop abort)
+- Page sizes actually used: tournament list `pageSize=250` (one page covers the
+  whole league history); standings/matches `pageSize=25`, max 20 pages
+  (runaway-loop abort)
+- Each round's data costs 2 fetches (standings + matches) plus one list fetch
+  per invocation — the backfill `maxTournaments` budget is the bound on that;
+  retries count as extra external fetches (Workers subrequest limit is 50/invocation)
+- Writes are `DB.batch()`ed per table per round (D1 batch counts as one internal call)
 
 ## Field quirks
 

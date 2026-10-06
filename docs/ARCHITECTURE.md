@@ -109,6 +109,7 @@ erDiagram
         string award_name PK
         string player_id PK,FK
         real score
+        int rank
     }
     attendance {
         int season_id PK,FK
@@ -151,8 +152,8 @@ erDiagram
 - `melee_tournaments` links to `season_standings` and `match_results` logically via
   `(season_id, round)` — enforced by `UNIQUE(season_id, round)`, not a declared FK.
 - `votes.opponent_id` points to another player (the favorite opponent).
-- `awards.rank` (Galactic Ruler 1/2/3) exists in the live D1 table but not in
-  `schema.sql` — migrated out-of-band (D1 lacks `ALTER COLUMN`).
+- `awards.rank` (Galactic Ruler 1/2/3) was migrated out-of-band (M4) and is now
+  also declared in `schema.sql` — the two match.
 
 ## Season lifecycle state machine
 
@@ -196,8 +197,12 @@ Runs on every cron fire. Idempotent — catches late-published Melee results.
 
 1. **Gate:** skip if no active season
 2. **Fetch:** tournaments from Melee.gg; insert new ones
-3. **Sync records:** standings + matches for unsynced rounds
-4. **Attendance:** rebuilt from regular standings
+3. **Sync records:** standings + matches for unsynced rounds — delegated to the
+   shared data engine `lib/leagueSync.js` (`syncSeasonData`), which the cron sync
+   and the admin backfill both call. The engine writes only players /
+   melee_tournaments / season_standings / match_results / attendance (never
+   `settings`/`awards`); lifecycle logic stays in this trigger.
+4. **Attendance:** rebuilt from regular standings (engine, per round)
 5. **Awards refresh:** recompute live podiums (Schemer, Ambassador, Ruler, etc.)
 6. **Pause gate:** if paused → return (data synced, no lifecycle writes)
 7. **Advance gate:** Wednesday + ≥ 22:10 + marker ≠ today

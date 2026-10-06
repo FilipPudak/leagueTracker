@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS awards (
   award_name TEXT NOT NULL,
   player_id TEXT NOT NULL,
   score REAL,
+  rank INTEGER,
   PRIMARY KEY (season_id, award_name, player_id),
   FOREIGN KEY (season_id) REFERENCES seasons(id),
   FOREIGN KEY (player_id) REFERENCES players(id)

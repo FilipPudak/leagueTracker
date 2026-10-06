@@ -8,6 +8,7 @@ export async function handleBackfillFromMelee(body, env) {
     seasonId: body.seasonId || null,
     maxTournaments: body.maxTournaments || undefined,
     resync: body.resync || false,
+    allowActiveSeason: body.allowActiveSeason || false,
   });
   return result;
 }

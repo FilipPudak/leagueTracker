@@ -1,9 +1,9 @@
 import { MeleeClient } from '../lib/melee.js';
 import { getSettings, updateSettingsBatch, parseSeasonId, parseWeek, isSeasonStarted, isSeasonPaused, isVotingOpen } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, computeChampion, computeBountyHunter, computeNewHopeClimbers, writePodiumBlock } from '../lib/awards.js';
-import { fetchLeagueTournaments, buildWeekMap, createPlayerFinder } from '../lib/meleeLeague.js';
+import { fetchLeagueTournaments, buildWeekMap } from '../lib/meleeLeague.js';
+import { syncSeasonData } from '../lib/leagueSync.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';
-import { auditVotesForWeek } from '../lib/voteAudit.js';
 import { AWARD, PHASE, SETTINGS_KEY, SEASON_ENDED_WEEK, WEEK_PREFIX, SET_TRUE, SET_FALSE, DEFAULT_TOP_RESULTS, DEFAULT_SEASON_LENGTH, GATE_WEEKDAY, GATE_MINUTES, PRIMARY_CUTOFF_MINUTES } from '../lib/constants.js';
 
 function stockholmTimeParts(isoNow) {
@@ -64,9 +64,6 @@ export async function syncFromMelee(env, deps = {}) {
   const clientSecret = env.MELEE_CLIENT_SECRET || '';
   const client = new ClientClass(clientId, clientSecret);
 
-  const allPlayersResult = await DB.prepare('SELECT * FROM players').all();
-  const allPlayers = allPlayersResult.results || [];
-
   const storedTournaments = await DB.prepare(
     'SELECT melee_id, round FROM melee_tournaments WHERE season_id = ?'
   ).bind(activeSeasonId).all();
@@ -86,24 +83,18 @@ export async function syncFromMelee(env, deps = {}) {
 
   const weekMap = buildWeekMap(matchedTournaments, existingRoundMap);
 
-  for (const [meleeId, info] of weekMap) {
-    if (existingRoundMap.has(meleeId)) continue;
-    try {
-      await DB.prepare(
-        'INSERT OR IGNORE INTO melee_tournaments (melee_id, season_id, round, name, date, phase) VALUES (?, ?, ?, ?, ?, ?)'
-      ).bind(meleeId, activeSeasonId, info.round, info.name, info.date, info.phase || PHASE.REGULAR).run();
-    } catch (err) {
-      console.error(`[SyncFromMelee] Failed to insert tournament ${meleeId}: ${err.message}`);
-    }
+  const engineResult = await syncSeasonData(DB, client, {
+    seasonId: activeSeasonId,
+    weekMap,
+    budget: Infinity,
+    reactivate: true,
+    auditVotes: true,
+    logPrefix: '[SyncFromMelee]',
+  });
+
+  if (engineResult.createdPlayers.length > 0) {
+    console.log(`[SyncFromMelee] Auto-created ${engineResult.createdPlayers.length} player(s) from Melee data: ${engineResult.createdPlayers.map(p => `${p.id} (${p.melee_name})`).join(', ')}`);
   }
-
-  const { roundAttendance, roundPhases, newlySyncedRounds } = await syncRoundRecords(DB, client, weekMap, activeSeasonId);
-
-  await recordRegularAttendance(DB, activeSeasonId, roundAttendance, roundPhases);
-
-  await auditNewlySyncedVotes(DB, activeSeasonId, newlySyncedRounds);
-
-  await reactivateAttendedPlayers(DB, allPlayers, roundAttendance);
 
   if (isPaused) {
     console.log('[SyncFromMelee] Season paused; data synced, skipping advance/open/close.');
@@ -244,208 +235,3 @@ export async function syncFromMelee(env, deps = {}) {
   console.log('[SyncFromMelee] Gate not met; data synced, no advance.');
   return { status: 'synced-no-advance' };
 }
-
-// --- Round data sync (fetch → standings/matches) ----------------------------
-
-// Returns { roundAttendance, roundPhases, newlySyncedRounds }.
-// A round is skipped only when BOTH standings and matches are already stored
-// (invariant 3); a standings fetch failure skips the whole round, a matches
-// failure still keeps the round's attendance but excludes it from audit.
-async function syncRoundRecords(DB, client, weekMap, activeSeasonId) {
-  const standingsInSeason = await DB.prepare(
-    'SELECT DISTINCT round FROM season_standings WHERE season_id = ?'
-  ).bind(activeSeasonId).all();
-  const syncedStandingsRounds = new Set((standingsInSeason.results || []).map(r => r.round));
-
-  const matchesInSeason = await DB.prepare(
-    'SELECT DISTINCT round FROM match_results WHERE season_id = ?'
-  ).bind(activeSeasonId).all();
-  const syncedMatchesRounds = new Set((matchesInSeason.results || []).map(r => r.round));
-
-  const createdPlayers = new Map();
-  const finder = createPlayerFinder(DB, { onCreated: p => createdPlayers.set(p.id, p) });
-  const roundAttendance = new Map();
-  const roundPhases = new Map();
-  const newlySyncedRounds = new Set();
-
-  for (const [meleeId, info] of weekMap) {
-    if (syncedStandingsRounds.has(info.round) && syncedMatchesRounds.has(info.round)) continue;
-
-    const attendedThisRound = await syncStandingsForRound(DB, client, finder, activeSeasonId, meleeId, info);
-    if (!attendedThisRound) continue;
-
-    roundAttendance.set(info.round, attendedThisRound);
-    roundPhases.set(info.round, info.phase || PHASE.REGULAR);
-
-    const matchesOk = await syncMatchesForRound(DB, client, finder, activeSeasonId, meleeId, info);
-    if (!matchesOk) continue;
-
-    newlySyncedRounds.add(info.round);
-  }
-
-  if (createdPlayers.size > 0) {
-    console.log(`[SyncFromMelee] Auto-created ${createdPlayers.size} player(s) from Melee data: ${[...createdPlayers.values()].map(p => `${p.id} (${p.melee_name})`).join(', ')}`);
-  }
-
-  return { roundAttendance, roundPhases, newlySyncedRounds };
-}
-
-// Returns the set of attended player ids, or null when the fetch failed.
-async function syncStandingsForRound(DB, client, finder, activeSeasonId, meleeId, info) {
-  let standingsResp;
-  try {
-    standingsResp = await client.getStandings(meleeId);
-  } catch (err) {
-    console.error(`[SyncFromMelee] Failed to get standings for tournament ${meleeId}: ${err.message}`);
-    return null;
-  }
-
-  const attendedThisRound = new Set();
-  const standings = standingsResp.Content || [];
-  for (const s of standings) {
-    const meleePlayer = s.Team?.Players?.[0];
-    const username = meleePlayer?.Username;
-    if (!username) continue;
-    const displayName = meleePlayer.DisplayName || meleePlayer.Name || username;
-    const playerId = await finder.find(username, displayName);
-
-    try {
-      await DB.prepare(
-        'DELETE FROM season_standings WHERE season_id = ? AND round = ? AND player_id = ?'
-      ).bind(activeSeasonId, info.round, playerId).run();
-      await DB.prepare(
-        'INSERT INTO season_standings (season_id, round, player_id, wins, losses, draws, match_points, rank) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-      ).bind(
-        activeSeasonId,
-        info.round,
-        playerId,
-        s.MatchWins || 0,
-        s.MatchLosses || 0,
-        s.MatchDraws || 0,
-        s.Points || 0,
-        s.Rank || null
-      ).run();
-    } catch (err) {
-      console.error(`[SyncFromMelee] Failed to insert standing: ${err.message}`);
-    }
-
-    attendedThisRound.add(playerId);
-  }
-  return attendedThisRound;
-}
-
-// Returns false when the fetch failed (round then stays out of audit scope).
-async function syncMatchesForRound(DB, client, finder, activeSeasonId, meleeId, info) {
-  let matchesResp;
-  try {
-    matchesResp = await client.getMatches(meleeId);
-  } catch (err) {
-    console.error(`[SyncFromMelee] Failed to get matches for tournament ${meleeId}: ${err.message}`);
-    return false;
-  }
-
-  const matches = matchesResp.Content || [];
-  for (const m of matches) {
-    const comps = m.Competitors || [];
-    if (comps.length < 2) continue;
-
-    const ids = await resolveMatchCompetitors(comps, finder);
-    if (!ids) continue;
-
-    const p1Wins = comps[0].GameWins || 0;
-    const p2Wins = comps[1].GameWins || 0;
-    const winnerId = decideWinner(p1Wins, p2Wins, ids.p1Id, ids.p2Id);
-
-    const isBye = !!m.ByeReason;
-
-    const matchGuid = m.Guid || m.ID;
-    try {
-      await DB.prepare(
-        'DELETE FROM match_results WHERE season_id = ? AND round = ? AND melee_match_id = ?'
-      ).bind(activeSeasonId, info.round, matchGuid).run();
-      await DB.prepare(
-        'INSERT INTO match_results (season_id, round, melee_match_id, player1_id, player2_id, winner_id, result, is_bye) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-      ).bind(
-        activeSeasonId,
-        info.round,
-        matchGuid,
-        ids.p1Id,
-        ids.p2Id,
-        winnerId,
-        m.ResultString || null,
-        isBye ? 1 : 0
-      ).run();
-    } catch (err) {
-      console.error(`[SyncFromMelee] Failed to insert match: ${err.message}`);
-    }
-  }
-  return true;
-}
-
-// Resolves both competitor slots to roster player ids (auto-creating unknown
-// Melee names — invariant 4). Returns null when either slot lacks a username.
-async function resolveMatchCompetitors(comps, finder) {
-  const p1Player = comps[0].Team?.Players?.[0];
-  const p2Player = comps[1].Team?.Players?.[0];
-  const p1Username = p1Player?.Username;
-  const p2Username = p2Player?.Username;
-  if (!p1Username || !p2Username) return null;
-
-  const p1Id = await finder.find(p1Username, p1Player.DisplayName || p1Player.Name || p1Username);
-  const p2Id = await finder.find(p2Username, p2Player.DisplayName || p2Player.Name || p2Username);
-  return { p1Id, p2Id };
-}
-
-// Higher game wins wins; equal game wins is a draw (winnerId null).
-function decideWinner(p1Wins, p2Wins, p1Id, p2Id) {
-  if (p1Wins > p2Wins) return p1Id;
-  if (p2Wins > p1Wins) return p2Id;
-  return null;
-}
-
-// --- Post-sync derived writes ------------------------------------------------
-
-async function recordRegularAttendance(DB, activeSeasonId, roundAttendance, roundPhases) {
-  for (const [round, players] of roundAttendance) {
-    if (roundPhases.get(round) !== PHASE.REGULAR) continue;
-    for (const playerId of players) {
-      try {
-        await DB.prepare(
-          'INSERT OR IGNORE INTO attendance (season_id, week, player_id) VALUES (?, ?, ?)'
-        ).bind(activeSeasonId, round, playerId).run();
-      } catch (err) {
-        console.error(`[SyncFromMelee] Failed to record attendance: ${err.message}`);
-      }
-    }
-  }
-}
-
-async function auditNewlySyncedVotes(DB, activeSeasonId, newlySyncedRounds) {
-  for (const round of newlySyncedRounds) {
-    try {
-      const audit = await auditVotesForWeek(DB, activeSeasonId, round);
-      if (audit.total === 0) continue;
-      if (audit.nonAttendees.length > 0 || audit.notFaced.length > 0) {
-        console.warn(`[VoteAudit] S${activeSeasonId} W${round}: ${audit.total} votes; non-attendee ${audit.nonAttendees.length} [${audit.nonAttendees.join(', ')}]; opponent-not-faced ${audit.notFaced.length} [${audit.notFaced.join(', ')}]`);
-      } else {
-        console.log(`[VoteAudit] S${activeSeasonId} W${round}: ${audit.total} votes reconciled, no violations`);
-      }
-    } catch (err) {
-      console.error(`[SyncFromMelee] Vote audit failed for week ${round}: ${err.message}`);
-    }
-  }
-}
-
-async function reactivateAttendedPlayers(DB, allPlayers, roundAttendance) {
-  const allAttended = new Set([...roundAttendance.values()].flatMap(s => [...s]));
-  for (const player of allPlayers) {
-    if (allAttended.has(player.id) && player.active !== 1) {
-      try {
-        await DB.prepare('UPDATE players SET active = ? WHERE id = ?').bind(1, player.id).run();
-      } catch (err) {
-        console.error(`[SyncFromMelee] Failed to activate player ${player.id}: ${err.message}`);
-      }
-    }
-  }
-}
-
