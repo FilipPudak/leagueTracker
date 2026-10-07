@@ -8,8 +8,11 @@ export async function handleAddLeaders(body, env) {
 
   if (!Array.isArray(leaders)) throw badRequest('leaders must be an array.');
 
-  const existing = await DB.prepare('SELECT name FROM leaders').all();
-  const existingNames = new Set((existing.results || []).map(l => l.name.toLowerCase()));
+  const existing = await DB.prepare('SELECT name, "set" FROM leaders').all();
+  const existingLeaders = (existing.results || []).map(l => ({
+    name: l.name.toLowerCase(),
+    set: (l.set || '').toLowerCase(),
+  }));
 
   const added = [];
   const skipped = [];
@@ -19,7 +22,12 @@ export async function handleAddLeaders(body, env) {
       skipped.push({ name: leader?.name || '(unnamed)', reason: 'missing name' });
       continue;
     }
-    if (existingNames.has(leader.name.toLowerCase())) {
+    const name = leader.name.toLowerCase();
+    const set = (leader.set || '').toLowerCase();
+    const isDuplicate = existingLeaders.some(e =>
+      e.name === name && (!e.set || !set || e.set === set)
+    );
+    if (isDuplicate) {
       skipped.push({ name: leader.name, reason: 'duplicate' });
       continue;
     }
@@ -31,7 +39,7 @@ export async function handleAddLeaders(body, env) {
     ).bind(id, leader.name, leader.set || null).run();
 
     added.push({ id, name: leader.name, set: leader.set });
-    existingNames.add(leader.name.toLowerCase());
+    existingLeaders.push({ name, set });
   }
 
   return { added, skipped };

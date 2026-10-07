@@ -126,6 +126,39 @@ describe('handleAddLeaders', () => {
     assert.equal(result.skipped.length, 1);
   });
 
+  it('same name with a different set is not a duplicate', async () => {
+    const db = createMockDb(adminTables());
+    await handleAddLeaders(
+      { adminToken: ADMIN_SECRET, leaders: [{ name: 'Yoda', set: 'JTL' }] },
+      { DB: db, ADMIN_SECRET }
+    );
+    const result = await handleAddLeaders(
+      { adminToken: ADMIN_SECRET, leaders: [{ name: 'Yoda', set: 'HMW' }] },
+      { DB: db, ADMIN_SECRET }
+    );
+    assert.equal(result.added.length, 1);
+    assert.equal(result.skipped.length, 0);
+    const store = db.getStore();
+    const yodas = store.leaders.filter(l => l.name === 'Yoda');
+    assert.equal(yodas.length, 2);
+    assert.deepEqual(yodas.map(l => l.set).sort(), ['HMW', 'JTL']);
+  });
+
+  it('entry without a set still matches any existing same name', async () => {
+    const db = createMockDb(adminTables());
+    await handleAddLeaders(
+      { adminToken: ADMIN_SECRET, leaders: [{ name: 'Yoda', set: 'JTL' }] },
+      { DB: db, ADMIN_SECRET }
+    );
+    const result = await handleAddLeaders(
+      { adminToken: ADMIN_SECRET, leaders: [{ name: 'Yoda' }] },
+      { DB: db, ADMIN_SECRET }
+    );
+    assert.equal(result.added.length, 0);
+    assert.equal(result.skipped.length, 1);
+    assert.equal(result.skipped[0].reason, 'duplicate');
+  });
+
   it('rejects non-array leaders with 400', async () => {
     const db = createMockDb(adminTables());
     await assert.rejects(
