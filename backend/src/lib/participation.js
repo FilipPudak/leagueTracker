@@ -78,7 +78,7 @@ export async function getVotingCompliance(db, seasonId, playerId, cutoffWeek = n
     && voted >= MILESTONE_VOTE_TARGET
     && voted * 100 >= attendedCount * COMPLIANCE_PCT;
 
-  return { attended: attendedCount, voted, pct, qualifying, target: COMPLIANCE_PCT };
+  return { attended: attendedCount, voted, pct, qualifying, target: COMPLIANCE_PCT, minVotes: MILESTONE_VOTE_TARGET };
 }
 
 // Get player's raffle ticket count for a season

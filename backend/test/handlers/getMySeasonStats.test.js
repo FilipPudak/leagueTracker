@@ -205,7 +205,7 @@ describe('handleGetMySeasonStats', () => {
     tables.votes.push({ id: 99, timestamp: new Date().toISOString(), updated_at: null, season_id: 6, week: 3, player_id: 'P001', leader_id: '1', opponent_id: 'P002' });
     const db = createMockDb(tables);
     const result = await handleGetMySeasonStats({ seasonId: 6 }, { DB: db }, aliceSession);
-    assert.deepEqual(result.compliance, { attended: 2, voted: 2, pct: 100, qualifying: false, target: 80 },
+    assert.deepEqual(result.compliance, { attended: 2, voted: 2, pct: 100, qualifying: false, target: 80, minVotes: 4 },
       'CURRENT_WEEK is 3 — week 3 window still open, must not count');
   });
 
@@ -219,7 +219,7 @@ describe('handleGetMySeasonStats', () => {
     tables.votes.push({ id: 99, timestamp: new Date().toISOString(), updated_at: null, season_id: 6, week: 3, player_id: 'P001', leader_id: '1', opponent_id: 'P002' });
     const db = createMockDb(tables);
     const result = await handleGetMySeasonStats({ seasonId: 6 }, { DB: db }, aliceSession);
-    assert.deepEqual(result.compliance, { attended: 3, voted: 3, pct: 100, qualifying: false, target: 80 });
+    assert.deepEqual(result.compliance, { attended: 3, voted: 3, pct: 100, qualifying: false, target: 80, minVotes: 4 });
   });
 
   it('compliance: historical season ignores CURRENT_WEEK cutoff', async () => {
@@ -233,7 +233,7 @@ describe('handleGetMySeasonStats', () => {
     const db = createMockDb(tables);
     const result = await handleGetMySeasonStats({ seasonId: 6 }, { DB: db }, aliceSession);
     assert.equal(result.isCurrentSeason, false);
-    assert.deepEqual(result.compliance, { attended: 3, voted: 3, pct: 100, qualifying: false, target: 80 },
+    assert.deepEqual(result.compliance, { attended: 3, voted: 3, pct: 100, qualifying: false, target: 80, minVotes: 4 },
       'closed seasons have all windows closed regardless of CURRENT_WEEK');
   });
 
@@ -243,7 +243,7 @@ describe('handleGetMySeasonStats', () => {
       env,
       { token: 't', player_id: 'P004', device_id: 'd', email: 'diana@test.com' }
     );
-    assert.deepEqual(result.compliance, { attended: 0, voted: 0, pct: null, qualifying: false, target: 80 });
+    assert.deepEqual(result.compliance, { attended: 0, voted: 0, pct: null, qualifying: false, target: 80, minVotes: 4 });
   });
 
   it('compliance: historical season without vote data still returns the shape', async () => {
@@ -252,7 +252,7 @@ describe('handleGetMySeasonStats', () => {
       env,
       aliceSession
     );
-    assert.deepEqual(result.compliance, { attended: 0, voted: 0, pct: null, qualifying: false, target: 80 });
+    assert.deepEqual(result.compliance, { attended: 0, voted: 0, pct: null, qualifying: false, target: 80, minVotes: 4 });
     assert.equal(result.milestone, null, 'zero-vote historical season carries no milestone');
   });
 });

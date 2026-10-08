@@ -1231,8 +1231,12 @@ function loadMySeasonStats() {
 }
 
 function complianceStatusSuffix(compliance, isLive) {
-  if (!compliance.qualifying) return ' (need ' + compliance.target + '%)';
-  return isLive ? ' — On track!' : ' — Prize earned!';
+  if (compliance.qualifying) return isLive ? ' — On track!' : ' — Prize earned!';
+  if (!isLive) return ' — target not met';
+  if (compliance.pct >= compliance.target && compliance.voted < compliance.minVotes) {
+    return ' (need ' + compliance.minVotes + ' votes)';
+  }
+  return ' (need ' + compliance.target + '%)';
 }
 
 function renderComplianceCard(res, view) {
@@ -1257,8 +1261,9 @@ function renderComplianceCard(res, view) {
 
 function complianceSummaryHtml(res) {
   if (!res.compliance || res.compliance.attended <= 0) return '';
-  const status = res.compliance.qualifying ? ' — Prize earned!' : ' (need ' + escapeHtml(res.compliance.target) + '%)';
-  return `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">80% rule:</span> <span style="font-size:0.85rem;">${escapeHtml(res.compliance.voted)} of ${escapeHtml(res.compliance.attended)} weeks — ${escapeHtml(res.compliance.pct)}%${status}</span></div>`;
+  const isLive = res.isCurrentSeason !== false && Boolean(appState.week);
+  const status = complianceStatusSuffix(res.compliance, isLive);
+  return `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">80% rule:</span> <span style="font-size:0.85rem;">${escapeHtml(res.compliance.voted)} of ${escapeHtml(res.compliance.attended)} weeks — ${escapeHtml(res.compliance.pct)}%${escapeHtml(status)}</span></div>`;
 }
 
 function renderMySeasonStats(res) {
@@ -1274,7 +1279,7 @@ function renderMySeasonStats(res) {
   if (milestoneContainer) {
     if (view === 'full' && res.milestone && milestoneBar && milestoneText) {
       const votes = res.milestone.votes || 0;
-      const target = res.milestone.target || 4;
+      const target = res.milestone.target;
       const pct = Math.min(100, Math.round((votes / target) * 100));
       milestoneBar.style.width = pct + '%';
       milestoneText.textContent = votes + ' of ' + target + ' votes' + (res.milestone.complete ? ' — Prize earned!' : '');

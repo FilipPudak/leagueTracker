@@ -81,6 +81,24 @@ describe('renderMySeasonStats compliance rendering (app.js)', () => {
     assert.ok(!js.includes('need 80%'), 'threshold must not be hardcoded in the renderer');
   });
 
+  it('names the binding vote floor instead of the percentage', () => {
+    const js = readJS();
+    assert.ok(/compliance\.minVotes/.test(js), 'suffix must read minVotes from the payload');
+    assert.ok(!js.includes('need 4 votes'), 'floor copy must not be hardcoded in the renderer');
+  });
+
+  it('closed non-qualifying state uses past-tense copy', () => {
+    const js = readJS();
+    assert.ok(/target not met/.test(js), 'closed non-qualifier must say "target not met"');
+  });
+
+  it('summary reuses the shared suffix for closed-season copy', () => {
+    const js = readJS();
+    assert.ok(!js.includes('res.compliance.qualifying ?'),
+      'summary must not build its own status ternary — delegate to complianceStatusSuffix');
+    assert.ok(/complianceSummaryHtml/.test(js), 'summary helper must exist');
+  });
+
   it('distinguishes live "on track" from closed-season "Prize earned!"', () => {
     const js = readJS();
     assert.ok(/on track/i.test(js), 'live qualifying state must say "on track"');
@@ -113,5 +131,6 @@ describe('renderMySeasonStats compliance rendering (app.js)', () => {
     const js = readJS();
     assert.ok(/res\.milestone/.test(js), 'milestone still driven by res.milestone');
     assert.ok(/milestone\.target/.test(js), 'milestone bar still uses its target');
+    assert.ok(!js.includes('res.milestone.target || 4'), 'target must come from the payload only');
   });
 });
