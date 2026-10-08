@@ -42,6 +42,9 @@ describe('Voting Milestones section (index.html)', () => {
     const js = readJS();
     assert.ok(/id="compliance-reward"/.test(html), 'compliance-reward element must exist');
     assert.ok(/'Vote in ' \+ res\.compliance\.target/.test(js), 'reward copy must derive from compliance.target');
+    assert.ok(/season end \(min\. ' \+ res\.compliance\.minVotes \+ ' votes\)/.test(js),
+      'reward copy must state the vote floor from the payload');
+    assert.ok(!js.includes('min. 4 votes'), 'the floor must not be hardcoded in the reward copy');
     assert.ok(/season end/i.test(js), 'copy must mention the season-end prize');
     assert.ok(!js.includes('Vote in 80% of'), 'copy must not hardcode the threshold');
   });

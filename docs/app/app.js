@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.15.0';
+const APP_VERSION = '4.16.0';
 
 const appState = {
   status: 'unlinked',
@@ -1251,7 +1251,7 @@ function renderComplianceCard(res, view) {
     text.textContent = res.compliance.voted + ' of ' + res.compliance.attended
       + ' weeks voted — ' + res.compliance.pct + '%' + complianceStatusSuffix(res.compliance, isLive);
     if (reward) {
-      reward.textContent = 'Vote in ' + res.compliance.target + '% of the nights you play — an extra prize at season end. Ask in our Discord';
+      reward.textContent = 'Vote in ' + res.compliance.target + '% of the nights you play — an extra prize at season end (min. ' + res.compliance.minVotes + ' votes). Ask in our Discord';
     }
     container.style.display = 'block';
   } else {
