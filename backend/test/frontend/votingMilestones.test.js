@@ -84,10 +84,15 @@ describe('renderMySeasonStats compliance rendering (app.js)', () => {
     assert.ok(!js.includes('need 80%'), 'threshold must not be hardcoded in the renderer');
   });
 
-  it('names the binding vote floor instead of the percentage', () => {
+  it('keeps the vote floor out of the status suffix (the subtitle owns it)', () => {
     const js = readJS();
-    assert.ok(/compliance\.minVotes/.test(js), 'suffix must read minVotes from the payload');
-    assert.ok(!js.includes('need 4 votes'), 'floor copy must not be hardcoded in the renderer');
+    const start = js.indexOf('function complianceStatusSuffix');
+    const end = js.indexOf('function renderComplianceCard');
+    assert.ok(start !== -1 && end > start, 'suffix function must exist');
+    const fn = js.slice(start, end);
+    assert.ok(!fn.includes('minVotes'), 'the floor must not appear in the status suffix');
+    assert.ok(fn.includes("return '';"), 'floor-blocked state must render no need-marker');
+    assert.ok(!js.includes('need 4 votes'), 'floor copy must not be hardcoded anywhere');
   });
 
   it('closed non-qualifying state uses past-tense copy', () => {

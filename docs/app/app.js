@@ -1233,9 +1233,7 @@ function loadMySeasonStats() {
 function complianceStatusSuffix(compliance, isLive) {
   if (compliance.qualifying) return isLive ? ' — On track!' : ' — Prize earned!';
   if (!isLive) return ' — target not met';
-  if (compliance.pct >= compliance.target && compliance.voted < compliance.minVotes) {
-    return ' (need ' + compliance.minVotes + ' votes)';
-  }
+  if (compliance.pct >= compliance.target) return '';
   return ' (need ' + compliance.target + '%)';
 }
 
