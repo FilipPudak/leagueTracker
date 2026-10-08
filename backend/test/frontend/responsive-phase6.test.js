@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSource } from '../helpers/read-source.js';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const HTML_FILE = join(__dirname, '../../../docs/app/index.html');
 
 function readHTML() {
-  return readFileSync(HTML_FILE, 'utf8');
+  return readSource(HTML_FILE);
 }
 
 describe('Tabs: ARIA roles', () => {
@@ -39,7 +39,7 @@ describe('Tabs: ARIA roles', () => {
 describe('Standings: semantic round header', () => {
   it('round-header uses button element or has role="button"', () => {
     const html = readHTML();
-    const jsSrc = readFileSync(join(__dirname, '../../../docs/app/app.js'), 'utf8');
+    const jsSrc = readSource(join(__dirname, '../../../docs/app/app.js'));
     const hasButton = (html.includes('<button') && html.includes('round-header')) ||
                       (jsSrc.includes('round-header') && jsSrc.includes('role="button"'));
     assert.ok(hasButton, 'round-header must be a <button> or have role="button"');

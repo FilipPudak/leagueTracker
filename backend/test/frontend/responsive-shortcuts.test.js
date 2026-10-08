@@ -1,14 +1,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSource } from '../helpers/read-source.js';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CSS_FILE = join(__dirname, '../../../docs/app/styles.css');
 const JS_FILE = join(__dirname, '../../../docs/app/app.js');
-function readCSS() { return readFileSync(CSS_FILE, 'utf8'); }
-function readJS() { return readFileSync(JS_FILE, 'utf8'); }
+function readCSS() { return readSource(CSS_FILE); }
+function readJS() { return readSource(JS_FILE); }
 
 describe('Responsive: wide desktop breakpoint', () => {
   it('has 1280px media query', () => {

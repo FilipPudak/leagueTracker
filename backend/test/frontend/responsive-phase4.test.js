@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSource } from '../helpers/read-source.js';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,8 +8,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const CSS_FILE = join(__dirname, '../../../docs/app/styles.css');
 const JS_FILE = join(__dirname, '../../../docs/app/app.js');
 
-function readCSS() { return readFileSync(CSS_FILE, 'utf8'); }
-function readJS() { return readFileSync(JS_FILE, 'utf8'); }
+function readCSS() { return readSource(CSS_FILE); }
+function readJS() { return readSource(JS_FILE); }
 
 describe('Layout: desktop 2-panel CSS Grid', () => {
   it('desktop-columns has display:grid at desktop', () => {
@@ -57,7 +57,7 @@ describe('Boot: view routing', () => {
 
 describe('Standings: vote CTA', () => {
   it('vote-cta element exists in HTML', () => {
-    const html = readFileSync(join(__dirname, '../../../docs/app/index.html'), 'utf8');
+    const html = readSource(join(__dirname, '../../../docs/app/index.html'));
     assert.ok(html.includes('vote-cta'), 'Must have #vote-cta element');
   });
 });

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSource } from '../helpers/read-source.js';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
@@ -9,7 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_DIR = join(__dirname, '../../../docs/app');
 
 function loadCore() {
-  const src = readFileSync(join(APP_DIR, 'app-core.js'), 'utf-8');
+  const src = readSource(join(APP_DIR, 'app-core.js'));
   const sandbox = {};
   vm.createContext(sandbox);
   vm.runInContext(src, sandbox);
@@ -32,7 +32,7 @@ const core = loadCore();
 
 describe('frontend/app-core', () => {
   it('core is DOM-free and side-effect-free (testable in a bare sandbox)', () => {
-    const src = readFileSync(join(APP_DIR, 'app-core.js'), 'utf-8');
+    const src = readSource(join(APP_DIR, 'app-core.js'));
     assert.ok(!/\bdocument\b|\bwindow\b|\blocalStorage\b/.test(src), 'app-core.js must not touch DOM globals');
     assert.equal(typeof core.mapSettings, 'function');
     assert.equal(typeof core.computeSubtitle, 'function');
@@ -296,8 +296,8 @@ describe('frontend/app-core', () => {
 });
 
 describe('frontend wiring', () => {
-  const html = readFileSync(join(APP_DIR, 'index.html'), 'utf-8');
-  const app = readFileSync(join(APP_DIR, 'app.js'), 'utf-8');
+  const html = readSource(join(APP_DIR, 'index.html'));
+  const app = readSource(join(APP_DIR, 'app.js'));
 
   it('index.html loads app-core.js before app.js', () => {
     const corePos = html.indexOf('app-core.js');

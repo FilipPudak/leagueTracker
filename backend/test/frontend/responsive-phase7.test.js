@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSource } from '../helpers/read-source.js';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,11 +10,11 @@ const JS_FILE = join(APP_DIR, 'app.js');
 const CSS_FILE = join(APP_DIR, 'styles.css');
 
 function readJS() {
-  return readFileSync(JS_FILE, 'utf8');
+  return readSource(JS_FILE);
 }
 
 function readCSS() {
-  return readFileSync(CSS_FILE, 'utf8');
+  return readSource(CSS_FILE);
 }
 
 describe('JS: inline style cleanup', () => {

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSource } from '../helpers/read-source.js';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,9 +9,9 @@ const CSS_FILE = join(__dirname, '../../../docs/app/styles.css');
 const JS_FILE = join(__dirname, '../../../docs/app/app.js');
 const HTML_FILE = join(__dirname, '../../../docs/app/index.html');
 
-function readCSS() { return readFileSync(CSS_FILE, 'utf8'); }
-function readJS() { return readFileSync(JS_FILE, 'utf8'); }
-function readHTML() { return readFileSync(HTML_FILE, 'utf8'); }
+function readCSS() { return readSource(CSS_FILE); }
+function readJS() { return readSource(JS_FILE); }
+function readHTML() { return readSource(HTML_FILE); }
 
 describe('Header: identity chip in status row', () => {
   it('identity-chip is inside header', () => {
@@ -514,7 +514,7 @@ describe('Sign-in & guest: modal, banner, header sizing', () => {
 
   it('guest pitch copy is single-sourced from LeagueCore', () => {
     const js = readJS();
-    const core = readFileSync(join(__dirname, '../../../docs/app/app-core.js'), 'utf8');
+    const core = readSource(join(__dirname, '../../../docs/app/app-core.js'));
     assert.ok(core.includes("const GUEST_PITCH = 'Standings are open to everyone"), 'canonical sentence must live in app-core');
     assert.ok(js.includes('LeagueCore.GUEST_PITCH'), 'surfaces must render the shared constant');
     assert.ok(js.includes('function renderGuestCopy'), 'copy renderer must exist');

@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { readSource } from '../helpers/read-source.js';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,11 +11,11 @@ const CSS_FILE = join(APP_DIR, 'styles.css');
 const HTML_FILE = join(APP_DIR, 'index.html');
 
 function readCSS() {
-  return readFileSync(CSS_FILE, 'utf8');
+  return readSource(CSS_FILE);
 }
 
 function readHTML() {
-  return readFileSync(HTML_FILE, 'utf8');
+  return readSource(HTML_FILE);
 }
 
 describe('Styles: external stylesheet extraction', () => {

@@ -1,12 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSource } from '../helpers/read-source.js';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const JS_FILE = join(__dirname, '../../../docs/app/app.js');
-function readJS() { return readFileSync(JS_FILE, 'utf8'); }
+function readJS() { return readSource(JS_FILE); }
 
 function refreshFnBody() {
   const js = readJS();
