@@ -1230,6 +1230,33 @@ function loadMySeasonStats() {
     });
 }
 
+function complianceStatusSuffix(compliance, isLive) {
+  if (!compliance.qualifying) return ' (need 80%)';
+  return isLive ? ' — On track!' : ' — Prize earned!';
+}
+
+function renderComplianceCard(res, view) {
+  const container = $('compliance-container');
+  const bar = $('compliance-bar');
+  const text = $('compliance-text');
+  if (!container) return;
+  const isLive = res.isCurrentSeason !== false && Boolean(appState.week);
+  if (view === 'full' && res.compliance && res.compliance.attended > 0 && bar && text) {
+    bar.style.width = Math.min(100, res.compliance.pct || 0) + '%';
+    text.textContent = res.compliance.voted + ' of ' + res.compliance.attended
+      + ' weeks voted — ' + res.compliance.pct + '%' + complianceStatusSuffix(res.compliance, isLive);
+    container.style.display = 'block';
+  } else {
+    container.style.display = 'none';
+  }
+}
+
+function complianceSummaryHtml(res) {
+  if (!res.compliance || res.compliance.attended <= 0) return '';
+  const status = res.compliance.qualifying ? ' — Prize earned!' : ' (need 80%)';
+  return `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">80% rule:</span> <span style="font-size:0.85rem;">${escapeHtml(res.compliance.voted)} of ${escapeHtml(res.compliance.attended)} weeks — ${escapeHtml(res.compliance.pct)}%${status}</span></div>`;
+}
+
 function renderMySeasonStats(res) {
   const gamSection = $('myseason-gamification-section');
   const gamContainer = $('myseason-gamification-container');
@@ -1253,6 +1280,8 @@ function renderMySeasonStats(res) {
     }
   }
 
+  renderComplianceCard(res, view);
+
   if (gamSection && gamContainer) {
     if (view === 'hidden') {
       gamSection.style.display = 'none';
@@ -1264,6 +1293,7 @@ function renderMySeasonStats(res) {
       } else if (view === 'summary' && streaks.bestStreak > 0) {
         html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Streak:</span> <span style="font-size:0.85rem;">${escapeHtml(streaks.bestStreak)} best (season record)</span></div>`;
       }
+      if (view === 'summary') html += complianceSummaryHtml(res);
       gamContainer.innerHTML = html;
       gamSection.style.display = 'block';
     }

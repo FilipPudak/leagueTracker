@@ -321,9 +321,13 @@ describe('frontend wiring', () => {
     assert.match(app, /LeagueCore\.mapSettings/);
   });
 
-  it('compliance is fully retired from the client and view mode is wired', () => {
-    assert.ok(!/compliance/i.test(app), 'app.js must not reference compliance');
-    assert.ok(!/compliance/i.test(html), 'index.html must not reference compliance');
+  it('80% compliance rule is scoped to My Stats and view mode is wired', () => {
+    assert.match(app, /res\.compliance/, 'My Stats renders the compliance payload');
+    assert.equal((app.match(/renderComplianceCard\(/g) || []).length, 2,
+      'compliance card helper is defined once and called once');
+    assert.match(html, /id="compliance-container"/, 'compliance card exists');
+    assert.ok(html.indexOf('id="myseason-view"') < html.indexOf('id="compliance-container"'),
+      'compliance card lives inside My Stats only');
     assert.match(app, /LeagueCore\.gamificationViewFor/);
   });
 
