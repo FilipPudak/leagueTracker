@@ -169,4 +169,62 @@ describe('handleGetMySeasonStats', () => {
       }
     );
   });
+
+  it('compliance: current season counts only weeks with closed voting windows', async () => {
+    const tables = basicTables();
+    tables.attendance.push({ season_id: 6, week: 3, player_id: 'P001' });
+    tables.melee_tournaments.push({ season_id: 6, round: 3, phase: 'regular' });
+    tables.votes.push({ id: 99, timestamp: new Date().toISOString(), updated_at: null, season_id: 6, week: 3, player_id: 'P001', leader_id: '1', opponent_id: 'P002' });
+    const db = createMockDb(tables);
+    const result = await handleGetMySeasonStats({ seasonId: 6 }, { DB: db }, aliceSession);
+    assert.deepEqual(result.compliance, { attended: 2, voted: 2, pct: 100, qualifying: false },
+      'CURRENT_WEEK is 3 — week 3 window still open, must not count');
+  });
+
+  it('compliance: active season after close counts all weeks', async () => {
+    const tables = basicTables();
+    tables.settings = tables.settings.map(s =>
+      s.key === 'CURRENT_WEEK' ? { ...s, value: 'Season Ended' } : s
+    );
+    tables.attendance.push({ season_id: 6, week: 3, player_id: 'P001' });
+    tables.melee_tournaments.push({ season_id: 6, round: 3, phase: 'regular' });
+    tables.votes.push({ id: 99, timestamp: new Date().toISOString(), updated_at: null, season_id: 6, week: 3, player_id: 'P001', leader_id: '1', opponent_id: 'P002' });
+    const db = createMockDb(tables);
+    const result = await handleGetMySeasonStats({ seasonId: 6 }, { DB: db }, aliceSession);
+    assert.deepEqual(result.compliance, { attended: 3, voted: 3, pct: 100, qualifying: false });
+  });
+
+  it('compliance: historical season ignores CURRENT_WEEK cutoff', async () => {
+    const tables = basicTables();
+    tables.settings = tables.settings.map(s =>
+      s.key === 'ACTIVE_SEASON_ID' ? { ...s, value: '5' } : s
+    );
+    tables.attendance.push({ season_id: 6, week: 3, player_id: 'P001' });
+    tables.melee_tournaments.push({ season_id: 6, round: 3, phase: 'regular' });
+    tables.votes.push({ id: 99, timestamp: new Date().toISOString(), updated_at: null, season_id: 6, week: 3, player_id: 'P001', leader_id: '1', opponent_id: 'P002' });
+    const db = createMockDb(tables);
+    const result = await handleGetMySeasonStats({ seasonId: 6 }, { DB: db }, aliceSession);
+    assert.equal(result.isCurrentSeason, false);
+    assert.deepEqual(result.compliance, { attended: 3, voted: 3, pct: 100, qualifying: false },
+      'closed seasons have all windows closed regardless of CURRENT_WEEK');
+  });
+
+  it('compliance: no attended weeks → pct null, not qualifying', async () => {
+    const result = await handleGetMySeasonStats(
+      { seasonId: 6 },
+      env,
+      { token: 't', player_id: 'P004', device_id: 'd', email: 'diana@test.com' }
+    );
+    assert.deepEqual(result.compliance, { attended: 0, voted: 0, pct: null, qualifying: false });
+  });
+
+  it('compliance: historical season without vote data still returns the shape', async () => {
+    const result = await handleGetMySeasonStats(
+      { seasonId: 5 },
+      env,
+      aliceSession
+    );
+    assert.deepEqual(result.compliance, { attended: 0, voted: 0, pct: null, qualifying: false });
+    assert.equal(result.milestone, null, 'milestone stays active-season-only');
+  });
 });

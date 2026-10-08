@@ -1,5 +1,5 @@
 // Attendance, voting streaks, raffle tickets, and weekly/season participation
-import { PHASE } from './constants.js';
+import { PHASE, MILESTONE_VOTE_TARGET, COMPLIANCE_PCT } from './constants.js';
 
 // Get player's current and best voting streak for a season
 export async function getStreaks(db, seasonId, playerId) {
@@ -50,6 +50,35 @@ export async function getStreaks(db, seasonId, playerId) {
   }
 
   return { currentStreak, bestStreak };
+}
+
+// Get voting compliance for the 80% season-end prize: votes in attended weeks
+// (intersection) vs attended regular weeks whose voting window has closed.
+// cutoffWeek excludes the current open week; null = all weeks (closed season).
+export async function getVotingCompliance(db, seasonId, playerId, cutoffWeek = null) {
+  const attendedWeeks = await db.prepare(`
+    SELECT DISTINCT a.week FROM attendance a
+    JOIN melee_tournaments t ON t.season_id = a.season_id AND t.round = a.week
+    WHERE a.season_id = ? AND a.player_id = ? AND t.phase = ?
+    ORDER BY a.week
+  `).bind(seasonId, playerId, PHASE.REGULAR).all();
+
+  const votedWeeks = await db.prepare(`
+    SELECT DISTINCT week FROM votes
+    WHERE season_id = ? AND player_id = ?
+  `).bind(seasonId, playerId).all();
+
+  const cutoff = typeof cutoffWeek === 'number' && Number.isFinite(cutoffWeek) ? cutoffWeek : Infinity;
+  const attended = (attendedWeeks.results || []).map(r => r.week).filter(w => w < cutoff);
+  const votedSet = new Set((votedWeeks.results || []).map(r => r.week).filter(w => w < cutoff));
+  const voted = attended.filter(w => votedSet.has(w)).length;
+  const attendedCount = attended.length;
+  const pct = attendedCount > 0 ? Math.round((voted / attendedCount) * 100) : null;
+  const qualifying = attendedCount > 0
+    && voted >= MILESTONE_VOTE_TARGET
+    && voted * 100 >= attendedCount * COMPLIANCE_PCT;
+
+  return { attended: attendedCount, voted, pct, qualifying };
 }
 
 // Get player's raffle ticket count for a season

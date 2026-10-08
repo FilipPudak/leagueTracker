@@ -37,3 +37,4 @@ export const GATE_WEEKDAY = 'Wed';
 export const GATE_MINUTES = 22 * 60 + 10;
 export const PRIMARY_CUTOFF_MINUTES = 23 * 60 + 10;
 export const MILESTONE_VOTE_TARGET = 4;
+export const COMPLIANCE_PCT = 80;

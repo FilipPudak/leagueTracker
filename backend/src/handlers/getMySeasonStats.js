@@ -1,5 +1,6 @@
-import { getSetting, getAwardsForSeason, parseSeasonId } from '../db/queries.js';
-import { getStreaks, getRaffleTickets } from '../lib/participation.js';
+import { getSetting, getAwardsForSeason, parseSeasonId, parseWeek } from '../db/queries.js';
+import { getStreaks, getRaffleTickets, getVotingCompliance } from '../lib/participation.js';
+import { MILESTONE_VOTE_TARGET } from '../lib/constants.js';
 import { badRequest } from '../lib/errors.js';
 import { computeBadges } from '../lib/badges.js';
 import { computeLeaderWinRates } from '../lib/careerStats.js';
@@ -31,6 +32,11 @@ export async function handleGetMySeasonStats(body, env, session) {
   }
 
   const isCurrentSeason = sid === activeSeasonId;
+
+  // Only weeks whose voting window has closed count toward compliance: in the
+  // active season that is weeks < CURRENT_WEEK ("Season Ended"/missing → all
+  // weeks); historical seasons always count every week.
+  const cutoffWeek = isCurrentSeason ? parseWeek(await getSetting(DB, 'CURRENT_WEEK')) : null;
 
   // Awards are declared at season close: mid-season podium rows exist (sync
   // refreshes them weekly) but must never be listed as won in the active season.
@@ -66,21 +72,21 @@ export async function handleGetMySeasonStats(body, env, session) {
     plays: r.play_count,
   }));
 
-  const [raffleTickets, badges, deckWinRates] = await Promise.all([
+  const [raffleTickets, badges, deckWinRates, compliance] = await Promise.all([
     getRaffleTickets(DB, sid, playerId),
     computeBadges(DB, playerId, activeSeasonId, isCurrentSeason),
     computeLeaderWinRates(DB, playerId, sid),
+    getVotingCompliance(DB, sid, playerId, cutoffWeek),
   ]);
   const hasVoteData = raffleTickets > 0;
 
   let streaks = await getStreaks(DB, sid, playerId);
   let milestone = null;
   if (isCurrentSeason) {
-    const milestoneTarget = 4;
     milestone = {
       votes: raffleTickets,
-      target: milestoneTarget,
-      complete: raffleTickets >= milestoneTarget,
+      target: MILESTONE_VOTE_TARGET,
+      complete: raffleTickets >= MILESTONE_VOTE_TARGET,
     };
   } else {
     streaks = { bestStreak: streaks.bestStreak };
@@ -101,6 +107,7 @@ export async function handleGetMySeasonStats(body, env, session) {
     streaks,
     raffleTickets,
     milestone,
+    compliance,
     badges,
     isCurrentSeason,
     hasVoteData,
