@@ -81,15 +81,16 @@ export async function handleGetMySeasonStats(body, env, session) {
   const hasVoteData = raffleTickets > 0;
 
   let streaks = await getStreaks(DB, sid, playerId);
+  if (!isCurrentSeason) {
+    streaks = { bestStreak: streaks.bestStreak };
+  }
   let milestone = null;
-  if (isCurrentSeason) {
+  if (isCurrentSeason || raffleTickets > 0) {
     milestone = {
       votes: raffleTickets,
       target: MILESTONE_VOTE_TARGET,
       complete: raffleTickets >= MILESTONE_VOTE_TARGET,
     };
-  } else {
-    streaks = { bestStreak: streaks.bestStreak };
   }
 
   return {

@@ -332,59 +332,59 @@ function makeComplianceTables() {
 }
 
 describe('getVotingCompliance', () => {
-  it('returns attended, voted, pct and qualifying keys', async () => {
+  it('returns attended, voted, pct, qualifying and target keys', async () => {
     const db = createMockDb(makeComplianceTables());
     const result = await getVotingCompliance(db, 7, 'P200');
-    assert.deepEqual(Object.keys(result).sort(), ['attended', 'pct', 'qualifying', 'voted']);
+    assert.deepEqual(Object.keys(result).sort(), ['attended', 'pct', 'qualifying', 'target', 'voted']);
   });
 
   it('qualifies at exactly 80% with 4 votes', async () => {
     const db = createMockDb(makeComplianceTables());
     const result = await getVotingCompliance(db, 7, 'P200');
-    assert.deepEqual(result, { attended: 5, voted: 4, pct: 80, qualifying: true });
+    assert.deepEqual(result, { attended: 5, voted: 4, pct: 80, qualifying: true, target: 80 });
   });
 
   it('does not qualify below 80%', async () => {
     const db = createMockDb(makeComplianceTables());
     const result = await getVotingCompliance(db, 7, 'P201');
-    assert.deepEqual(result, { attended: 5, voted: 3, pct: 60, qualifying: false });
+    assert.deepEqual(result, { attended: 5, voted: 3, pct: 60, qualifying: false, target: 80 });
   });
 
   it('perfect ratio but under 4 votes does not qualify (vote floor)', async () => {
     const db = createMockDb(makeComplianceTables());
     const result = await getVotingCompliance(db, 7, 'P202');
-    assert.deepEqual(result, { attended: 3, voted: 3, pct: 100, qualifying: false });
+    assert.deepEqual(result, { attended: 3, voted: 3, pct: 100, qualifying: false, target: 80 });
   });
 
   it('qualifies with 8 of 9 attended weeks', async () => {
     const db = createMockDb(makeComplianceTables());
     const result = await getVotingCompliance(db, 7, 'P203');
-    assert.deepEqual(result, { attended: 9, voted: 8, pct: 89, qualifying: true });
+    assert.deepEqual(result, { attended: 9, voted: 8, pct: 89, qualifying: true, target: 80 });
   });
 
   it('grace vote in an unattended week is excluded from the numerator', async () => {
     const db = createMockDb(makeComplianceTables());
     const result = await getVotingCompliance(db, 7, 'P204');
-    assert.deepEqual(result, { attended: 5, voted: 4, pct: 80, qualifying: true },
+    assert.deepEqual(result, { attended: 5, voted: 4, pct: 80, qualifying: true, target: 80 },
       'week 99 vote must not count — numerator is the attended/voted intersection');
   });
 
   it('voted but never attended → pct null, not qualifying', async () => {
     const db = createMockDb(makeComplianceTables());
     const result = await getVotingCompliance(db, 7, 'P205');
-    assert.deepEqual(result, { attended: 0, voted: 0, pct: null, qualifying: false });
+    assert.deepEqual(result, { attended: 0, voted: 0, pct: null, qualifying: false, target: 80 });
   });
 
   it('cut-phase attendance is ignored', async () => {
     const db = createMockDb(makeComplianceTables());
     const result = await getVotingCompliance(db, 7, 'P206');
-    assert.deepEqual(result, { attended: 0, voted: 0, pct: null, qualifying: false });
+    assert.deepEqual(result, { attended: 0, voted: 0, pct: null, qualifying: false, target: 80 });
   });
 
   it('cutoff excludes the current week and beyond, for attendance and votes', async () => {
     const db = createMockDb(makeComplianceTables());
     const result = await getVotingCompliance(db, 7, 'P200', 3);
-    assert.deepEqual(result, { attended: 2, voted: 2, pct: 100, qualifying: false },
+    assert.deepEqual(result, { attended: 2, voted: 2, pct: 100, qualifying: false, target: 80 },
       'weeks >= 3 (still-open window) must not count on either side');
   });
 
@@ -393,19 +393,19 @@ describe('getVotingCompliance', () => {
     const db2 = createMockDb(makeComplianceTables());
     const withNull = await getVotingCompliance(db1, 7, 'P200');
     const withLarge = await getVotingCompliance(db2, 7, 'P200', 99);
-    assert.deepEqual(withNull, { attended: 5, voted: 4, pct: 80, qualifying: true });
+    assert.deepEqual(withNull, { attended: 5, voted: 4, pct: 80, qualifying: true, target: 80 });
     assert.deepEqual(withLarge, withNull);
   });
 
   it('returns zeroed result with empty tables', async () => {
     const db = createMockDb(emptyTables());
     const result = await getVotingCompliance(db, 6, 'P001');
-    assert.deepEqual(result, { attended: 0, voted: 0, pct: null, qualifying: false });
+    assert.deepEqual(result, { attended: 0, voted: 0, pct: null, qualifying: false, target: 80 });
   });
 
   it('returns zeroed result for unknown player', async () => {
     const db = createMockDb(makeComplianceTables());
     const result = await getVotingCompliance(db, 7, 'P999');
-    assert.deepEqual(result, { attended: 0, voted: 0, pct: null, qualifying: false });
+    assert.deepEqual(result, { attended: 0, voted: 0, pct: null, qualifying: false, target: 80 });
   });
 });

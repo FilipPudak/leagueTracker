@@ -1231,7 +1231,7 @@ function loadMySeasonStats() {
 }
 
 function complianceStatusSuffix(compliance, isLive) {
-  if (!compliance.qualifying) return ' (need 80%)';
+  if (!compliance.qualifying) return ' (need ' + compliance.target + '%)';
   return isLive ? ' — On track!' : ' — Prize earned!';
 }
 
@@ -1239,12 +1239,16 @@ function renderComplianceCard(res, view) {
   const container = $('compliance-container');
   const bar = $('compliance-bar');
   const text = $('compliance-text');
+  const reward = $('compliance-reward');
   if (!container) return;
   const isLive = res.isCurrentSeason !== false && Boolean(appState.week);
   if (view === 'full' && res.compliance && res.compliance.attended > 0 && bar && text) {
     bar.style.width = Math.min(100, res.compliance.pct || 0) + '%';
     text.textContent = res.compliance.voted + ' of ' + res.compliance.attended
       + ' weeks voted — ' + res.compliance.pct + '%' + complianceStatusSuffix(res.compliance, isLive);
+    if (reward) {
+      reward.textContent = 'Vote in ' + res.compliance.target + '% of the nights you play — an extra prize at season end. Ask in our Discord';
+    }
     container.style.display = 'block';
   } else {
     container.style.display = 'none';
@@ -1253,7 +1257,7 @@ function renderComplianceCard(res, view) {
 
 function complianceSummaryHtml(res) {
   if (!res.compliance || res.compliance.attended <= 0) return '';
-  const status = res.compliance.qualifying ? ' — Prize earned!' : ' (need 80%)';
+  const status = res.compliance.qualifying ? ' — Prize earned!' : ' (need ' + escapeHtml(res.compliance.target) + '%)';
   return `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">80% rule:</span> <span style="font-size:0.85rem;">${escapeHtml(res.compliance.voted)} of ${escapeHtml(res.compliance.attended)} weeks — ${escapeHtml(res.compliance.pct)}%${status}</span></div>`;
 }
 
@@ -1274,6 +1278,10 @@ function renderMySeasonStats(res) {
       const pct = Math.min(100, Math.round((votes / target) * 100));
       milestoneBar.style.width = pct + '%';
       milestoneText.textContent = votes + ' of ' + target + ' votes' + (res.milestone.complete ? ' — Prize earned!' : '');
+      const milestoneReward = $('milestone-reward');
+      if (milestoneReward) {
+        milestoneReward.textContent = target + ' votes earns you a prize — ask in our Discord';
+      }
       milestoneContainer.style.display = 'block';
     } else {
       milestoneContainer.style.display = 'none';
@@ -1292,6 +1300,9 @@ function renderMySeasonStats(res) {
         html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Streak:</span> <span style="font-size:0.85rem;">${escapeHtml(streaks.currentStreak)} current &bull; ${escapeHtml(streaks.bestStreak)} best</span></div>`;
       } else if (view === 'summary' && streaks.bestStreak > 0) {
         html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Streak:</span> <span style="font-size:0.85rem;">${escapeHtml(streaks.bestStreak)} best (season record)</span></div>`;
+      }
+      if (view === 'summary' && res.milestone) {
+        html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Milestone:</span> <span style="font-size:0.85rem;">${escapeHtml(res.milestone.votes)} of ${escapeHtml(res.milestone.target)} votes${res.milestone.complete ? ' — Prize earned!' : ''}</span></div>`;
       }
       if (view === 'summary') html += complianceSummaryHtml(res);
       gamContainer.innerHTML = html;

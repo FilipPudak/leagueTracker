@@ -50,7 +50,7 @@ No valid session → `401`.
 | `submitVote` | `voteData: { leaderId, opponentId }` | Submits this week's vote. Validates: voting open, not paused, no duplicate, no self-vote, opponent faced that week. Increments raffle ticket. |
 | `updateVote` | `voteData: { leaderId, opponentId }` | Replaces both choices for the current week. `404` if no prior vote (use `submitVote`). |
 | `unlinkAccount` | — | Deletes the session for this (player, device) pair only. Other devices untouched. |
-| `getMySeasonStats` | `seasonId?` | Linked player's private season stats: tickets, streaks, badges, leader win-rates, awards. |
+| `getMySeasonStats` | `seasonId?` | Linked player's private season stats: tickets, streaks, badges, leader win-rates, voting-milestone and 80%-rule progress, awards. |
 | `getMyCareerStats` | — | Linked player's private career: record, rivalry, season progression, badges. |
 
 ## Admin actions

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSource } from '../helpers/read-source.js';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,8 +8,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const JS_FILE = join(__dirname, '../../../docs/app/app.js');
 const HTML_FILE = join(__dirname, '../../../docs/app/index.html');
 
-function readJS() { return readFileSync(JS_FILE, 'utf8'); }
-function readHTML() { return readFileSync(HTML_FILE, 'utf8'); }
+function readJS() { return readSource(JS_FILE); }
+function readHTML() { return readSource(HTML_FILE); }
 
 describe('Voting Milestones section (index.html)', () => {
   it('section heading is plural "Voting Milestones"', () => {
@@ -37,17 +37,30 @@ describe('Voting Milestones section (index.html)', () => {
       'compliance card must sit between milestone card and tickets/streak container');
   });
 
-  it('reward copy states the 80% season-end rule', () => {
+  it('reward copy is built from the server threshold, not hardcoded', () => {
     const html = readHTML();
-    const reward = html.match(/id="compliance-reward"[^>]*>([^<]+)</);
-    assert.ok(reward, 'compliance-reward copy must exist');
-    assert.ok(reward[1].includes('80%'), 'copy must mention 80%');
-    assert.ok(/season end/i.test(reward[1]), 'copy must mention the season-end prize');
+    const js = readJS();
+    assert.ok(/id="compliance-reward"/.test(html), 'compliance-reward element must exist');
+    assert.ok(/'Vote in ' \+ res\.compliance\.target/.test(js), 'reward copy must derive from compliance.target');
+    assert.ok(/season end/i.test(js), 'copy must mention the season-end prize');
+    assert.ok(!js.includes('Vote in 80% of'), 'copy must not hardcode the threshold');
   });
 
-  it('milestone reward copy is untouched', () => {
+  it('milestone reward copy derives from milestone target', () => {
     const html = readHTML();
-    assert.ok(html.includes('4 votes earns you a prize'), 'milestone copy must stay');
+    const js = readJS();
+    assert.ok(/id="milestone-reward"/.test(html), 'milestone-reward element must exist');
+    assert.ok(/target \+ ' votes earns you a prize/.test(js), 'reward copy must derive from milestone target');
+    assert.ok(/ask in our Discord/.test(js), 'reward wording must stay');
+  });
+
+  it('static reward lines stay empty (copy comes from the payload)', () => {
+    const html = readHTML();
+    const milestone = html.match(/id="milestone-reward"[^>]*>([^<]*)</);
+    const compliance = html.match(/id="compliance-reward"[^>]*>([^<]*)</);
+    assert.ok(milestone && compliance, 'both reward elements must exist');
+    assert.equal(milestone[1].trim(), '', 'milestone reward line must be filled by the renderer');
+    assert.equal(compliance[1].trim(), '', 'compliance reward line must be filled by the renderer');
   });
 });
 
@@ -60,10 +73,12 @@ describe('renderMySeasonStats compliance rendering (app.js)', () => {
     });
   });
 
-  it('shows the ratio percentage and the 80% requirement', () => {
+  it('shows the ratio and the server-provided threshold', () => {
     const js = readJS();
-    assert.ok(/need 80%/.test(js), 'non-qualifying state must show "need 80%"');
+    assert.ok(/' \(need ' \+ compliance\.target \+ '%\)'/.test(js),
+      'non-qualifying state must show the threshold from the payload');
     assert.ok(/compliance\.pct/.test(js), 'bar text must include the computed pct');
+    assert.ok(!js.includes('need 80%'), 'threshold must not be hardcoded in the renderer');
   });
 
   it('distinguishes live "on track" from closed-season "Prize earned!"', () => {
@@ -84,6 +99,14 @@ describe('renderMySeasonStats compliance rendering (app.js)', () => {
     assert.ok(idx !== -1, 'summary view rendering must exist');
     const window = js.slice(idx, idx + 1200);
     assert.ok(/compliance/.test(window), 'summary view must include the compliance status');
+  });
+
+  it('closed-season summary lists the milestone final status', () => {
+    const js = readJS();
+    assert.ok(/view === 'summary' && res\.milestone/.test(js),
+      'summary must render the milestone line when present');
+    assert.ok(/Milestone:/.test(js), 'summary milestone line must carry its label');
+    assert.ok(/Prize earned/.test(js), 'summary milestone must show the final verdict');
   });
 
   it('milestone rendering is untouched (regression guard)', () => {
