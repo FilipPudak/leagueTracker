@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.16.0';
+const APP_VERSION = '4.16.1';
 
 const appState = {
   status: 'unlinked',
@@ -1264,6 +1264,11 @@ function complianceSummaryHtml(res) {
   return `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">80% rule:</span> <span style="font-size:0.85rem;">${escapeHtml(res.compliance.voted)} of ${escapeHtml(res.compliance.attended)} weeks — ${escapeHtml(res.compliance.pct)}%${escapeHtml(status)}</span></div>`;
 }
 
+function milestoneCountLabel(milestone) {
+  const votes = Math.min(milestone.votes || 0, milestone.target);
+  return votes + ' of ' + milestone.target + ' votes' + (milestone.complete ? ' — Prize earned!' : '');
+}
+
 function renderMySeasonStats(res) {
   const gamSection = $('myseason-gamification-section');
   const gamContainer = $('myseason-gamification-container');
@@ -1280,7 +1285,7 @@ function renderMySeasonStats(res) {
       const target = res.milestone.target;
       const pct = Math.min(100, Math.round((votes / target) * 100));
       milestoneBar.style.width = pct + '%';
-      milestoneText.textContent = votes + ' of ' + target + ' votes' + (res.milestone.complete ? ' — Prize earned!' : '');
+      milestoneText.textContent = milestoneCountLabel(res.milestone);
       const milestoneReward = $('milestone-reward');
       if (milestoneReward) {
         milestoneReward.textContent = target + ' votes earns you a prize — ask in our Discord';
@@ -1305,7 +1310,7 @@ function renderMySeasonStats(res) {
         html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Streak:</span> <span style="font-size:0.85rem;">${escapeHtml(streaks.bestStreak)} best (season record)</span></div>`;
       }
       if (view === 'summary' && res.milestone) {
-        html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Milestone:</span> <span style="font-size:0.85rem;">${escapeHtml(res.milestone.votes)} of ${escapeHtml(res.milestone.target)} votes${res.milestone.complete ? ' — Prize earned!' : ''}</span></div>`;
+        html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Milestone:</span> <span style="font-size:0.85rem;">${escapeHtml(milestoneCountLabel(res.milestone))}</span></div>`;
       }
       if (view === 'summary') html += complianceSummaryHtml(res);
       gamContainer.innerHTML = html;

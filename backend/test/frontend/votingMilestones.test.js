@@ -135,6 +135,22 @@ describe('renderMySeasonStats compliance rendering (app.js)', () => {
     assert.ok(/Prize earned/.test(js), 'summary milestone must show the final verdict');
   });
 
+  it('caps milestone display at the target (a completion bar, not a counter)', () => {
+    const js = readJS();
+    assert.ok(/function milestoneCountLabel/.test(js), 'shared milestone label helper must exist');
+    const start = js.indexOf('function milestoneCountLabel');
+    const fn = js.slice(start, start + 400);
+    assert.ok(/Math\.min\(/.test(fn), 'label must clamp votes to the target');
+    assert.ok(fn.includes("milestone.complete ? ' — Prize earned!' : ''"), 'label must own the prize verdict');
+    const barIdx = js.indexOf('milestoneText.textContent');
+    assert.ok(js.slice(barIdx, barIdx + 120).includes('milestoneCountLabel'),
+      'bar text must use the shared label');
+    const summaryIdx = js.indexOf("view === 'summary' && res.milestone");
+    assert.ok(js.slice(summaryIdx, summaryIdx + 400).includes('milestoneCountLabel'),
+      'summary line must use the shared label');
+    assert.ok(!js.includes("votes + ' of ' + target"), 'raw votes must not build the bar text anymore');
+  });
+
   it('milestone rendering is untouched (regression guard)', () => {
     const js = readJS();
     assert.ok(/res\.milestone/.test(js), 'milestone still driven by res.milestone');
