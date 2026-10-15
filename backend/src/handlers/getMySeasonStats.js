@@ -80,7 +80,7 @@ export async function handleGetMySeasonStats(body, env, session) {
   ]);
   const hasVoteData = raffleTickets > 0;
 
-  let streaks = await getStreaks(DB, sid, playerId);
+  let streaks = await getStreaks(DB, sid, playerId, cutoffWeek);
   if (!isCurrentSeason) {
     streaks = { bestStreak: streaks.bestStreak };
   }

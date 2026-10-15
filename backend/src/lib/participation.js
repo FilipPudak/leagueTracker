@@ -1,8 +1,11 @@
 // Attendance, voting streaks, raffle tickets, and weekly/season participation
 import { PHASE, MILESTONE_VOTE_TARGET, COMPLIANCE_PCT } from './constants.js';
 
-// Get player's current and best voting streak for a season
-export async function getStreaks(db, seasonId, playerId) {
+// Get player's current and best voting streak for a season.
+// cutoffWeek: the open voting week (CURRENT_WEEK). Attended weeks up to the
+// cutoff are final; the open week is pending — an unvoted open week must not
+// break the streak, a voted one counts immediately. null = all weeks closed.
+export async function getStreaks(db, seasonId, playerId, cutoffWeek = null) {
   const attendedWeeks = await db.prepare(`
     SELECT DISTINCT a.week FROM attendance a
     JOIN melee_tournaments t ON t.season_id = a.season_id AND t.round = a.week
@@ -22,12 +25,16 @@ export async function getStreaks(db, seasonId, playerId) {
 
   const votedSet = new Set((votedWeeks.results || []).map(r => r.week));
 
+  const cutoff = typeof cutoffWeek === 'number' && Number.isFinite(cutoffWeek) ? cutoffWeek : Infinity;
+  const weeks = attendedWeeks.results
+    .map(r => r.week)
+    .filter(w => w < cutoff || votedSet.has(w));
+
   // Calculate streaks
   let currentStreak = 0;
   let bestStreak = 0;
 
   // Iterate from most recent to oldest for current streak
-  const weeks = attendedWeeks.results.map(r => r.week);
 
   // Current streak: count consecutive voted weeks from the most recent backwards
   for (let i = weeks.length - 1; i >= 0; i--) {

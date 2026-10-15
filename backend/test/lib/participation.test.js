@@ -63,6 +63,23 @@ function makeStreakTables() {
   };
 }
 
+function makePendingOpenWeekTables({ votedWeeks }) {
+  const now = new Date().toISOString();
+  return {
+    settings: [],
+    players: [{ id: 'P300', name: 'PendingStreak', melee_name: 'pending', email: 'pending@test.com', active: 1 }],
+    leaders: [],
+    seasons: [],
+    sessions: [],
+    votes: votedWeeks.map((week, i) => ({
+      id: i + 1, timestamp: now, updated_at: null, season_id: 9, week, player_id: 'P300', leader_id: '1', opponent_id: null,
+    })),
+    awards: [],
+    attendance: [1, 2, 3, 4, 5].map(week => ({ season_id: 9, week, player_id: 'P300' })),
+    melee_tournaments: [1, 2, 3, 4, 5].map(round => ({ season_id: 9, round, phase: 'regular' })),
+  };
+}
+
 describe('getStreaks', () => {
   it('returns full streak when player voted every attended week', async () => {
     const db = createMockDb(makeStreakTables());
@@ -132,6 +149,34 @@ describe('getStreaks', () => {
     const result = await getStreaks(db, 8, 'P200');
     assert.equal(result.currentStreak, 0, 'cut/side attendance should not form a streak');
     assert.equal(result.bestStreak, 0);
+  });
+
+  it('attended-but-unvoted OPEN week does not break the current streak (pending, not a miss)', async () => {
+    const db = createMockDb(makePendingOpenWeekTables({ votedWeeks: [1, 2, 3, 4] }));
+    const result = await getStreaks(db, 9, 'P300', 5);
+    assert.equal(result.currentStreak, 4, 'week 5 window still open — pending, must not zero the streak');
+    assert.equal(result.bestStreak, 4);
+  });
+
+  it('a vote cast in the open week extends the streak immediately', async () => {
+    const db = createMockDb(makePendingOpenWeekTables({ votedWeeks: [1, 2, 3, 4, 5] }));
+    const result = await getStreaks(db, 9, 'P300', 5);
+    assert.equal(result.currentStreak, 5);
+    assert.equal(result.bestStreak, 5);
+  });
+
+  it('attended-but-unvoted CLOSED week still breaks the streak', async () => {
+    const db = createMockDb(makePendingOpenWeekTables({ votedWeeks: [1, 2, 3, 4] }));
+    const result = await getStreaks(db, 9, 'P300', 6);
+    assert.equal(result.currentStreak, 0, 'week 5 window closed without a vote — streak broken');
+    assert.equal(result.bestStreak, 4);
+  });
+
+  it('default (no cutoff) treats every week as closed', async () => {
+    const db = createMockDb(makePendingOpenWeekTables({ votedWeeks: [1, 2, 3, 4] }));
+    const result = await getStreaks(db, 9, 'P300');
+    assert.equal(result.currentStreak, 0);
+    assert.equal(result.bestStreak, 4);
   });
 });
 

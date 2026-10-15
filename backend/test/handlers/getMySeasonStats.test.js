@@ -209,6 +209,27 @@ describe('handleGetMySeasonStats', () => {
       'CURRENT_WEEK is 3 — week 3 window still open, must not count');
   });
 
+  it('streak: attended-but-unvoted open week does not reset the current streak', async () => {
+    const tables = basicTables();
+    tables.attendance.push({ season_id: 6, week: 3, player_id: 'P001' });
+    tables.melee_tournaments.push({ season_id: 6, round: 3, phase: 'regular' });
+    const db = createMockDb(tables);
+    const result = await handleGetMySeasonStats({ seasonId: 6 }, { DB: db }, aliceSession);
+    assert.deepEqual(result.streaks, { currentStreak: 2, bestStreak: 2 },
+      'CURRENT_WEEK is 3 — week 3 not voted yet is pending, not a miss');
+  });
+
+  it('streak: voting in the open week extends the streak immediately', async () => {
+    const tables = basicTables();
+    tables.attendance.push({ season_id: 6, week: 3, player_id: 'P001' });
+    tables.melee_tournaments.push({ season_id: 6, round: 3, phase: 'regular' });
+    tables.votes.push({ id: 99, timestamp: new Date().toISOString(), updated_at: null, season_id: 6, week: 3, player_id: 'P001', leader_id: '1', opponent_id: 'P002' });
+    const db = createMockDb(tables);
+    const result = await handleGetMySeasonStats({ seasonId: 6 }, { DB: db }, aliceSession);
+    assert.deepEqual(result.streaks, { currentStreak: 3, bestStreak: 3 },
+      'action rewards are immediate: a cast vote counts before the window closes');
+  });
+
   it('compliance: active season after close counts all weeks', async () => {
     const tables = basicTables();
     tables.settings = tables.settings.map(s =>

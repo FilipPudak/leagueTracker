@@ -71,15 +71,15 @@ cd backend && node --test "test/**/*.test.js"
 
 | Category | Files | Tests |
 |----------|-------|-------|
-| Library (awards, auth, badges, careerStats, deckStats, leagueSync, melee, meleeLeague, pagination, participation, seasonTable, voteAudit) | 12 | 304 |
-| Handlers (getAppData, submitVote, updateVote, linkAccount, unlinkAccount, getStandingsData, getAwardsData, getMySeasonStats, getMyCareerStats, getPlayerProfile, getVoteBootstrap, startNewSeason, admin, backfill) | 14 | 225 |
+| Library (awards, auth, badges, careerStats, deckStats, leagueSync, melee, meleeLeague, pagination, participation, seasonTable, voteAudit) | 12 | 308 |
+| Handlers (getAppData, submitVote, updateVote, linkAccount, unlinkAccount, getStandingsData, getAwardsData, getMySeasonStats, getMyCareerStats, getPlayerProfile, getVoteBootstrap, startNewSeason, admin, backfill) | 14 | 227 |
 | Database (queries, schema) | 2 | 74 |
 | Triggers (syncFromMelee, backfillFromMelee) | 2 | 79 |
 | Router & rate limiter | 2 | 41 |
 | Frontend (app-core + responsive redesign + vote-state + voting milestones) | 13 | 224 |
 | Privacy guard | 1 | 2 |
 | Test helpers (mock-db behavior) | 1 | 8 |
-| **Total** | **47** | **957** |
+| **Total** | **47** | **963** |
 
 Test infrastructure: `backend/test/helpers/mock-db.js` (D1 mock), `mock-fetch.js`,
 `mock-crypto.js`, `fixtures.js`, `test-utils.js`, `read-source.js` (EOL-normalized source reader).
