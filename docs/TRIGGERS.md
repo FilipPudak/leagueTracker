@@ -9,7 +9,7 @@ The backend uses a Cloudflare Worker with dual-cron triggers for DST-safe weekly
 crons = ["15 20,21,22 * * WED", "0 7 * * THU", "15 */2 * * *"]
 ```
 
-Two fires per Wednesday (20:15 and 21:15 UTC). Exactly one is 22:15 Stockholm in either DST state (summer UTC+2 / winter UTC+1). A Thursday 07:00 UTC fire retries data and opens voting if Wednesday's results weren't published in time.
+Three Wednesday fires (20:15, 21:15 and 22:15 UTC) — exactly two are time-gate-eligible per night, landing at 22:15 and 23:15 Stockholm in either DST state; the third always falls outside the gate. A Thursday 07:00 UTC fire retries data and opens voting if Wednesday's results weren't published in time.
 
 **Liveness probe:** `15 */2 * * *` (every 2 hours) writes the `LAST_PROBE_AT` heartbeat and does nothing else. It exists to detect silently-dead cron triggers: if `LAST_PROBE_AT` is fresh but `LAST_CRON_AT` is older than the last scheduled league-night fire, the weekly schedules — not the platform — are broken.
 
@@ -21,17 +21,24 @@ Two fires per Wednesday (20:15 and 21:15 UTC). Exactly one is 22:15 Stockholm in
 2. **Sync:** Fetches tournaments from Melee.gg API, then hands round data
    (tournament inserts, standings, matches, attendance, optional vote audit,
    player reactivation) to the shared engine `lib/leagueSync.js` — see
-   `syncSeasonData`. The lifecycle below is unchanged and stays inline here.
+   `syncSeasonData`. A synced round is only skipped while the Melee tournament
+   reports `Ended`; a round imported mid-night (torn standings/matches snapshot)
+   is re-fetched on every later fire and self-heals. The lifecycle below is
+   unchanged and stays inline here.
 3. **Attendance:** Rebuilt from regular standings
-4. **Awards:** Recomputes Schemer, Ambassador, Ruler, Champion, Bounty Hunter, A New Hope
+4. **Awards:** Recomputes the live podiums — Schemer, Ambassador, Ruler, Bounty Hunter, A New Hope.
+   Champion is not recomputed mid-season; it materializes at close or by a post-close fire.
 5. **Advance gate:** `shouldAdvance(isoNow, marker)` checks:
    - Stockholm local weekday is Wednesday (league night)
    - Stockholm local time ≥ 22:10
    - `LAST_ADVANCED` marker ≠ today's date (YYYY-MM-DD)
 6. **First run of season:** Sets `VOTING_OPEN=TRUE`, sets `LAST_ADVANCED=today`
 7. **Subsequent runs:** Advances `CURRENT_WEEK` to next week, sets `LAST_ADVANCED=today`
-8. **Season close:** When next week > `seasons.length` → syncs cut event, materializes all awards, sets `VOTING_OPEN=FALSE`, `SEASON_STARTED=FALSE`, `CURRENT_WEEK='Season Ended'`
+8. **Season close:** When next week > `seasons.length` → syncs cut event, materializes all awards
+   (Galactic Champion deferred while the cut event is still running — a post-close fire
+   materializes it once the bracket reports `Ended`), sets `VOTING_OPEN=FALSE`, `SEASON_STARTED=FALSE`, `CURRENT_WEEK='Season Ended'`
 9. **Paused:** If `SEASON_PAUSED=TRUE` → syncs data only, skips advance/open/close
+10. **Post-close fires:** Still sync data and fill the Champion award if a deferred close left it unwritten
 
 **Late data handling:** Data sync runs on every fire. If Melee publishes results after both fires, the next week's sync picks them up automatically.
 
