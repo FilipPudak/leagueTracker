@@ -77,6 +77,9 @@ Close sequence (runs on the fire after the last regular week's window — usuall
 championship night):
   sync that night's events (including the cut!) → compute & materialize awards →
   VOTING_OPEN=FALSE, SEASON_STARTED=FALSE, CURRENT_WEEK="Season Ended"
+  The Galactic Champion is materialized only while the cut event reports Ended; closing during a
+  still-running bracket defers the award (never the close itself — §3 "close is never deferred"),
+  and a post-close fire materializes it from the final standings.
 ```
 
 ## 5. Season Configuration
@@ -266,8 +269,12 @@ voted"), never per-player rankings.
 1. Round ≡ week ≡ voting window — guarded by `UNIQUE(season_id, round)`.
 2. Every `MAX(round)` / "final standings" query filters `phase='regular'` — enforced via
    separate query for regular rounds from `melee_tournaments`, then filter standings in JS.
-3. A night is "fully synced" only when **both** its standings and its match rows exist; an empty
-   tournament (created but unplayed/unpublished) may be re-fetched.
+3. A night is "fully synced" only when **both** its standings and its match rows exist **and** the
+ Melee tournament reports status `Ended`. Standings and matches are two separate fetches, so a run
+ during a still-reporting night can persist a torn snapshot (matches ahead of standings by a round —
+ observed 2026-10-28 week 8): row existence is not completeness. A synced-but-not-Ended night is
+ re-fetched on every later run (per-round DELETE+INSERT is atomic), so provisional data self-heals;
+ an empty tournament (created but unplayed/unpublished) may likewise be re-fetched.
 4. Sync and backfill share one player-lookup/creation path; unknown Melee names are
    auto-created (both paths, identically).
 5. Session timestamps are ISO-8601 UTC with `Z` everywhere (SQL `datetime('now')` and

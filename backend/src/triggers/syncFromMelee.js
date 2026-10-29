@@ -2,7 +2,7 @@ import { MeleeClient } from '../lib/melee.js';
 import { getSettings, updateSettingsBatch, parseSeasonId, parseWeek, isSeasonStarted, isSeasonPaused, isVotingOpen } from '../db/queries.js';
 import { computeSchemer, computeAmbassador, computeChampion, computeBountyHunter, computeNewHopeClimbers, writePodiumBlock } from '../lib/awards.js';
 import { fetchLeagueTournaments, buildWeekMap } from '../lib/meleeLeague.js';
-import { syncSeasonData } from '../lib/leagueSync.js';
+import { syncSeasonData, isRoundFinal } from '../lib/leagueSync.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';
 import { AWARD, PHASE, SETTINGS_KEY, SEASON_ENDED_WEEK, WEEK_PREFIX, SET_TRUE, SET_FALSE, DEFAULT_TOP_RESULTS, DEFAULT_SEASON_LENGTH, GATE_WEEKDAY, GATE_MINUTES, PRIMARY_CUTOFF_MINUTES } from '../lib/constants.js';
 
@@ -82,6 +82,10 @@ export async function syncFromMelee(env, deps = {}) {
   const topResults = season?.top_results || DEFAULT_TOP_RESULTS;
 
   const weekMap = buildWeekMap(matchedTournaments, existingRoundMap);
+  // A cut tournament that this fire still sees non-Ended means its bracket
+  // standings may be mid-event: the Champion award must not be materialized
+  // from it (the data itself self-heals; a later fire writes the award).
+  const cutProvisional = [...weekMap.values()].some(v => v.phase === PHASE.CUT && !isRoundFinal(v));
 
   const engineResult = await syncSeasonData(DB, client, {
     seasonId: activeSeasonId,
@@ -106,12 +110,14 @@ export async function syncFromMelee(env, deps = {}) {
     const championRow = await DB.prepare(
       "SELECT 1 FROM awards WHERE season_id = ? AND award_name = ? AND player_id != '' LIMIT 1"
     ).bind(activeSeasonId, AWARD.CHAMPION).first();
-    if (!championRow) {
+    if (!championRow && !cutProvisional) {
       const champion = await computeChampion(DB, activeSeasonId);
       if (champion.length > 0) {
         await writePodiumBlock(DB, activeSeasonId, AWARD.CHAMPION, champion);
         console.log('[SyncFromMelee] Post-close: Galactic Champion materialized.');
       }
+    } else if (!championRow && cutProvisional) {
+      console.log('[SyncFromMelee] Post-close: cut event still running; Champion deferred to a later fire.');
     }
     return { status: 'post-close-sync', syncedTournaments: weekMap.size };
   }
@@ -212,9 +218,13 @@ export async function syncFromMelee(env, deps = {}) {
   } else if (canAdvance) {
     const nextWeek = Math.max((currentWeek || 0) + 1, latestRegularAttended);
     if (nextWeek > seasonLength) {
-      const champion = await computeChampion(DB, activeSeasonId);
-      if (champion.length > 0) {
-        await writePodiumBlock(DB, activeSeasonId, AWARD.CHAMPION, champion);
+      if (!cutProvisional) {
+        const champion = await computeChampion(DB, activeSeasonId);
+        if (champion.length > 0) {
+          await writePodiumBlock(DB, activeSeasonId, AWARD.CHAMPION, champion);
+        }
+      } else {
+        console.log('[SyncFromMelee] Close: cut event still running; Champion left for post-close fires.');
       }
       await updateSettingsBatch(DB, [[SETTINGS_KEY.CURRENT_WEEK, SEASON_ENDED_WEEK], [SETTINGS_KEY.VOTING_OPEN, SET_FALSE], [SETTINGS_KEY.SEASON_STARTED, SET_FALSE]]);
       console.log('[SyncFromMelee] Season ended.');

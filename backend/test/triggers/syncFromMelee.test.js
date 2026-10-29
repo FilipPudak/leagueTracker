@@ -620,6 +620,53 @@ describe('triggers/syncFromMelee', () => {
       assert.equal(settings.CURRENT_WEEK, 'Season Ended');
     });
 
+    it('close defers Galactic Champion while the cut event is still running; post-close fire fills it when Ended', async () => {
+      const cutStandings = [
+        { Rank: 1, Points: 12, MatchWins: 4, MatchDraws: 0, MatchLosses: 1, Team: { Players: [{ Username: 'eve00' }] } },
+        { Rank: 2, Points: 9, MatchWins: 3, MatchDraws: 0, MatchLosses: 2, Team: { Players: [{ Username: 'alice42' }] } },
+      ];
+      const cutTournament = { ID: 200, Name: 'SWU Wednesday league season 6 Top 8', StartDate: '2026-09-09T19:00:00' };
+
+      const tables = fullySyncedTables();
+      tables.settings = tables.settings.map(s =>
+        s.key === 'CURRENT_WEEK' ? { ...s, value: 'Week 11' } : s
+      );
+      tables.melee_tournaments.push(
+        { melee_id: 200, season_id: 6, round: 12, name: 'SWU Wednesday league season 6 Top 8', date: '2026-09-09', phase: 'cut' }
+      );
+      tables.season_standings.push(
+        { season_id: 6, round: 12, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+        { season_id: 6, round: 12, player_id: 'P005', wins: 2, losses: 1, draws: 0, match_points: 6, rank: 2 }
+      );
+      tables.match_results.push(
+        { season_id: 6, round: 12, melee_match_id: 'semi1', player1_id: 'P001', player2_id: 'P005', winner_id: 'P001', result: '2-1', is_bye: 0 }
+      );
+      db = createMockDb(tables);
+
+      const f1 = buildMockFetch({ tournaments: [{ ...cutTournament, Status: 2 }], standings: cutStandings, matches: [] });
+      globalThis.fetch = f1.mockFetch;
+      const result1 = await syncFromMelee(
+        { DB: db },
+        { MeleeClient: makeMockClient(f1.mockFetch), now: '2026-09-09T20:15:00Z' }
+      );
+      assert.equal(result1.status, 'season-ended');
+      assert.ok(!db.getStore().awards.find(a => a.award_name === 'Galactic Champion' && a.season_id === 6),
+        'Champion must NOT materialize from a mid-bracket snapshot');
+      const healed = db.getStore().season_standings.find(s => s.round === 12 && s.rank === 1);
+      assert.equal(healed.player_id, 'P005', 'cut standings data still self-heals on the not-Ended refresh');
+
+      const f2 = buildMockFetch({ tournaments: [{ ...cutTournament, Status: 4, StatusDescription: 'Ended' }], standings: cutStandings, matches: [] });
+      globalThis.fetch = f2.mockFetch;
+      const result2 = await syncFromMelee(
+        { DB: db },
+        { MeleeClient: makeMockClient(f2.mockFetch), now: '2026-09-10T05:00:00Z' }
+      );
+      assert.equal(result2.status, 'post-close-sync');
+      const champion = db.getStore().awards.find(a => a.award_name === 'Galactic Champion' && a.season_id === 6);
+      assert.ok(champion, 'Champion materializes once the bracket is Ended');
+      assert.equal(champion.player_id, 'P005', 'from the final standings, not the semifinal leader');
+    });
+
     it('race guard skips advance when LAST_ADVANCED changed mid-run', async () => {
       const tables = fullySyncedTables();
       tables.settings = tables.settings.map(s =>

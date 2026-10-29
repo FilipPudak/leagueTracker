@@ -114,6 +114,8 @@ function makeWeekMap(entries) {
     name: e.name || `SWU Wednesday league season 6 ${e.round}/1 (week ${e.round})`,
     date: '2026-01-01T19:00:00',
     phase: e.phase || 'regular',
+    status: e.status === undefined ? 4 : e.status,
+    statusDescription: e.statusDescription,
   }]));
 }
 
@@ -278,6 +280,69 @@ describe('lib/leagueSync syncSeasonData (P4 Phase 2)', () => {
     assert.equal(client.calls.standings.length, 0, 'no standings fetch');
     assert.equal(client.calls.matches.length, 0, 'no matches fetch');
     assert.equal(db.getStore().season_standings.length, 1, 'seed row untouched');
+  });
+
+  it('T2.5b refetches a synced round while the source is not Ended (torn snapshot heals)', async () => {
+    const tables = engineTables();
+    tables.season_standings = [
+      { season_id: 6, round: 1, player_id: 'P001', wins: 2, losses: 0, draws: 0, match_points: 6, rank: 1 },
+    ];
+    tables.match_results = [
+      { season_id: 6, round: 1, melee_match_id: 'torn-guid', player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: '2-0', is_bye: 0 },
+    ];
+    const db = createMockDb(tables);
+    const client = engineClient();
+
+    const result = await syncSeasonData(db, client, {
+      seasonId: 6,
+      weekMap: makeWeekMap([{ meleeId: 201, round: 1, status: 2 }]),
+    });
+
+    assert.equal(result.roundsSkipped, 0, 'not-Ended rounds are never skipped');
+    assert.equal(result.roundsProcessed, 1);
+    assert.equal(client.calls.standings.length, 1, 'provisional round is re-fetched');
+    const store = db.getStore();
+    assert.ok(!store.match_results.find(m => m.melee_match_id === 'torn-guid'), 'torn rows replaced');
+    const alice = store.season_standings.find(s => s.player_id === 'P001');
+    assert.equal(alice.match_points, 9, 'final snapshot replaces the provisional one');
+  });
+
+  it('T2.5c treats missing status as provisional — refetches', async () => {
+    const tables = engineTables();
+    tables.season_standings = [
+      { season_id: 6, round: 1, player_id: 'P001', wins: 2, losses: 0, draws: 0, match_points: 6, rank: 1 },
+    ];
+    tables.match_results = [
+      { season_id: 6, round: 1, melee_match_id: 'm-1', player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: '2-0', is_bye: 0 },
+    ];
+    const db = createMockDb(tables);
+    const client = engineClient();
+
+    const weekMap = new Map([[201, { meleeId: 201, round: 1, name: 'x', date: null, phase: 'regular' }]]);
+    const result = await syncSeasonData(db, client, { seasonId: 6, weekMap });
+
+    assert.equal(result.roundsProcessed, 1, 'unknown status must default to provisional');
+    assert.equal(client.calls.standings.length, 1);
+  });
+
+  it('T2.5d skips a synced round identified final by statusDescription only', async () => {
+    const tables = engineTables();
+    tables.season_standings = [
+      { season_id: 6, round: 1, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+    ];
+    tables.match_results = [
+      { season_id: 6, round: 1, melee_match_id: 'm-1', player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: '2-0', is_bye: 0 },
+    ];
+    const db = createMockDb(tables);
+    const client = engineClient();
+
+    const result = await syncSeasonData(db, client, {
+      seasonId: 6,
+      weekMap: makeWeekMap([{ meleeId: 201, round: 1, status: null, statusDescription: 'Ended' }]),
+    });
+
+    assert.equal(result.roundsSkipped, 1);
+    assert.equal(client.calls.standings.length, 0);
   });
 
   it('T2.6 force bypasses the skip predicate and replaces the round', async () => {

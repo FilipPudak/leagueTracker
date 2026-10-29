@@ -189,6 +189,25 @@ describe('meleeLeague', () => {
       const weekMap = buildWeekMap(tournaments);
       assert.equal(weekMap.get(100).phase, 'cut');
     });
+
+    it('carries Melee Status onto regular and special weekMap entries', () => {
+      const tournaments = [
+        { ID: 100, Name: 'SWU Wednesday league season 6 15/7', StartDate: '2026-07-15', phase: 'regular', Status: 4, StatusDescription: 'Ended' },
+        { ID: 101, Name: 'SWU Wednesday league season 6 TOP 8', StartDate: '2026-07-22', phase: 'cut', Status: 2, StatusDescription: 'Running' },
+      ];
+      const weekMap = buildWeekMap(tournaments);
+      assert.equal(weekMap.get(100).status, 4);
+      assert.equal(weekMap.get(100).statusDescription, 'Ended');
+      assert.equal(weekMap.get(101).status, 2, 'specials must carry status too (champion guard)');
+    });
+
+    it('leaves status undefined when the API omits it', () => {
+      const tournaments = [
+        { ID: 100, Name: 'SWU Wednesday league season 6 15/7', StartDate: '2026-07-15', phase: 'regular' },
+      ];
+      const weekMap = buildWeekMap(tournaments);
+      assert.equal(weekMap.get(100).status, undefined);
+    });
   });
 
   describe('createPlayerFinder', () => {

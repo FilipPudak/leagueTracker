@@ -7,7 +7,7 @@
 
 import { createPlayerFinder } from './meleeLeague.js';
 import { auditVotesForWeek } from './voteAudit.js';
-import { PHASE } from './constants.js';
+import { PHASE, MELEE_STATUS_ENDED } from './constants.js';
 
 // D1 run/batch results carry meta.changes; the test mock carries changes.
 function changesOf(res) {
@@ -45,10 +45,21 @@ export async function resolveMatchCompetitors(comps, finder) {
   return { p1Id, p2Id };
 }
 
+// A round's source data is final only when Melee reports the tournament Ended
+// (numeric code or description). Anything else — Running, Pending, Not
+// Published, or an unknown/missing status — is provisional: standings and
+// matches are fetched as two separate calls, so a fire during a still
+// in-progress night can persist a torn snapshot; the not-Ended state must
+// therefore keep the round eligible for re-fetch so a later fire heals it.
+export function isRoundFinal(info) {
+  return info?.status === MELEE_STATUS_ENDED || info?.statusDescription === 'Ended';
+}
+
 // Per-round order (hard invariant):
-// skip check → fetch standings → resolve players → attended set from RESPONSE
-// → batch replace standings → write attendance (regular, ≤ maxAttendanceWeek)
-// → fetch matches → batch replace matches → audit (if opted in and complete).
+// skip check (rows exist AND source Ended, unless force) → fetch standings →
+// resolve players → attended set from RESPONSE → batch replace standings →
+// write attendance (regular, ≤ maxAttendanceWeek) → fetch matches → batch
+// replace matches → audit (if opted in and complete).
 export async function syncSeasonData(DB, client, {
   seasonId,
   weekMap,
@@ -106,8 +117,11 @@ export async function syncSeasonData(DB, client, {
     const round = info.round;
     if (processedRounds.has(round)) continue;
     if (!force && syncedStandingsRounds.has(round) && syncedMatchesRounds.has(round)) {
-      result.roundsSkipped++;
-      continue;
+      if (isRoundFinal(info)) {
+        result.roundsSkipped++;
+        continue;
+      }
+      console.log(`${logPrefix} Round ${round} synced but source not Ended (status ${info?.status ?? 'unknown'}) — refreshing provisional snapshot`);
     }
     if (result.roundsProcessed >= budget) break;
 

@@ -28,6 +28,7 @@ export const SETTINGS_KEY = {
 };
 
 export const SEASON_ENDED_WEEK = 'Season Ended';
+export const MELEE_STATUS_ENDED = 4;
 export const WEEK_PREFIX = 'Week ';
 export const DEFAULT_TOP_RESULTS = 7;
 export const DEFAULT_SEASON_LENGTH = 11;

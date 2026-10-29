@@ -282,7 +282,7 @@ describe('triggers/backfillFromMelee (engine)', () => {
     let fetchCount = 0;
     globalThis.fetch = async (url) => {
       if (url.includes('/api/standing/list/current/') || url.includes('/api/match/list/')) fetchCount++;
-      return { ok: true, status: 200, text: async () => JSON.stringify({ Content: [{ ID: 100, Name: 'SWU Wednesday league season 5 01/01 (week 1)', StartDate: '2025-01-01T19:00:00' }], TotalCount: 1 }) };
+      return { ok: true, status: 200, text: async () => JSON.stringify({ Content: [{ ID: 100, Name: 'SWU Wednesday league season 5 01/01 (week 1)', StartDate: '2025-01-01T19:00:00', Status: 4, StatusDescription: 'Ended' }], TotalCount: 1 }) };
     };
 
     await backfillFromMelee({ DB: db }, { MeleeClient: makeMockClient(globalThis.fetch), seasonId: 5 });

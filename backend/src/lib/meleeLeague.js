@@ -96,6 +96,8 @@ export function buildWeekMap(tournaments, existingRoundMap = new Map()) {
       name: t.Name,
       date: t.StartDate || t.LastPairDateTime || null,
       phase: PHASE.REGULAR,
+      status: t.Status,
+      statusDescription: t.StatusDescription,
     });
   }
 
@@ -109,6 +111,8 @@ export function buildWeekMap(tournaments, existingRoundMap = new Map()) {
       name: t.Name,
       date: t.StartDate || t.LastPairDateTime || null,
       phase,
+      status: t.Status,
+      statusDescription: t.StatusDescription,
     });
   }
 
