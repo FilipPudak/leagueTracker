@@ -76,10 +76,10 @@ cd backend && node --test "test/**/*.test.js"
 | Database (queries, schema) | 2 | 74 |
 | Triggers (syncFromMelee, backfillFromMelee) | 2 | 80 |
 | Router & rate limiter | 2 | 41 |
-| Frontend (app-core + responsive redesign + vote-state + voting milestones + CSP hardening) | 14 | 232 |
+| Frontend (app-core + responsive redesign + vote-state + voting milestones + CSP hardening) | 14 | 237 |
 | Privacy guard | 1 | 2 |
 | Test helpers (mock-db behavior) | 1 | 8 |
-| **Total** | **48** | **977** |
+| **Total** | **48** | **982** |
 
 Test infrastructure: `backend/test/helpers/mock-db.js` (D1 mock), `mock-fetch.js`,
 `mock-crypto.js`, `fixtures.js`, `test-utils.js`, `read-source.js` (EOL-normalized source reader).

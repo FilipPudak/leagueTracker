@@ -1,13 +1,16 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync, statSync } from 'node:fs';
 import { readSource } from '../helpers/read-source.js';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const HTML = join(__dirname, '../../../docs/app/index.html');
-const JS = join(__dirname, '../../../docs/app/app.js');
-const BOOT = join(__dirname, '../../../docs/app/boot.js');
+const APP = join(__dirname, '../../../docs/app');
+const HTML = join(APP, 'index.html');
+const JS = join(APP, 'app.js');
+const BOOT = join(APP, 'boot.js');
+const CSS = join(APP, 'styles.css');
 
 describe('CSP hardening Phase A: no inline event handlers', () => {
   it('index.html carries zero on*= handler attributes', () => {
@@ -85,12 +88,57 @@ describe('CSP hardening Phase A: no inline event handlers', () => {
     assert.ok(!meta.includes("script-src 'self' 'unsafe-inline'"), 'no unsafe-inline for scripts');
     assert.ok(meta.includes("style-src-attr 'unsafe-inline'"), 'style attribute idiom stays allowed');
     assert.ok(meta.includes("style-src-elem 'self'"), 'style elements pinned to self');
-    assert.ok(meta.includes("style-src 'self' 'unsafe-inline' https://fonts.googleapis.com"),
+    assert.ok(meta.includes("style-src 'self' 'unsafe-inline'"),
       'legacy style-src fallback so pre-2022 browsers never fall to default-src none');
     assert.ok(meta.includes('connect-src https://league-tracker.filip-pudak.workers.dev'), 'connect pinned to the worker');
     assert.ok(meta.includes('http://localhost:8787'), 'dev localhost branch stays allowed');
     assert.ok(meta.includes("base-uri 'none'") && meta.includes("form-action 'none'") && meta.includes("object-src 'none'"), 'navigation/embed hardening present');
-    assert.ok(metaIdx < html.indexOf('<link rel="preconnect"'), 'policy must precede every resource it should govern');
+    assert.ok(metaIdx < html.indexOf('<link rel="stylesheet"'), 'policy must precede every resource it should govern');
     assert.ok(html.indexOf('<meta charset') < metaIdx && metaIdx - html.indexOf('<meta charset') < 120, 'placed immediately after charset');
+  });
+});
+
+describe('CSP hardening Phase C1: fonts self-hosted, zero third-party origins', () => {
+  it('no Google font references remain in the shipped surface', () => {
+    const html = readSource(HTML);
+    const css = readSource(CSS);
+    for (const [name, src] of [['index.html', html], ['styles.css', css]]) {
+      assert.ok(!src.includes('fonts.googleapis.com'), `${name} must not reference fonts.googleapis.com`);
+      assert.ok(!src.includes('fonts.gstatic.com'), `${name} must not reference fonts.gstatic.com`);
+    }
+  });
+
+  it('four pinned latin woff2 files are bundled on disk', () => {
+    const files = ['orbitron-latin.woff2', 'rajdhani-500.woff2', 'rajdhani-600.woff2', 'rajdhani-700.woff2'];
+    files.forEach((f) => {
+      const p = join(APP, 'fonts', f);
+      assert.ok(existsSync(p), `fonts/${f} must exist`);
+      assert.ok(statSync(p).size > 8000, `fonts/${f} looks truncated (${statSync(p).size} bytes)`);
+    });
+    assert.ok(!existsSync(join(APP, 'fonts', 'orbitron-400.woff2')), 'orbitron is one variable file, no per-weight duplicates');
+  });
+
+  it('OFL license texts ship alongside the fonts', () => {
+    assert.ok(existsSync(join(APP, 'fonts', 'OFL-orbitron.txt')), 'Orbitron OFL required');
+    assert.ok(existsSync(join(APP, 'fonts', 'OFL-rajdhani.txt')), 'Rajdhani OFL required');
+  });
+
+  it('styles.css declares the @font-face sources locally', () => {
+    const css = readSource(CSS);
+    assert.equal((css.match(/@font-face/g) || []).length, 4, 'one variable orbitron + three static rajdhani faces');
+    ['orbitron-latin', 'rajdhani-500', 'rajdhani-600', 'rajdhani-700'].forEach((n) => {
+      assert.ok(css.includes(`url('fonts/${n}.woff2')`), `@font-face must load fonts/${n}.woff2 locally`);
+    });
+    assert.ok(/font-weight:\s*400 900/.test(css), 'orbitron face declares the variable weight range');
+    assert.ok(css.includes('font-display: swap'), 'swap semantics preserved from Google css');
+    assert.ok(!css.includes('gstatic') && !css.includes('googleapis'), 'css must not reach back to Google');
+  });
+
+  it('policy is same-origin + worker only after C1', () => {
+    const html = readSource(HTML);
+    const meta = html.slice(html.indexOf('<meta http-equiv="Content-Security-Policy"'),
+      html.indexOf('>', html.indexOf('<meta http-equiv="Content-Security-Policy"')) + 1);
+    assert.ok(meta.includes("font-src 'self'"), 'font-src pinned to self');
+    assert.ok(!meta.includes('googleapis') && !meta.includes('gstatic'), 'no external origins left in the policy');
   });
 });
