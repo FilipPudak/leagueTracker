@@ -74,4 +74,23 @@ describe('CSP hardening Phase A: no inline event handlers', () => {
       assert.ok(html.includes(`id="${id}"`), `wireEvents targets #${id} but index.html has no such id`);
     });
   });
+
+  it('Phase B: meta CSP present, script-self-only, and placed before every resource', () => {
+    const html = readSource(HTML);
+    const metaIdx = html.indexOf('<meta http-equiv="Content-Security-Policy"');
+    assert.ok(metaIdx !== -1, 'meta CSP must be delivered in the document');
+    const meta = html.slice(metaIdx, html.indexOf('>', metaIdx) + 1);
+    assert.ok(meta.includes("default-src 'none'"), 'deny-by-default');
+    assert.ok(/script-src 'self'(;|")/.test(meta), "script-src must be 'self' with no further sources");
+    assert.ok(!meta.includes("script-src 'self' 'unsafe-inline'"), 'no unsafe-inline for scripts');
+    assert.ok(meta.includes("style-src-attr 'unsafe-inline'"), 'style attribute idiom stays allowed');
+    assert.ok(meta.includes("style-src-elem 'self'"), 'style elements pinned to self');
+    assert.ok(meta.includes("style-src 'self' 'unsafe-inline' https://fonts.googleapis.com"),
+      'legacy style-src fallback so pre-2022 browsers never fall to default-src none');
+    assert.ok(meta.includes('connect-src https://league-tracker.filip-pudak.workers.dev'), 'connect pinned to the worker');
+    assert.ok(meta.includes('http://localhost:8787'), 'dev localhost branch stays allowed');
+    assert.ok(meta.includes("base-uri 'none'") && meta.includes("form-action 'none'") && meta.includes("object-src 'none'"), 'navigation/embed hardening present');
+    assert.ok(metaIdx < html.indexOf('<link rel="preconnect"'), 'policy must precede every resource it should govern');
+    assert.ok(html.indexOf('<meta charset') < metaIdx && metaIdx - html.indexOf('<meta charset') < 120, 'placed immediately after charset');
+  });
 });
