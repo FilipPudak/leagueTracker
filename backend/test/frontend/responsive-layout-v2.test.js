@@ -290,7 +290,7 @@ describe('Review guards: layout regressions', () => {
 describe('Assets: cache-busting stamps', () => {
   it('all local asset links carry a ?v= stamp', () => {
     const html = readHTML();
-    ['styles.css', 'app-core.js', 'app.js'].forEach((asset) => {
+    ['styles.css', 'boot.js', 'app-core.js', 'app.js'].forEach((asset) => {
       assert.ok(
         html.includes(`${asset}?v=`),
         `${asset} link must carry a ?v= cache-busting stamp`
@@ -408,7 +408,7 @@ describe('Flow & accessibility: guards', () => {
   it('season selectors share one browsing state', () => {
     const html = readHTML();
     const js = readJS();
-    assert.equal((html.match(/onSeasonFilterChange/g) || []).length, 4, 'all four season selects must sync');
+    assert.equal((html.match(/data-season-sync=/g) || []).length, 4, 'all four season selects must sync');
     assert.ok(js.includes("localStorage.setItem(KEY_BROWSING_SEASON"), 'browsing season must persist');
     assert.ok(js.includes('function seasonForBrowsing'), 'shared season getter must exist');
   });
@@ -499,9 +499,10 @@ describe('Season switch: lands on the latest night', () => {
 describe('Sign-in & guest: modal, banner, header sizing', () => {
   it('sign-in is a dialog with full dismissal affordances', () => {
     const html = readHTML();
+    const js = readJS();
     assert.ok(html.includes('id="link-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true"'), 'sign-in must be a dialog');
     assert.ok(html.includes('aria-label="Close sign in"'), 'sign-in close needs an accessible name');
-    assert.ok(html.includes('onclick="closeSignIn(event)"'), 'backdrop tap must close sign-in');
+    assert.ok(js.includes("wireBackdrop($('link-modal-overlay'), closeSignIn)"), 'backdrop tap must close sign-in');
   });
 
   it('link form messages surface inside the modal, not behind the backdrop', () => {
@@ -525,7 +526,7 @@ describe('Sign-in & guest: modal, banner, header sizing', () => {
     const js = readJS();
     assert.ok(!html.includes('guest-banner-cta'), 'banner must not carry its own sign-in button');
     assert.ok(html.includes('aria-label="Dismiss sign-in reminder"'), 'banner close needs an accessible name');
-    assert.ok(html.includes('id="signin-cta" class="signin-cta" onclick="openSignIn(true)"'), 'header pill is the explicit CTA');
+    assert.ok(html.includes('id="signin-cta" class="signin-cta"'), 'header pill is the explicit CTA');
     assert.ok(js.includes("sessionStorage.setItem('lt_guestbanner_dismissed'"), 'dismissal is per session');
     assert.ok(js.includes('if (explicit === true)'), 'engagement flag must be explicit-only');
     assert.ok(js.includes("sessionStorage.removeItem('lt_signin_engaged')"), 'sign-out restarts the guest funnel');
@@ -534,7 +535,7 @@ describe('Sign-in & guest: modal, banner, header sizing', () => {
   it('sign-in modal submits on Enter and never lets the page behind it take focus', () => {
     const html = readHTML();
     const js = readJS();
-    assert.ok(html.includes('<form novalidate onsubmit="event.preventDefault(); submitAccountLink();">'), 'sign-in must be a real form');
+    assert.ok(html.includes('<form id="link-form" novalidate>'), 'sign-in must be a real form');
     assert.ok(html.includes('type="submit" id="link-submit"'), 'submit button must be type=submit');
     assert.ok(js.includes('shell.inert = anyOpen'), 'background must be inert while an overlay is open');
   });

@@ -10,10 +10,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap" as="style">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="styles.css?v=4.16.3">
+  <link rel="stylesheet" href="styles.css?v=4.17.0">
 </head>
 <body>
-  <script>document.body.classList.toggle('is-linked',!!localStorage.getItem('lt_token'))</script>
+  <script src="boot.js?v=4.17.0"></script>
   <div class="app-container">
     <div class="header">
       <div class="header-content">
@@ -29,28 +29,28 @@
         <div id="voting-badge" class="badge badge-active" style="display: none;">Voting Open</div>
         <div id="identity-chip" class="identity-chip">
           <span class="chip-name" id="chip-name">—</span>
-          <button type="button" class="not-you" onclick="unlinkCurrentDevice()">· Not you?</button>
+          <button type="button" id="chip-unlink" class="not-you">· Not you?</button>
         </div>
-        <button type="button" id="signin-cta" class="signin-cta" onclick="openSignIn(true)">Sign in</button>
+        <button type="button" id="signin-cta" class="signin-cta">Sign in</button>
       </div>
     </div>
 
     <div class="desktop-columns">
     <div class="col-right">
     <div class="nav-tabs" style="display:none;" role="tablist" aria-label="Main navigation">
-      <button type="button" id="tab-vote" class="tab-btn" role="tab" tabindex="-1" aria-selected="false" aria-controls="vote-view" onclick="switchTab('vote-view')">
+      <button type="button" id="tab-vote" class="tab-btn" role="tab" tabindex="-1" aria-selected="false" aria-controls="vote-view" data-view="vote-view">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
         <span>Vote</span>
       </button>
-      <button type="button" id="tab-standings" class="tab-btn" role="tab" tabindex="0" aria-selected="false" aria-controls="standings-view" onclick="switchTab('standings-view')">
+      <button type="button" id="tab-standings" class="tab-btn" role="tab" tabindex="0" aria-selected="false" aria-controls="standings-view" data-view="standings-view">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         <span>Standings</span>
       </button>
-      <button type="button" id="tab-awards" class="tab-btn" role="tab" tabindex="-1" aria-selected="false" aria-controls="awards-view" onclick="switchTab('awards-view')">
+      <button type="button" id="tab-awards" class="tab-btn" role="tab" tabindex="-1" aria-selected="false" aria-controls="awards-view" data-view="awards-view">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
         <span>Awards</span>
       </button>
-      <button type="button" id="tab-myseason" class="tab-btn" role="tab" tabindex="-1" aria-selected="false" aria-controls="myseason-view" onclick="switchTab('myseason-view')">
+      <button type="button" id="tab-myseason" class="tab-btn" role="tab" tabindex="-1" aria-selected="false" aria-controls="myseason-view" data-view="myseason-view">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span>My Stats</span>
       </button>
@@ -58,7 +58,7 @@
 
     <div id="status-box" class="status-msg" role="status" aria-live="polite"></div>
     <div id="retry-load" style="display:none; text-align:center; margin-bottom:16px;">
-      <button type="button" class="btn-submit" style="width:auto; padding:0 24px; margin-top:0;" onclick="fetchInitialAppData()">Retry</button>
+      <button type="button" id="retry-load-btn" class="btn-submit" style="width:auto; padding:0 24px; margin-top:0;">Retry</button>
     </div>
     <div id="loading-spinner" class="loader" role="status" aria-label="Loading data"></div>
 
@@ -67,7 +67,7 @@
       <div id="deadline-copy" class="card" style="display: none; margin-bottom: 12px; padding: 10px 14px; font-size: 0.85rem; color: #94a3b8;">
         <span id="deadline-text"></span>
       </div>
-      <form id="vote-form" onsubmit="event.preventDefault(); submitVotes();">
+      <form id="vote-form">
         <div class="form-group">
           <label for="leader-1">Leader Played</label>
           <select id="leader-1" required><option value="">-- Select Leader --</option></select>
@@ -83,7 +83,7 @@
       <div id="already-voted-card" class="card" style="display: none;">
         <h3 class="section-heading">Votes Received!</h3>
         <p style="font-size: 0.9rem; color: #a7f3d0; margin-bottom:12px;">Your votes for this week are logged. Check back next week!</p>
-        <button type="button" id="btn-change-vote" class="btn-ghost" onclick="changeVote()" style="display:none;">Change Vote</button>
+        <button type="button" id="btn-change-vote" class="btn-ghost" style="display:none;">Change Vote</button>
       </div>
 
       <div id="not-attended-card" class="card" style="display: none;">
@@ -99,18 +99,18 @@
     <div id="standings-view" class="view-panel" role="tabpanel" aria-labelledby="tab-standings">
       <div id="guest-banner" class="guest-banner">
         <span class="guest-pitch-text"></span>
-        <button type="button" class="guest-banner-close" aria-label="Dismiss sign-in reminder" onclick="dismissGuestBanner()">&#10005;</button>
+        <button type="button" id="guest-banner-close" class="guest-banner-close" aria-label="Dismiss sign-in reminder">&#10005;</button>
       </div>
       <div id="vote-cta" style="display:none;" class="vote-cta">
-        <button type="button" class="btn-submit" onclick="switchTab('vote-view')">Vote now &rarr;</button>
+        <button type="button" id="vote-cta-btn" class="btn-submit">Vote now &rarr;</button>
       </div>
       <div class="form-group">
         <label for="standings-season-filter">Select Season</label>
-        <select id="standings-season-filter" onchange="onSeasonFilterChange('standings-season-filter'); loadStandingsData()"></select>
+        <select id="standings-season-filter" data-season-sync="true"></select>
       </div>
       <div class="form-group">
         <label for="standings-round-filter">Up to Night</label>
-        <select id="standings-round-filter" onchange="loadStandingsData()">
+        <select id="standings-round-filter">
         </select>
       </div>
 
@@ -150,7 +150,7 @@
     <div id="awards-view" class="view-panel" role="tabpanel" aria-labelledby="tab-awards">
       <div class="form-group">
         <label for="season-filter">Select Season</label>
-        <select id="season-filter" onchange="onSeasonFilterChange('season-filter'); loadAwardsData()"></select>
+        <select id="season-filter" data-season-sync="true"></select>
       </div>
 
       <div id="awards-participation-card" class="card" style="display: none; margin-bottom: 16px; padding: 10px 14px; font-size: 0.85rem; color: #94a3b8;">
@@ -198,19 +198,19 @@
     <!-- PLAYER PROFILE PANEL -->
     <div id="player-profile-view" class="view-panel">
       <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:16px;">
-        <button type="button" class="link-back-text" onclick="switchTab(appState.lastView || 'standings-view')">&larr; Back</button>
+        <button type="button" id="profile-back-btn" class="link-back-text">&larr; Back</button>
         <h2 id="profile-title" style="margin:0; font-size:1.1rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;"></h2>
       </div>
       <div id="profile-loading" class="player-modal-loading" style="display:none;">Loading profile...</div>
       <div id="profile-content" style="display:none;">
         <div class="profile-tabs" role="tablist" aria-label="Profile sections">
-          <button type="button" class="profile-tab active" role="tab" aria-selected="true" aria-controls="profile-tab-season" onclick="switchProfileTab('season')">Season</button>
-          <button type="button" class="profile-tab" role="tab" aria-selected="false" aria-controls="profile-tab-career" onclick="switchProfileTab('career')">Career</button>
+          <button type="button" class="profile-tab active" role="tab" aria-selected="true" aria-controls="profile-tab-season" data-tab="season">Season</button>
+          <button type="button" class="profile-tab" role="tab" aria-selected="false" aria-controls="profile-tab-career" data-tab="career">Career</button>
         </div>
         <div id="profile-tab-season" class="profile-panel active" role="tabpanel">
           <div class="form-group">
             <label for="profile-season-filter">Select Season</label>
-            <select id="profile-season-filter" onchange="onSeasonFilterChange('profile-season-filter'); loadProfileSeason()"></select>
+            <select id="profile-season-filter" data-season-sync="true"></select>
           </div>
           <div id="profile-season-content"></div>
         </div>
@@ -226,7 +226,7 @@
     <div id="guest-pitch" class="card">
       <h3 class="section-heading">Sign In</h3>
       <p class="guest-pitch-text" style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 12px;"></p>
-      <button type="button" class="btn-submit" onclick="openSignIn(true)">Sign In</button>
+      <button type="button" id="guest-pitch-signin" class="btn-submit">Sign In</button>
       <p class="guest-pitch-note">Your email is only used to recognize this device — the league runs on Melee results.</p>
     </div>
 
@@ -237,9 +237,9 @@
         <summary>Career</summary>
         <div id="career-empty" style="text-align:center; color:#94a3b8; padding:12px; font-size:0.85rem; display:none;">No career history yet — your stats appear after you play your first league night.</div>
         <div class="career-tabs" role="tablist" aria-label="Career sections">
-          <button type="button" class="career-tab active" role="tab" aria-selected="true" aria-controls="career-tab-record" onclick="switchCareerTab('record')">Record</button>
-          <button type="button" class="career-tab" role="tab" aria-selected="false" aria-controls="career-tab-versus" onclick="switchCareerTab('versus')">Versus</button>
-          <button type="button" class="career-tab" role="tab" aria-selected="false" aria-controls="career-tab-badges" onclick="switchCareerTab('badges')">Badges</button>
+          <button type="button" class="career-tab active" role="tab" aria-selected="true" aria-controls="career-tab-record" data-tab="record">Record</button>
+          <button type="button" class="career-tab" role="tab" aria-selected="false" aria-controls="career-tab-versus" data-tab="versus">Versus</button>
+          <button type="button" class="career-tab" role="tab" aria-selected="false" aria-controls="career-tab-badges" data-tab="badges">Badges</button>
         </div>
         <div id="career-tab-record" class="career-panel active" role="tabpanel">
           <div id="career-record-card" class="card card-tight" style="display:none;"></div>
@@ -257,7 +257,7 @@
         <summary id="season-summary">Season</summary>
         <div class="form-group">
           <label for="myseason-season-filter">Select Season</label>
-          <select id="myseason-season-filter" onchange="onSeasonFilterChange('myseason-season-filter'); loadMySeasonStats()"></select>
+          <select id="myseason-season-filter" data-season-sync="true"></select>
         </div>
 
         <div id="myseason-content" style="display: none;">
@@ -313,56 +313,56 @@
       <h3 id="unlink-confirm-title">Sign Out?</h3>
       <p id="unlink-confirm-text">You'll be signed out on this device. You can sign in again anytime.</p>
       <div class="modal-actions">
-        <button type="button" class="btn-ghost" onclick="cancelUnlink()">Cancel</button>
-        <button type="button" class="btn-danger" onclick="confirmUnlink()">Sign Out</button>
+        <button type="button" id="cancel-unlink-btn" class="btn-ghost">Cancel</button>
+        <button type="button" id="confirm-unlink-btn" class="btn-danger">Sign Out</button>
       </div>
     </div>
   </div>
 
-  <div id="player-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="player-modal-name" onclick="closePlayerModal(event)">
+  <div id="player-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="player-modal-name">
     <div class="modal-box player-modal-box">
       <div class="player-modal-head">
         <div style="min-width:0;">
           <h3 id="player-modal-name" style="margin:0;"></h3>
           <div id="player-modal-season" class="stats-subtitle" style="margin-top:2px;"></div>
         </div>
-        <button type="button" id="player-modal-close" class="btn-ghost player-modal-close" aria-label="Close player summary" onclick="closePlayerModal()">&#10005;</button>
+        <button type="button" id="player-modal-close" class="btn-ghost player-modal-close" aria-label="Close player summary">&#10005;</button>
       </div>
       <div id="player-modal-content"></div>
       <div class="player-modal-foot">
-        <a href="#" id="player-modal-profile-link" onclick="openPlayerProfile(event)"
+        <a href="#" id="player-modal-profile-link"
            class="hover-underline" style="color:#38bdf8; font-size:0.9rem; cursor:pointer;">View Full Profile &rarr;</a>
       </div>
     </div>
   </div>
 
-  <div id="link-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="link-modal-title" onclick="closeSignIn(event)">
+  <div id="link-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="link-modal-title">
     <div class="modal-box link-modal-box">
       <div class="player-modal-head">
         <h3 id="link-modal-title" style="margin:0;">Sign In</h3>
-        <button type="button" id="link-modal-close" class="btn-ghost player-modal-close" aria-label="Close sign in" onclick="closeSignIn()">&#10005;</button>
+        <button type="button" id="link-modal-close" class="btn-ghost player-modal-close" aria-label="Close sign in">&#10005;</button>
       </div>
       <div id="link-modal-error" class="status-msg status-error"></div>
       <p class="guest-pitch-text" style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 14px;"></p>
-      <form novalidate onsubmit="event.preventDefault(); submitAccountLink();">
+      <form id="link-form" novalidate>
       <div class="form-group">
         <label for="link-email">Your Email</label>
         <input type="email" id="link-email" class="text-input" placeholder="you@example.com" autocomplete="email" required>
       </div>
       <div class="form-group" id="link-picker-group" style="display:none;">
         <label for="link-player-search">Select Your Name</label>
-        <input type="text" id="link-player-search" class="text-input" placeholder="Type to search..." oninput="filterLinkPicker()" autocomplete="off">
+        <input type="text" id="link-player-search" class="text-input" placeholder="Type to search..." autocomplete="off">
         <div id="link-player-select" class="picker-list" role="group" aria-label="Player names" style="margin-top: 8px;"></div>
         <div id="link-picker-empty" class="picker-empty" style="display:none;">No match — names appear exactly as registered at the table. Sign in with your email instead, or ask on Discord.</div>
       </div>
       <p id="link-email-hint" style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 12px;">We'll find your player profile using this email.</p>
-      <button type="button" id="link-mode-toggle" class="not-you" onclick="toggleLinkMode()" style="display:block; margin-bottom:12px;">First time here? Pick your name from the player list</button>
+      <button type="button" id="link-mode-toggle" class="not-you" style="display:block; margin-bottom:12px;">First time here? Pick your name from the player list</button>
       <button type="submit" id="link-submit" class="btn-submit">Sign In</button>
       </form>
     </div>
   </div>
 
-  <script src="app-core.js?v=4.16.3"></script>
-<script src="app.js?v=4.16.3"></script>
+  <script src="app-core.js?v=4.17.0"></script>
+<script src="app.js?v=4.17.0"></script>
 </body>
 </html>

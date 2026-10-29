@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.16.3';
+const APP_VERSION = '4.17.0';
 
 const appState = {
   status: 'unlinked',
@@ -463,7 +463,7 @@ function renderLinkPicker(query) {
   const matches = linkPickerPlayers.filter((p) => (p.name || '').toLowerCase().includes(q));
   list.innerHTML = matches.map((p) => {
     const selected = String(p.id) === linkPickerSelection;
-    return `<button type="button" aria-pressed="${selected ? 'true' : 'false'}" class="picker-row${selected ? ' selected' : ''}" onclick="selectLinkPlayer('${escapeHtml(String(p.id))}')">${escapeHtml(p.name || p.id)}</button>`;
+    return `<button type="button" aria-pressed="${selected ? 'true' : 'false'}" class="picker-row${selected ? ' selected' : ''}" data-player-id="${escapeHtml(String(p.id))}">${escapeHtml(p.name || p.id)}</button>`;
   }).join('');
   const empty = $('link-picker-empty');
   if (empty) empty.style.display = matches.length > 0 ? 'none' : 'block';
@@ -1033,7 +1033,7 @@ function renderStandingsTable(table) {
     const playerName = nameMap[row.playerId] || row.playerId;
     return `<tr class="standings-row${rankClass}" ${row.rank > STANDINGS_PAGE_SIZE && !standingsShowAll ? 'style="display:none;"' : ''}>
       <td style="font-weight:700; text-align:left;">${escapeHtml(row.rank)}</td>
-      <td style="text-align:left;"><button type="button" class="name-btn" onclick="openPlayerModal('${escapeHtml(row.playerId)}')">${escapeHtml(playerName)}</button>${awardBadge('ruler', (appState.rulerCounts || {})[row.playerId])}${awardBadge('champion', (appState.championCounts || {})[row.playerId])}</td>
+      <td style="text-align:left;"><button type="button" class="name-btn" data-player-id="${escapeHtml(row.playerId)}">${escapeHtml(playerName)}</button>${awardBadge('ruler', (appState.rulerCounts || {})[row.playerId])}${awardBadge('champion', (appState.championCounts || {})[row.playerId])}</td>
       <td style="text-align:center;">${escapeHtml(row.played)}</td>
       <td style="text-align:center;">${escapeHtml(row.won)}</td>
       <td style="text-align:center;">${escapeHtml(row.drawn)}</td>
@@ -1090,7 +1090,7 @@ function renderRoundResults(rounds) {
         return `<div class="stats-row" style="padding:6px 10px;">
           <div class="stats-left">
             <div class="rank-pill" style="width:24px; height:24px; font-size:0.65rem;">#${escapeHtml(p.rank || '-')}</div>
-            <button type="button" class="name-btn stats-title" style="font-size:0.85rem;" onclick="openPlayerModal('${escapeHtml(p.playerId)}')">${escapeHtml(playerName)}</button>
+            <button type="button" class="name-btn stats-title" style="font-size:0.85rem;" data-player-id="${escapeHtml(p.playerId)}">${escapeHtml(playerName)}</button>
           </div>
           <span class="stats-score" style="font-size:0.8rem;">${escapeHtml(p.points)} pts</span>
         </div>`;
@@ -1098,7 +1098,7 @@ function renderRoundResults(rounds) {
       .join('');
 
     return `<div class="round-card">
-      <div class="round-header" role="button" tabindex="0" onclick="this.nextElementSibling.classList.toggle('open')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.nextElementSibling.classList.toggle('open')}">
+      <div class="round-header" role="button" tabindex="0">
         <span class="round-title">${title}</span>
         <span class="round-phase ${phaseClass}">${escapeHtml(phaseLabel)}</span>
       </div>
@@ -1617,9 +1617,96 @@ async function fetchInitialAppData() {
   }
 }
 
+function wireBackdrop(el, closeFn) {
+  if (el) el.addEventListener('click', (e) => closeFn(e));
+}
+
+function wireEvents() {
+  const on = (id, type, fn) => {
+    const el = $(id);
+    if (el) el.addEventListener(type, fn);
+  };
+
+  on('chip-unlink', 'click', () => unlinkCurrentDevice());
+  on('signin-cta', 'click', () => openSignIn(true));
+  on('guest-pitch-signin', 'click', () => openSignIn(true));
+  on('guest-banner-close', 'click', dismissGuestBanner);
+  on('vote-cta-btn', 'click', () => switchTab('vote-view'));
+  on('retry-load-btn', 'click', () => fetchInitialAppData());
+  on('btn-change-vote', 'click', () => changeVote());
+  on('profile-back-btn', 'click', () => switchTab(appState.lastView || 'standings-view'));
+  on('cancel-unlink-btn', 'click', () => cancelUnlink());
+  on('confirm-unlink-btn', 'click', () => confirmUnlink());
+  on('player-modal-close', 'click', () => closePlayerModal());
+  on('link-modal-close', 'click', () => closeSignIn());
+  on('link-mode-toggle', 'click', () => toggleLinkMode());
+  on('link-player-search', 'input', () => filterLinkPicker());
+  on('player-modal-profile-link', 'click', openPlayerProfile);
+  wireBackdrop($('player-modal-overlay'), closePlayerModal);
+  wireBackdrop($('link-modal-overlay'), closeSignIn);
+
+  on('vote-form', 'submit', (e) => {
+    e.preventDefault();
+    submitVotes();
+  });
+  on('link-form', 'submit', (e) => {
+    e.preventDefault();
+    submitAccountLink();
+  });
+
+  document.querySelectorAll('.nav-tabs [data-view]').forEach((btn) => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.view));
+  });
+  document.querySelectorAll('.profile-tabs [data-tab]').forEach((btn) => {
+    btn.addEventListener('click', () => switchProfileTab(btn.dataset.tab));
+  });
+  document.querySelectorAll('.career-tabs [data-tab]').forEach((btn) => {
+    btn.addEventListener('click', () => switchCareerTab(btn.dataset.tab));
+  });
+
+  const seasonReload = {
+    'standings-season-filter': loadStandingsData,
+    'season-filter': loadAwardsData,
+    'profile-season-filter': loadProfileSeason,
+    'myseason-season-filter': loadMySeasonStats,
+  };
+  document.querySelectorAll('[data-season-sync]').forEach((sel) => {
+    sel.addEventListener('change', () => {
+      onSeasonFilterChange(sel.id);
+      (seasonReload[sel.id] || (() => {}))();
+    });
+  });
+  on('standings-round-filter', 'change', () => loadStandingsData());
+
+  on('standings-table-body', 'click', (e) => {
+    const name = e.target.closest('[data-player-id]');
+    if (name) openPlayerModal(name.dataset.playerId);
+  });
+  on('link-player-select', 'click', (e) => {
+    const row = e.target.closest('[data-player-id]');
+    if (row) selectLinkPlayer(row.dataset.playerId);
+  });
+  on('round-results-container', 'click', (e) => {
+    const name = e.target.closest('[data-player-id]');
+    if (name) {
+      openPlayerModal(name.dataset.playerId);
+      return;
+    }
+    const header = e.target.closest('.round-header');
+    if (header) header.nextElementSibling.classList.toggle('open');
+  });
+  on('round-results-container', 'keydown', (e) => {
+    const header = e.target.closest('.round-header');
+    if (!header || (e.key !== 'Enter' && e.key !== ' ')) return;
+    e.preventDefault();
+    header.nextElementSibling.classList.toggle('open');
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   applyVersion();
   renderGuestCopy();
+  wireEvents();
   fetchInitialAppData();
   initCollapsibles();
   initBadgeTooltips();
