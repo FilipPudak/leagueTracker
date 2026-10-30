@@ -314,7 +314,7 @@ function executeSelect(sql, params, store) {
     // Handle GROUP BY in JOIN results
     const hasGroupBy = /GROUP\s+BY/i.test(sql);
     if (hasGroupBy) {
-      const groupMatch = sql.match(/GROUP\s+BY\s+([\w.",]+(?:\s*,\s*[\w.",]+)*)/i);
+    const groupMatch = sql.match(/GROUP\s+BY\s+([\w."]+(?:\s*,\s*[\w."]+)*)/i);
       const rawGroupCols = groupMatch[1].split(',').map(c => c.trim().replace(/"/g, ''));
       const groupCols = rawGroupCols.map(c => {
         const parts = c.split('.');
@@ -478,7 +478,7 @@ function executeSelect(sql, params, store) {
 
   // Handle GROUP BY (must be checked before standalone COUNT)
   if (hasGroupBy) {
-    const groupMatch = sql.match(/GROUP\s+BY\s+([\w.",]+(?:\s*,\s*[\w.",]+)*)/i);
+    const groupMatch = sql.match(/GROUP\s+BY\s+([\w."]+(?:\s*,\s*[\w."]+)*)/i);
       const groupCols = groupMatch[1].split(',').map(c => c.trim().split('.').pop().replace(/"/g, '').toLowerCase());
 
     // Parse SELECT column aliases for non-aggregate columns

@@ -52,7 +52,7 @@ export async function handleGetAwardsData(body, env) {
   const mostPlayedRaw = await getMostPlayedLeaders(DB, seasonId);
   const topLeaders = assignDenseRanks(
     (mostPlayedRaw.results || []).map(r => ({
-      id: r.id, name: r.name, set: r.set, score: r.play_count,
+      id: r.id, name: r.name, set: r.set, aspects: r.aspects, score: r.play_count,
     }))
   );
 

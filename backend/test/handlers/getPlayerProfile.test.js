@@ -298,6 +298,7 @@ describe('handleGetPlayerProfile', () => {
     assert.ok(typeof leader.wins === 'number');
     assert.ok(typeof leader.losses === 'number');
     assert.ok(typeof leader.draws === 'number');
+    assert.equal(leader.aspects, 'Command,Villainy', 'leader rows carry aspects from the catalog');
   });
 
   it('works without auth (public endpoint)', async () => {

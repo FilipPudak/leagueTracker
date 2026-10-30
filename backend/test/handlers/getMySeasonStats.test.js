@@ -53,6 +53,20 @@ describe('handleGetMySeasonStats', () => {
     assert.equal(totalPlays, 2);
   });
 
+  it('leaders rows carry aspects from the leaders catalog', async () => {
+    const result = await handleGetMySeasonStats(
+      { seasonId: 6 },
+      env,
+      aliceSession
+    );
+    const vader = result.leaders.find(l => l.id === '1');
+    assert.ok(vader, 'Darth Vader row expected');
+    assert.equal(vader.aspects, 'Command,Villainy');
+    for (const leader of result.leaders) {
+      assert.equal(typeof leader.aspects, 'string');
+    }
+  });
+
   it('closed season lists awards won for this player', async () => {
     const tables = basicTables();
     tables.settings = tables.settings.map(s =>

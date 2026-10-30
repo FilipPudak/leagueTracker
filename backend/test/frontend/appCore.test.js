@@ -413,3 +413,40 @@ describe('award badge rendering', () => {
     assert.equal(core.awardBadgeTitle('champion', 0), '');
   });
 });
+
+describe('aspect icon markup', () => {
+  it('renders one same-origin img per known aspect with alt text', () => {
+    const html = core.aspectIconMarkup({ aspects: 'Villainy,Aggression' });
+    assert.equal(html,
+      '<img class="swu-icon" src="img/swu/SWH_Aspects_Villainy.png" alt="Villainy">' +
+      '<img class="swu-icon" src="img/swu/SWH_Aspects_Aggression.png" alt="Aggression">');
+  });
+
+  it('empty string for missing, blank or unknown-only aspects', () => {
+    assert.equal(core.aspectIconMarkup(null), '');
+    assert.equal(core.aspectIconMarkup({}), '');
+    assert.equal(core.aspectIconMarkup({ aspects: null }), '');
+    assert.equal(core.aspectIconMarkup({ aspects: '' }), '');
+    assert.equal(core.aspectIconMarkup({ aspects: 'Valor,Honor' }), '');
+  });
+
+  it('drops unknowns, dedupes, keeps catalog order, caps at two', () => {
+    const html = core.aspectIconMarkup({ aspects: 'Command,Command,Cunning,Vigilance' });
+    assert.equal(html,
+      '<img class="swu-icon" src="img/swu/SWH_Aspects_Command.png" alt="Command">' +
+      '<img class="swu-icon" src="img/swu/SWH_Aspects_Cunning.png" alt="Cunning">');
+  });
+
+  it('whitelists src names — hostile aspect strings cannot inject markup', () => {
+    const html = core.aspectIconMarkup({ aspects: '<img onerror=x>,Villainy' });
+    assert.ok(!html.includes('onerror'), 'no handler strings may leak into markup');
+    assert.ok(html.includes('alt="Villainy"'), 'valid aspect still renders');
+    assert.equal((html.match(/<img/g) || []).length, 1, 'only the whitelisted aspect renders');
+  });
+
+  it('accepts arrays of aspect names as well as comma-joined strings', () => {
+    const html = core.aspectIconMarkup({ aspects: ['Heroism', 'Command'] });
+    assert.ok(html.includes('alt="Heroism"'));
+    assert.ok(html.includes('alt="Command"'));
+  });
+});

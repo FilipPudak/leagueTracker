@@ -68,11 +68,11 @@ export async function handleGetPlayerProfile(body, env) {
     DB.prepare('SELECT season_id, round, player_id, wins, losses, draws, rank FROM season_standings WHERE season_id = ? AND player_id = ?').bind(sid, playerId).all(),
     DB.prepare('SELECT round, phase FROM melee_tournaments WHERE season_id = ?').bind(sid).all(),
     DB.prepare(`
-      SELECT l.id, l.name, l."set", COUNT(v.id) as play_count
+      SELECT l.id, l.name, l."set", l.aspects, COUNT(v.id) as play_count
       FROM votes v
       JOIN leaders l ON v.leader_id = l.id
       WHERE v.season_id = ? AND v.player_id = ?
-      GROUP BY l.id, l.name, l."set"
+      GROUP BY l.id, l.name, l."set", l.aspects
       ORDER BY play_count DESC
     `).bind(sid, playerId).all(),
     computeLeaderWinRates(DB, playerId, sid),
@@ -143,6 +143,7 @@ function buildLeaderRows(rawRows, deckWinRates) {
       id: r.id,
       name: r.name,
       set: r.set,
+      aspects: r.aspects,
       plays: r.play_count,
       wins: deck ? deck.wins : 0,
       losses: deck ? deck.losses : 0,

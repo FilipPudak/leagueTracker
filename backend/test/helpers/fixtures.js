@@ -24,10 +24,10 @@ export function basicTables() {
       { id: 'P005', name: 'Eve', melee_name: 'eve00', email: 'eve@test.com', active: 0 },
     ],
     leaders: [
-      { id: '1', name: 'Darth Vader', set: 'JTL', active: 1 },
-      { id: '2', name: 'Luke Skywalker', set: 'JTL', active: 1 },
-      { id: '3', name: 'Ahsoka Tano', set: 'LOF', active: 1 },
-      { id: '4', name: 'Grand Inquisitor', set: 'LOF', active: 0 },
+      { id: '1', name: 'Darth Vader', set: 'JTL', aspects: 'Command,Villainy', active: 1 },
+      { id: '2', name: 'Luke Skywalker', set: 'JTL', aspects: 'Aggression,Heroism', active: 1 },
+      { id: '3', name: 'Ahsoka Tano', set: 'LOF', aspects: 'Vigilance,Heroism', active: 1 },
+      { id: '4', name: 'Grand Inquisitor', set: 'LOF', aspects: 'Cunning,Villainy', active: 0 },
     ],
     seasons: [
       { id: 6, name: 'Season 6', created_date: '2026-06-03', length: 11, top_results: 7 },

@@ -142,3 +142,52 @@ describe('CSP hardening Phase C1: fonts self-hosted, zero third-party origins', 
     assert.ok(!meta.includes('googleapis') && !meta.includes('gstatic'), 'no external origins left in the policy');
   });
 });
+
+describe('CSP hardening Phase D: aspect icons are same-origin only (v4.18.0)', () => {
+  const CORE = join(APP, 'app-core.js');
+  const IMG_DIR = join(APP, 'img', 'swu');
+  const ASPECTS = ['Aggression', 'Command', 'Cunning', 'Heroism', 'Vigilance', 'Villainy'];
+
+  it('six resized icon files exist under img/swu and are lightweight', () => {
+    for (const a of ASPECTS) {
+      const p = join(IMG_DIR, `SWH_Aspects_${a}.png`);
+      assert.ok(existsSync(p), `img/swu/SWH_Aspects_${a}.png must be bundled`);
+      const size = statSync(p).size;
+      assert.ok(size > 1000, `SWH_Aspects_${a}.png looks truncated (${size} bytes)`);
+      assert.ok(size < 40 * 1024, `SWH_Aspects_${a}.png must be resized (96px), got ${size} bytes`);
+    }
+  });
+
+  it('icon markup template is whitelisted, same-origin and alt-complete', () => {
+    const core = readSource(CORE);
+    assert.ok(/aspectIconMarkup/.test(core), 'LeagueCore must expose aspectIconMarkup');
+    const srcs = [...core.matchAll(/src="([^"]*)"/g)].map(m => m[1]);
+    assert.equal(srcs.length, 1, 'exactly one icon src template (aspect name interpolated, never raw URL)');
+    assert.ok(srcs[0].startsWith('img/swu/SWH_Aspects_'), 'icon src must live under img/swu/');
+    assert.ok(!srcs[0].includes('http'), 'no external image origin');
+    assert.ok(/alt="\$\{\w+\}"/.test(core), 'icon img must carry alt text (interpolated aspect name)');
+    assert.ok(!/\bon(click|error|load)=/.test(core), 'generated icon markup must stay handler-free');
+  });
+
+  it('styles.css defines .swu-icon and reaches no external url()', () => {
+    const css = readSource(CSS);
+    const rule = css.match(/\.swu-icon\s*{[^}]*}/);
+    assert.ok(rule, '.swu-icon rule required');
+    assert.ok(/height:\s*1em/.test(rule[0]), 'icons must size with the text line');
+    assert.ok(!/url\(\s*['"]?https?:/.test(css), 'styles.css must not reference external urls');
+  });
+
+  it('both leader surfaces route through aspectIconMarkup', () => {
+    const js = readSource(JS);
+    assert.equal((js.match(/getIcons:/g) || []).length, 2, 'renderStatsList configs: topLeaders + myseason leaders');
+    const seasonBody = js.slice(js.indexOf('function renderSeasonContent'), js.indexOf('function renderPlayerModal'));
+    assert.ok(seasonBody.includes('LeagueCore.aspectIconMarkup'), 'profile/modal leader rows render icons too');
+  });
+
+  it('index.html ships no external img sources', () => {
+    const html = readSource(HTML);
+    for (const m of html.matchAll(/<img[^>]*>/g)) {
+      assert.ok(!/src="https?:/.test(m[0]), `external img src in html: ${m[0]}`);
+    }
+  });
+});

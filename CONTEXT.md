@@ -238,6 +238,11 @@ voted"), never per-player rankings.
   profile header only. Glyphs do not repeat — a single glyph per award type, with the exact
   count in `aria-label`/`title` (e.g. "2× Galactic Champion"). Never on night-result rows,
   podium rows, or pickers.
+- **Aspect icons next to leader names:** up to two official SWU aspect icons per leader, rendered
+  in "Leaders Played" (My Stats), Most Played Leaders (Awards), and the profile leader breakdown.
+  `leaders.aspects` (1–2 aspect names, comma-joined) is display-only offline reference data —
+  reconciled once from the community card database against the official FFG media-kit aspect set
+  and baked into the catalog by migration; never Melee-derived, never fetched at runtime.
 - **Player profile (full page):** shows season stats, career record, progression, badges, and
   leader-use breakdown for any player. **Intentionally omits gamification** (milestones, raffle
   tickets, streaks — private to the linked player only) and **rivalry/versus** data (personal

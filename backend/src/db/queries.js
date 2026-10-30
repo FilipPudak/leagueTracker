@@ -128,11 +128,11 @@ export async function getCurrentVote(db, seasonId, week, playerId) {
 // Most played leaders
 export async function getMostPlayedLeaders(db, seasonId) {
   return db.prepare(`
-    SELECT l.id, l.name, l."set", COUNT(v.id) as play_count
+    SELECT l.id, l.name, l."set", l.aspects, COUNT(v.id) as play_count
     FROM votes v
     JOIN leaders l ON v.leader_id = l.id
     WHERE v.season_id = ?
-    GROUP BY l.id, l.name, l."set"
+    GROUP BY l.id, l.name, l."set", l.aspects
     ORDER BY play_count DESC
     LIMIT 50
   `).bind(seasonId).all();

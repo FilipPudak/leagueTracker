@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS leaders (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   "set" TEXT,
+  aspects TEXT,
   active INTEGER DEFAULT 1
 );
 

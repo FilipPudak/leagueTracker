@@ -108,6 +108,16 @@ describe('handleGetAwardsData', () => {
     assert.deepEqual(scores, [3, 3, 1], 'play counts sorted descending');
   });
 
+  it('topLeaders rows carry aspects from the leaders catalog', async () => {
+    const result = await handleGetAwardsData({ seasonId: 6 }, env);
+    assert.ok(result.topLeaders.length > 0, 'fixture votes produce a topLeaders podium');
+    for (const l of result.topLeaders) {
+      assert.equal(typeof l.aspects, 'string');
+    }
+    const vader = result.topLeaders.find(l => l.id === '1');
+    if (vader) assert.equal(vader.aspects, 'Command,Villainy');
+  });
+
   it('returns participation data', async () => {
     const result = await handleGetAwardsData({ seasonId: 6 }, env);
     assert.ok(result.participation);

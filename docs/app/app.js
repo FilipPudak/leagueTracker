@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.17.2';
+const APP_VERSION = '4.18.0';
 
 const appState = {
   status: 'unlinked',
@@ -1161,6 +1161,7 @@ function renderAwards(res) {
 
   renderStatsList('most-played-container', res.topLeaders || [], {
     getTitle: (item) => LeagueCore.leaderOptionLabel(item),
+    getIcons: (item) => LeagueCore.aspectIconMarkup(item),
     getScore: (item) => item.score,
     getSubtitle: (item) => item.subtitle,
     limit: 5,
@@ -1338,6 +1339,7 @@ function renderMySeasonStats(res) {
 
   renderStatsList('myseason-leaders-container', res.leaders || [], {
     getTitle: (item) => LeagueCore.leaderOptionLabel(item),
+    getIcons: (item) => LeagueCore.aspectIconMarkup(item),
     getScore: (item) => {
       const parts = [`${item.plays} Plays`];
       if (item.winPct != null) parts.push(`${item.winPct}% Win`);
@@ -1559,6 +1561,7 @@ function renderStatsList(containerId, items, config) {
     const rankNumber = item.displayRank !== undefined ? item.displayRank : (i + 1);
     const safeRank = Math.floor(Number(rankNumber)) || 0;
     const title = config.getTitle(item, i);
+    const icons = config.getIcons ? config.getIcons(item) : '';
     const subtitle = config.getSubtitle ? config.getSubtitle(item, i) : null;
     const score = config.getScore(item);
     html += `
@@ -1566,7 +1569,7 @@ function renderStatsList(containerId, items, config) {
         <div class="stats-left">
           <div class="rank-pill">#${safeRank}</div>
           <div class="stats-info">
-            <span class="stats-title">${escapeHtml(title)}</span>
+            <span class="stats-title">${icons}${escapeHtml(title)}</span>
             ${subtitle ? `<span class="stats-subtitle">${escapeHtml(subtitle)}</span>` : ''}
           </div>
         </div>
@@ -2103,7 +2106,7 @@ function renderSeasonContent(s, opts = {}) {
       s.leaders.map(l => {
         const wp = l.winPct != null ? l.winPct + '%' : '—';
         return `<div class="player-modal-item">
-          <span>${escapeHtml(LeagueCore.leaderOptionLabel(l))}</span>
+          <span>${LeagueCore.aspectIconMarkup(l)}${escapeHtml(LeagueCore.leaderOptionLabel(l))}</span>
           <span>${escapeHtml(l.plays)} plays · ${escapeHtml(l.wins)}W ${escapeHtml(l.draws)}D ${escapeHtml(l.losses)}L · ${wp}</span>
         </div>`;
       }).join('') +

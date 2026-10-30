@@ -75,4 +75,45 @@ describe('helpers/mock-db (P4 Phase 0)', () => {
     assert.equal(batchCalls[0].sql, ATTENDANCE_SQL);
     assert.equal(directCalls.length, 1);
   });
+
+  it('JOIN GROUP BY keeps every grouped column (v4.18.0 regression)', async () => {
+    const db = createMockDb({
+      votes: [
+        { id: 1, season_id: 6, player_id: 'P001', leader_id: '1', opponent_id: 'P002' },
+        { id: 2, season_id: 6, player_id: 'P001', leader_id: '1', opponent_id: 'P003' },
+      ],
+      leaders: [
+        { id: '1', name: 'Darth Vader', set: 'JTL', aspects: 'Command,Villainy', active: 1 },
+      ],
+    });
+    const { results } = await db.prepare(
+      'SELECT l.id, l.name, l."set", l.aspects, COUNT(v.id) as play_count ' +
+      'FROM votes v JOIN leaders l ON v.leader_id = l.id WHERE v.season_id = ? ' +
+      'GROUP BY l.id, l.name, l."set", l.aspects ORDER BY play_count DESC'
+    ).bind(6).all();
+    assert.equal(results.length, 1);
+    assert.equal(results[0].id, '1');
+    assert.equal(results[0].name, 'Darth Vader');
+    assert.equal(results[0].set, 'JTL');
+    assert.equal(results[0].aspects, 'Command,Villainy');
+    assert.equal(results[0].play_count, 2);
+  });
+
+  it('standalone GROUP BY keeps every grouped column', async () => {
+    const db = createMockDb({
+      attendance: [
+        { season_id: 6, week: 1, player_id: 'P001' },
+        { season_id: 6, week: 1, player_id: 'P002' },
+        { season_id: 6, week: 2, player_id: 'P001' },
+      ],
+    });
+    const { results } = await db.prepare(
+      'SELECT season_id, week, COUNT(player_id) as cnt FROM attendance GROUP BY season_id, week ORDER BY season_id, week'
+    ).all();
+    assert.equal(results.length, 2);
+    assert.deepEqual(
+      results.map(r => `${r.season_id}/${r.week}/${r.cnt}`),
+      ['6/1/2', '6/2/1']
+    );
+  });
 });

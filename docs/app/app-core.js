@@ -45,6 +45,23 @@ const LeagueCore = (() => {
     return leader.set ? `${leader.name} - ${leader.set}` : leader.name;
   }
 
+  const SWU_ASPECTS = ['Aggression', 'Command', 'Cunning', 'Vigilance', 'Heroism', 'Villainy'];
+
+  // Offline reference data (official FFG aspect set per leader, baked into the
+  // leaders catalog by migration M5). Whitelisted names only: the src is built
+  // from the enum, never from the raw value, so hostile data cannot inject markup.
+  function aspectIconMarkup(leader) {
+    const raw = leader && leader.aspects;
+    if (!raw) return '';
+    const names = (Array.isArray(raw) ? raw : String(raw).split(','))
+      .map((a) => String(a).trim())
+      .filter((a) => SWU_ASPECTS.includes(a));
+    const unique = [...new Set(names)].slice(0, 2);
+    return unique
+      .map((a) => `<img class="swu-icon" src="img/swu/SWH_Aspects_${a}.png" alt="${a}">`)
+      .join('');
+  }
+
   function visibleListSlice(items, limit, expanded) {
     if (!Array.isArray(items)) return [];
     return expanded ? items : items.slice(0, limit);
@@ -113,7 +130,7 @@ const LeagueCore = (() => {
     return '';
   }
 
-  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, gamificationViewFor, leaderOptionLabel, visibleListSlice, listToggleLabel, voteSubmitAction, shouldShowVoteCta, shouldRetryAsNewVote, shouldSkipVoteStamp, resolveHasVoted, resolveServerVote, resolveStandingsAsOf, awardBadgeMarkup, awardBadgeTitle, GUEST_PITCH, CACHE_TTL_MS };
+  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, gamificationViewFor, leaderOptionLabel, aspectIconMarkup, visibleListSlice, listToggleLabel, voteSubmitAction, shouldShowVoteCta, shouldRetryAsNewVote, shouldSkipVoteStamp, resolveHasVoted, resolveServerVote, resolveStandingsAsOf, awardBadgeMarkup, awardBadgeTitle, GUEST_PITCH, CACHE_TTL_MS };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.LeagueCore = LeagueCore;
