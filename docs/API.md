@@ -82,7 +82,7 @@ All require `adminToken` matching `ADMIN_SECRET`.
 - **Response shape on list-fetch failure:** `{ seasonId, fetchFailed: true,
   tournaments: 0, standings: 0, matches: 0, error }`.
 | `materializePastAwards` | `seasonId` (required), `dryRun?` | One-time award materialization for S1–S5 only. |
-| `addLeaders` | `leaders: [{ name, set? }]` | Inserts non-duplicate leaders. Returns `{ added, skipped }`. |
+| `addLeaders` | `leaders: [{ name, set?, aspects? }]` | Inserts leaders with aspect enrichment: explicit `aspects` (whitelist-validated) wins, else one offline lookup against FFG's official card data per distinct set. Returns `{ added, skipped, filled, summary: { requested, added, skipped, filled, unresolved } }`; `added` entries carry `aspects`, `aspectsResolved`, `reason?` and `swuDbSuggestion?` (near-misses are advisory, never auto-applied — replay the row with explicit `aspects`). A name+set duplicate whose stored aspects is NULL is repaired via `filled`. Fully-clean batch ⇔ `summary.unresolved === 0 && summary.skipped === 0 && summary.added === summary.requested`. |
 | `setLeadersActive` | `leaderIds: []`, `active: bool` | Activates or deactivates leaders. |
 | `removeLeaders` | `leaderIds: []` | Deletes leaders; refuses any referenced by votes. |
 
@@ -96,7 +96,7 @@ All require `adminToken` matching `ADMIN_SECRET`.
 
 | Limit | Free tier | How this codebase stays inside it |
 |-------|-----------|-----------------------------------|
-| External fetches / invocation | 50 | Typical weekly sync 4–7; backfill's `maxTournaments` budget bounds multi-round fetches (2 per round + 1 list fetch) |
+| External fetches / invocation | 50 | Typical weekly sync 4–7; leader imports fetch at most once per distinct set (memoized per batch); backfill's `maxTournaments` budget bounds multi-round fetches (2 per round + 1 list fetch) |
 | Internal service (D1) calls / invocation | 1,000 | Per-round standings/matches/attendance writes go through `DB.batch()` — one internal call per table per round instead of one per row |
 | CPU / cron invocation | 10 ms | I/O wait is free; JSON parsing is the main CPU cost |
 

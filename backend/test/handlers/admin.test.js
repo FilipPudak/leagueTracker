@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables } from '../helpers/fixtures.js';
@@ -16,6 +16,35 @@ function adminTables() {
 }
 
 const ADMIN_SECRET = 'test-admin-secret';
+
+const ffgRow = (title, aspects, dups = [], cardUid = 777) => ({
+  id: cardUid,
+  attributes: {
+    title,
+    cardUid,
+    aspects: { data: aspects.map((n) => ({ attributes: { name: n } })) },
+    aspectDuplicates: { data: dups.map((n) => ({ attributes: { name: n } })) },
+  },
+});
+function ffgOk(...rows) {
+  return {
+    ok: true, status: 200,
+    text: async () => JSON.stringify({ data: rows, meta: { pagination: { total: rows.length } } }),
+  };
+}
+function stubFfg(responses = {}) {
+  const original = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    const key = Object.keys(responses).find((k) => String(url).includes(k));
+    if (!key) return ffgOk();
+    const r = responses[key];
+    if (r.throw) throw new Error('network down');
+    return r;
+  };
+  return { calls, restore: () => { globalThis.fetch = original; } };
+}
 
 describe('handleTriggerWeeklyCycle', () => {
   it('runs sync immediately with admin token', async () => {
@@ -84,6 +113,10 @@ describe('handleResumeSeason', () => {
 });
 
 describe('handleAddLeaders', () => {
+  let suiteStub;
+  beforeEach(() => { suiteStub = stubFfg({}); });
+  afterEach(() => { suiteStub.restore(); });
+
   it('rejects missing admin token', async () => {
     const db = createMockDb(adminTables());
     await assert.rejects(
@@ -184,6 +217,149 @@ describe('handleAddLeaders', () => {
     assert.equal(result.added.length, 0);
     assert.equal(result.skipped.length, 1);
     assert.equal(result.skipped[0].reason, 'missing name');
+  });
+
+  it('resolves aspects via FFG lookup, one fetch per set per batch', async () => {
+    const db = createMockDb(adminTables());
+    const stub = stubFfg({ JTL: ffgOk(ffgRow('Yoda', ['Heroism', 'Vigilance'], [], 555)) });
+    const result = await handleAddLeaders(
+      { adminToken: ADMIN_SECRET, leaders: [{ name: 'Yoda', set: 'JTL' }, { name: 'Nobody Here', set: 'JTL' }] },
+      { DB: db, ADMIN_SECRET }
+    );
+    stub.restore();
+    const yoda = result.added.find((a) => a.name === 'Yoda');
+    assert.equal(yoda.aspects, 'Heroism,Vigilance');
+    assert.equal(yoda.aspectsResolved, true);
+    const nobody = result.added.find((a) => a.name === 'Nobody Here');
+    assert.equal(nobody.aspects, null);
+    assert.equal(nobody.aspectsResolved, false);
+    assert.equal(nobody.reason, 'no match');
+    assert.equal(stub.calls.length, 1, 'same-set rows share one lookup');
+    assert.equal(db.getStore().leaders.find((l) => l.name === 'Yoda').aspects, 'Heroism,Vigilance');
+  });
+
+  it('stores admin-provided aspects canonically without any lookup', async () => {
+    const db = createMockDb(adminTables());
+    const stub = stubFfg({});
+    const result = await handleAddLeaders(
+      { adminToken: ADMIN_SECRET, leaders: [{ name: 'Custom Leader', set: 'JTL', aspects: 'villainy,cunning' }] },
+      { DB: db, ADMIN_SECRET }
+    );
+    stub.restore();
+    assert.equal(result.added[0].aspects, 'Villainy,Cunning');
+    assert.equal(result.added[0].aspectsResolved, true);
+    assert.equal(stub.calls.length, 0);
+  });
+
+  it('refuses invalid admin-provided aspects without inserting', async () => {
+    const db = createMockDb(adminTables());
+    const result = await handleAddLeaders(
+      { adminToken: ADMIN_SECRET, leaders: [{ name: 'Nope Leader', set: 'JTL', aspects: 'Valor,Honor' }] },
+      { DB: db, ADMIN_SECRET }
+    );
+    assert.equal(result.added.length, 0);
+    assert.equal(result.skipped[0].reason, 'invalid aspects');
+    assert.equal(db.getStore().leaders.some((l) => l.name === 'Nope Leader'), false);
+  });
+
+  it('no set → NULL aspects with reason, no lookup attempted', async () => {
+    const db = createMockDb(adminTables());
+    const result = await handleAddLeaders(
+      { adminToken: ADMIN_SECRET, leaders: [{ name: 'Homeless Leader' }] },
+      { DB: db, ADMIN_SECRET }
+    );
+    assert.equal(result.added[0].aspects, null);
+    assert.equal(result.added[0].aspectsResolved, false);
+    assert.equal(result.added[0].reason, 'no set');
+    assert.equal(db.getStore().leaders.find((l) => l.name === 'Homeless Leader').aspects, null);
+  });
+
+  it('FFG unreachable → import still succeeds with NULL aspects', async () => {
+    const db = createMockDb(adminTables());
+    const stub = stubFfg({ JTL: { throw: true } });
+    const result = await handleAddLeaders(
+      { adminToken: ADMIN_SECRET, leaders: [{ name: 'Yoda', set: 'JTL' }] },
+      { DB: db, ADMIN_SECRET }
+    );
+    stub.restore();
+    assert.equal(result.added.length, 1);
+    assert.equal(result.added[0].aspects, null);
+    assert.equal(result.added[0].aspectsResolved, false);
+    assert.equal(result.added[0].reason, 'lookup failed');
+    assert.equal(db.getStore().leaders.some((l) => l.name === 'Yoda'), true);
+  });
+
+  it('near-miss name surfaces a suggestion without auto-applying', async () => {
+    const db = createMockDb(adminTables());
+    const stub = stubFfg({ JTL: ffgOk(ffgRow('Enfy Nest', ['Aggression', 'Heroism'], [], 424)) });
+    const result = await handleAddLeaders(
+      { adminToken: ADMIN_SECRET, leaders: [{ name: 'Enfys Nest', set: 'JTL' }] },
+      { DB: db, ADMIN_SECRET }
+    );
+    stub.restore();
+    const row = result.added[0];
+    assert.equal(row.aspects, null);
+    assert.equal(row.reason, 'no match');
+    assert.deepEqual(row.swuDbSuggestion, { name: 'Enfy Nest', aspects: 'Aggression,Heroism', cardUid: 424 });
+    assert.equal(db.getStore().leaders.find((l) => l.name === 'Enfys Nest').aspects, null);
+  });
+
+  it('fill-gap: replay with aspects patches an existing NULL row, id preserved', async () => {
+    const db = createMockDb(adminTables());
+    const first = await handleAddLeaders(
+      { adminToken: ADMIN_SECRET, leaders: [{ name: 'Yoda', set: 'JTL' }] },
+      { DB: db, ADMIN_SECRET }
+    );
+    const second = await handleAddLeaders(
+      { adminToken: ADMIN_SECRET, leaders: [{ name: 'Yoda', set: 'JTL', aspects: 'Heroism,Vigilance' }] },
+      { DB: db, ADMIN_SECRET }
+    );
+    assert.equal(second.added.length, 0);
+    assert.equal(second.skipped.length, 0);
+    assert.equal(second.filled.length, 1);
+    assert.equal(second.filled[0].id, first.added[0].id);
+    assert.equal(second.filled[0].aspects, 'Heroism,Vigilance');
+    assert.equal(db.getStore().leaders.filter((l) => l.name === 'Yoda').length, 1);
+    assert.equal(db.getStore().leaders.find((l) => l.name === 'Yoda').aspects, 'Heroism,Vigilance');
+  });
+
+  it('fill-gap never overwrites non-NULL aspects', async () => {
+    const db = createMockDb(adminTables());
+    const result = await handleAddLeaders(
+      { adminToken: ADMIN_SECRET, leaders: [{ name: 'Darth Vader', set: 'JTL', aspects: 'Aggression,Cunning' }] },
+      { DB: db, ADMIN_SECRET }
+    );
+    assert.equal(result.filled.length, 0);
+    assert.equal(result.skipped[0].reason, 'duplicate');
+    assert.equal(db.getStore().leaders.find((l) => l.name === 'Darth Vader').aspects, 'Command,Villainy');
+  });
+
+  it('summary lets a script check batch success at a glance', async () => {
+    const db = createMockDb(adminTables());
+    const stub = stubFfg({ JTL: ffgOk(ffgRow('Yoda', ['Heroism', 'Vigilance'], [], 555)) });
+    const result = await handleAddLeaders(
+      { adminToken: ADMIN_SECRET, leaders: [
+        { name: 'Yoda', set: 'JTL' },
+        { name: 'Yoda', set: 'JTL' },
+        { name: 'Ghost Leader', set: 'JTL' },
+        { name: 'Bad One', set: 'JTL', aspects: 'Valor' },
+        { name: 'NoSet One' },
+      ] },
+      { DB: db, ADMIN_SECRET }
+    );
+    stub.restore();
+    assert.deepEqual(result.summary, { requested: 5, added: 3, skipped: 2, filled: 0, unresolved: 2 });
+  });
+
+  it('summary reports a fully clean batch', async () => {
+    const db = createMockDb(adminTables());
+    const stub = stubFfg({ JTL: ffgOk(ffgRow('Yoda', ['Heroism', 'Vigilance'], [], 555)) });
+    const result = await handleAddLeaders(
+      { adminToken: ADMIN_SECRET, leaders: [{ name: 'Yoda', set: 'JTL' }] },
+      { DB: db, ADMIN_SECRET }
+    );
+    stub.restore();
+    assert.deepEqual(result.summary, { requested: 1, added: 1, skipped: 0, filled: 0, unresolved: 0 });
   });
 });
 

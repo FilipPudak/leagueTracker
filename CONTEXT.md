@@ -240,9 +240,12 @@ voted"), never per-player rankings.
   podium rows, or pickers.
 - **Aspect icons next to leader names:** up to two official SWU aspect icons per leader, rendered
   in "Leaders Played" (My Stats), Most Played Leaders (Awards), and the profile leader breakdown.
-  `leaders.aspects` (1–2 aspect names, comma-joined) is display-only offline reference data —
-  reconciled once from the community card database against the official FFG media-kit aspect set
-  and baked into the catalog by migration; never Melee-derived, never fetched at runtime.
+  `leaders.aspects` (1–2 aspect names, comma-joined — may repeat, as DJ prints Cunning twice; the
+  display dedupes) is display-only offline reference data — reconciled once from the community card
+  database against the official FFG media-kit aspect set and baked into the catalog by migration;
+  new admin imports enrich it at write time via a one-off lookup of FFG's official card data
+  (near-miss suggestions are advisory, never auto-applied). Never Melee-derived, never fetched at
+  runtime by the app.
 - **Player profile (full page):** shows season stats, career record, progression, badges, and
   leader-use breakdown for any player. **Intentionally omits gamification** (milestones, raffle
   tickets, streaks — private to the linked player only) and **rivalry/versus** data (personal
