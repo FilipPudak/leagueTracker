@@ -69,8 +69,9 @@ export async function handleGetAwardsData(body, env) {
   // A New Hope: stored or live from season_standings
   let newHope = await resolveNewHope(DB, awardsMap, { seasonId, isActiveSeason, seasonEnded, votingOpen, currentWeek });
 
-  // Bounty Hunter: stored only, hidden while voting is live
-  let bountyHunter = isLive ? null : (awardsMap[AWARD.BOUNTY_HUNTER] || null);
+  // Bounty Hunter: stored podium (weekly sync refreshes it), visible live since v4.19.1 —
+  // prior-season top-4 are public and Swiss pairing offers nothing to target-farm.
+  let bountyHunter = awardsMap[AWARD.BOUNTY_HUNTER] || null;
   if (bountyHunter) bountyHunter = assignStandardRanks(bountyHunter);
 
   // Galactic Champion: stored or live from cut tournament

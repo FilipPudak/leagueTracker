@@ -27,7 +27,7 @@ Rate limits (per IP, 60s window): writes capped at 10; reads capped at 90.
 
 | Action | Payload | Description |
 |--------|---------|-------------|
-| `getAwardsData` | `seasonId?` | Award podiums, most-played leaders, participation. Ambassador callsigns / Bounty Hunter hidden while voting is open. |
+| `getAwardsData` | `seasonId?` | Award podiums, most-played leaders, participation. Ambassador names are callsign-masked while voting is open; Bounty Hunter renders live (since v4.19.1). |
 | `getStandingsData` | `seasonId` (required), `asOfRound?` | Derived season table (best-X nights) + per-night results with phase labels. |
 | `getPlayerProfile` | `playerId` (required), `seasonId?` | Full public profile: season stats, career record, badges, leader win-rates. Omits gamification and rivalry. |
 | `linkAccount` | `email` (required), `deviceId` (required), `playerId?` | Honor-based email claim + session mint. Returns token and link state. |

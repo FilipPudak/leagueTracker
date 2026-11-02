@@ -172,7 +172,9 @@ actual award winner; the podium shows the full top 3 for context.
 | **Bounty Hunter** | Regular-season non-bye match wins against players who placed top-4 in the **previous** season's **derived season table** (best-X nights, not raw per-round standings). Only matches from regular-phase tournaments count (cut/side excluded). Top-4 is determined by standard competition ranking on the derived table. | share podium; **none in S1** (no prior season) |
 
 **Reveal gating (display rules):** Ambassador names are **callsigns** while voting is live
-("Gold Leader", …); Bounty Hunter is hidden while voting is live; both resolve at close.
+("Gold Leader", …) — live tallies would de-anonymize votes over time. Bounty Hunter is **visible
+live** (since v4.19.1: its targets are public history and Swiss pairing leaves nothing to
+target-farm); its winner is nonetheless declared at close like every award.
 
 **Most Played Leaders** (`topLeaders`) is not an award — it is a live popularity list recomputed
 on every read. It uses **dense ranking** (1, 2, 2, 3): ties share a rank and the next distinct

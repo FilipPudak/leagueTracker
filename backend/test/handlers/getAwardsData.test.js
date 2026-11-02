@@ -204,9 +204,21 @@ describe('handleGetAwardsData', () => {
     assert.ok(/\+\d+ Climb/.test(result.newHope[0].score));
   });
 
-  it('Bounty Hunter null when voting is live', async () => {
+  it('Bounty Hunter visible while voting is live (v4.19.1 reveal)', async () => {
     const result = await handleGetAwardsData({ seasonId: 6 }, env);
-    assert.equal(result.bountyHunter, null, 'bountyHunter hidden during live voting');
+    assert.ok(result.bountyHunter, 'bountyHunter present during live voting');
+    assert.ok(result.bountyHunter.length > 0, 'live podium renders from weekly-refreshed rows');
+    assert.ok(result.bountyHunter[0].name, 'names resolved');
+    assert.equal(result.bountyHunter[0].displayRank, 1);
+    assert.equal(result.bountyHunter[0].score, '8 💀', 'top scorer formatted with kill count');
+  });
+
+  it('Bounty Hunter null while live when nobody has kills yet', async () => {
+    const tables = basicTables();
+    tables.awards = tables.awards.filter(a => a.award_name !== 'Bounty Hunter');
+    const db = createMockDb(tables);
+    const result = await handleGetAwardsData({ seasonId: 6 }, { DB: db });
+    assert.equal(result.bountyHunter, null, 'no rows (S1 / zero-kill) → section stays hidden');
   });
 
   it('Bounty Hunter visible when voting closed', async () => {
