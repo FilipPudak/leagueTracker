@@ -427,11 +427,11 @@ describe('getVotingCompliance', () => {
     assert.deepEqual(result, { attended: 0, voted: 0, pct: null, qualifying: false, target: 80, minVotes: 4 });
   });
 
-  it('cutoff excludes the current week and beyond, for attendance and votes', async () => {
+  it('cutoff includes the open current week, excludes weeks beyond it', async () => {
     const db = createMockDb(makeComplianceTables());
     const result = await getVotingCompliance(db, 7, 'P200', 3);
-    assert.deepEqual(result, { attended: 2, voted: 2, pct: 100, qualifying: false, target: 80, minVotes: 4 },
-      'weeks >= 3 (still-open window) must not count on either side');
+    assert.deepEqual(result, { attended: 3, voted: 3, pct: 100, qualifying: false, target: 80, minVotes: 4 },
+      'week 3 is the open week — it counts the moment it is attended (live nudge); weeks >3 stay out');
   });
 
   it('cutoff beyond the last week counts everything, like a null cutoff', async () => {

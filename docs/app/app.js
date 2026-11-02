@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.19.1';
+const APP_VERSION = '4.19.2';
 
 const appState = {
   status: 'unlinked',
@@ -367,6 +367,7 @@ function applyBoot(boot) {
       if (votedCard) votedCard.style.display = 'block';
       const changeBtn = $('btn-change-vote');
       if (changeBtn) changeBtn.style.display = appState.votingOpen ? 'inline-block' : 'none';
+      syncVotedNote();
       clearStatus();
     } else if (!appState.votingOpen) {
       if (voteForm) voteForm.style.display = 'none';
@@ -809,9 +810,18 @@ function syncVotedCardView(hasVoted) {
       if (votedCard) votedCard.style.display = 'block';
     }
     if (changeBtn) changeBtn.style.display = appState.votingOpen ? 'inline-block' : 'none';
+    syncVotedNote();
   } else if (votedCard) {
     votedCard.style.display = 'none';
   }
+}
+
+function syncVotedNote() {
+  const note = $('already-voted-note');
+  if (!note) return;
+  note.textContent = appState.votingOpen
+    ? 'Your votes for this week are logged — you can still change them until voting closes.'
+    : 'Your votes for this week are logged. Check back next week!';
 }
 
 function applyVoteTabRefresh(res) {
@@ -893,6 +903,7 @@ function submitVotes(isRetry) {
     if (voteCta) voteCta.style.display = 'none';
     const changeBtn = $('btn-change-vote');
     if (changeBtn) changeBtn.style.display = appState.votingOpen ? 'inline-block' : 'none';
+    syncVotedNote();
     clearStatus();
     appState.editingVote = false;
     appState.awardsCache = {};
@@ -1266,8 +1277,10 @@ function complianceSummaryHtml(res) {
 }
 
 function milestoneCountLabel(milestone) {
-  const votes = Math.min(milestone.votes || 0, milestone.target);
-  return votes + ' of ' + milestone.target + ' votes' + (milestone.complete ? ' — Prize earned!' : '');
+  const actual = milestone.votes || 0;
+  const votes = Math.min(actual, milestone.target);
+  const cast = milestone.complete && actual > milestone.target ? ' (' + actual + ' cast)' : '';
+  return votes + ' of ' + milestone.target + ' votes' + (milestone.complete ? ' — Prize earned!' : '') + cast;
 }
 
 function renderMySeasonStats(res) {
@@ -1289,7 +1302,7 @@ function renderMySeasonStats(res) {
       milestoneText.textContent = milestoneCountLabel(res.milestone);
       const milestoneReward = $('milestone-reward');
       if (milestoneReward) {
-        milestoneReward.textContent = target + ' votes earns you a prize — ask in our Discord';
+        milestoneReward.textContent = target + ' votes earn you a prize — ask in our Discord';
       }
       milestoneContainer.style.display = 'block';
     } else {

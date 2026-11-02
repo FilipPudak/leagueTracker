@@ -53,7 +53,7 @@ describe('Voting Milestones section (index.html)', () => {
     const html = readHTML();
     const js = readJS();
     assert.ok(/id="milestone-reward"/.test(html), 'milestone-reward element must exist');
-    assert.ok(/target \+ ' votes earns you a prize/.test(js), 'reward copy must derive from milestone target');
+    assert.ok(/target \+ ' votes earn you a prize/.test(js), 'reward copy must derive from milestone target');
     assert.ok(/ask in our Discord/.test(js), 'reward wording must stay');
   });
 
@@ -113,10 +113,10 @@ describe('renderMySeasonStats compliance rendering (app.js)', () => {
     assert.ok(/Prize earned/.test(js), 'closed qualifying state must say "Prize earned!"');
   });
 
-  it('hides the compliance row when there are no closed attended weeks', () => {
+  it('hides the compliance row when nobody has attended yet', () => {
     const js = readJS();
     assert.ok(/compliance\.attended\s*>\s*0/.test(js),
-      'row must be hidden when attended is 0 (week 1 has no closed weeks yet)');
+      'row must be hidden when attended is 0 (before night 1 the ratio has no denominator)');
   });
 
   it('shows compliance status in the summary view for closed seasons', () => {
@@ -142,6 +142,7 @@ describe('renderMySeasonStats compliance rendering (app.js)', () => {
     const fn = js.slice(start, start + 400);
     assert.ok(/Math\.min\(/.test(fn), 'label must clamp votes to the target');
     assert.ok(fn.includes("milestone.complete ? ' — Prize earned!' : ''"), 'label must own the prize verdict');
+    assert.ok(fn.includes("' cast)'"), 'completed label must reveal the true count above the cap (e.g. "(7 cast)")');
     const barIdx = js.indexOf('milestoneText.textContent');
     assert.ok(js.slice(barIdx, barIdx + 120).includes('milestoneCountLabel'),
       'bar text must use the shared label');

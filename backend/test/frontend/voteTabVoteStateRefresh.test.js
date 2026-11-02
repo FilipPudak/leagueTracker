@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const JS_FILE = join(__dirname, '../../../docs/app/app.js');
+const HTML_FILE = join(__dirname, '../../../docs/app/index.html');
 function readJS() { return readSource(JS_FILE); }
 
 function fnBody(name) {
@@ -66,6 +67,24 @@ describe('Vote tab vote-state refresh (cross-device sync)', () => {
     assert.ok(weekIdx < syncIdx, 'week/players adoption must run before the voted-card sync');
     assert.ok(body.includes('populateVotingDropdowns(appState.leaders, res.players'),
       'dropdown repopulation must stay in the refresh path');
+  });
+
+  it('voted-card note tells the truth about editability in both states (v4.19.2)', () => {
+    const helper = fnBody('syncVotedNote');
+    assert.ok(helper.includes('you can still change them until voting closes'),
+      'open-window note must promise editability');
+    assert.ok(helper.includes('Check back next week'),
+      'closed note keeps the original sign-off');
+    const js = readJS();
+    assert.equal((js.match(/syncVotedNote\(\)/g) || []).length, 4,
+      'note synced at definition + all three voted-card show sites (boot, sync, post-submit)');
+  });
+
+  it('voted card exposes a note element id and a plural Change label', () => {
+    const html = readSource(HTML_FILE);
+    assert.ok(html.includes('id="already-voted-note"'), 'note element needs an id for the renderer');
+    assert.ok(html.includes('>Change Votes<'),
+      'label must be plural — recast rewrites both leader and opponent');
   });
 
   it('adopts res.votingOpen so a page booted while voting was closed can recover', () => {

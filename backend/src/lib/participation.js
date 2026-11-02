@@ -60,8 +60,10 @@ export async function getStreaks(db, seasonId, playerId, cutoffWeek = null) {
 }
 
 // Get voting compliance for the 80% season-end prize: votes in attended weeks
-// (intersection) vs attended regular weeks whose voting window has closed.
-// cutoffWeek excludes the current open week; null = all weeks (closed season).
+// (intersection) vs attended regular weeks. The open week (cutoffWeek = CURRENT_WEEK)
+// counts from the moment its night is attended — a live nudge; final math at close
+// is unchanged (a week enters the denominator at next sync regardless).
+// cutoffWeek null = all weeks (closed season).
 export async function getVotingCompliance(db, seasonId, playerId, cutoffWeek = null) {
   const attendedWeeks = await db.prepare(`
     SELECT DISTINCT a.week FROM attendance a
@@ -76,8 +78,8 @@ export async function getVotingCompliance(db, seasonId, playerId, cutoffWeek = n
   `).bind(seasonId, playerId).all();
 
   const cutoff = typeof cutoffWeek === 'number' && Number.isFinite(cutoffWeek) ? cutoffWeek : Infinity;
-  const attended = (attendedWeeks.results || []).map(r => r.week).filter(w => w < cutoff);
-  const votedSet = new Set((votedWeeks.results || []).map(r => r.week).filter(w => w < cutoff));
+  const attended = (attendedWeeks.results || []).map(r => r.week).filter(w => w <= cutoff);
+  const votedSet = new Set((votedWeeks.results || []).map(r => r.week).filter(w => w <= cutoff));
   const voted = attended.filter(w => votedSet.has(w)).length;
   const attendedCount = attended.length;
   const pct = attendedCount > 0 ? Math.round((voted / attendedCount) * 100) : null;

@@ -212,15 +212,25 @@ describe('handleGetMySeasonStats', () => {
     );
   });
 
-  it('compliance: current season counts only weeks with closed voting windows', async () => {
+  it('compliance: open week counts from the moment its night is attended (live nudge)', async () => {
     const tables = basicTables();
     tables.attendance.push({ season_id: 6, week: 3, player_id: 'P001' });
     tables.melee_tournaments.push({ season_id: 6, round: 3, phase: 'regular' });
     tables.votes.push({ id: 99, timestamp: new Date().toISOString(), updated_at: null, season_id: 6, week: 3, player_id: 'P001', leader_id: '1', opponent_id: 'P002' });
     const db = createMockDb(tables);
     const result = await handleGetMySeasonStats({ seasonId: 6 }, { DB: db }, aliceSession);
-    assert.deepEqual(result.compliance, { attended: 2, voted: 2, pct: 100, qualifying: false, target: 80, minVotes: 4 },
-      'CURRENT_WEEK is 3 — week 3 window still open, must not count');
+    assert.deepEqual(result.compliance, { attended: 3, voted: 3, pct: 100, qualifying: false, target: 80, minVotes: 4 },
+      'CURRENT_WEEK is 3 — the voted open week counts immediately, on the same clock as raffle/streak');
+  });
+
+  it('compliance: attended-but-unvoted open week dips the live ratio (the nudge)', async () => {
+    const tables = basicTables();
+    tables.attendance.push({ season_id: 6, week: 3, player_id: 'P001' });
+    tables.melee_tournaments.push({ season_id: 6, round: 3, phase: 'regular' });
+    const db = createMockDb(tables);
+    const result = await handleGetMySeasonStats({ seasonId: 6 }, { DB: db }, aliceSession);
+    assert.deepEqual(result.compliance, { attended: 3, voted: 2, pct: 67, qualifying: false, target: 80, minVotes: 4 },
+      'playing without voting lowers the live ratio until the vote lands — that is the nudge');
   });
 
   it('streak: attended-but-unvoted open week does not reset the current streak', async () => {
