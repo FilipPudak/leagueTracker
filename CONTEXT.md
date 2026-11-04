@@ -279,12 +279,12 @@ voted"), never per-player rankings.
 1. Round ≡ week ≡ voting window — guarded by `UNIQUE(season_id, round)`.
 2. Every `MAX(round)` / "final standings" query filters `phase='regular'` — enforced via
    separate query for regular rounds from `melee_tournaments`, then filter standings in JS.
-3. A night is "fully synced" only when **both** its standings and its match rows exist **and** the
- Melee tournament reports status `Ended`. Standings and matches are two separate fetches, so a run
- during a still-reporting night can persist a torn snapshot (matches ahead of standings by a round —
- observed 2026-10-28 week 8): row existence is not completeness. A synced-but-not-Ended night is
- re-fetched on every later run (per-round DELETE+INSERT is atomic), so provisional data self-heals;
- an empty tournament (created but unplayed/unpublished) may likewise be re-fetched.
+3. Standings and matches are fetched **only while the Melee tournament reports status `Ended`**
+   (4 / 'Ended') — a running or unknown-status night is never fetched, so a mid-event torn snapshot
+   cannot be written (fetch-always caused both incidents: 2026-10-28 week 8's matches-ahead-of-
+   standings tear, and 2026-11-04 night 9 frozen at 3 rounds — written pre-Ended, then locked by
+   the rows-exist skip). Rows exist ⇒ final by construction; admin resync (`force`) is the only
+   bypass.
 4. Sync and backfill share one player-lookup/creation path; unknown Melee names are
    auto-created (both paths, identically).
 5. Session timestamps are ISO-8601 UTC with `Z` everywhere (SQL `datetime('now')` and

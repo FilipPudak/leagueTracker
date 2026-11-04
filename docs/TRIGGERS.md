@@ -21,10 +21,11 @@ Three Wednesday fires (20:15, 21:15 and 22:15 UTC) — exactly two are time-gate
 2. **Sync:** Fetches tournaments from Melee.gg API, then hands round data
    (tournament inserts, standings, matches, attendance, optional vote audit,
    player reactivation) to the shared engine `lib/leagueSync.js` — see
-   `syncSeasonData`. A synced round is only skipped while the Melee tournament
-   reports `Ended`; a round imported mid-night (torn standings/matches snapshot)
-   is re-fetched on every later fire and self-heals. The lifecycle below is
-   unchanged and stays inline here.
+   `syncSeasonData`. Rounds are fetched **only while the Melee tournament reports
+   `Ended`** — a running or unknown-status night is never fetched, so mid-event
+   torn snapshots cannot be written (fixes both incident classes: 2026-10-28 torn
+   snapshot and 2026-11-04 night-9 freeze); admin `resync` (`force`) is the only
+   bypass. The lifecycle below is unchanged and stays inline here.
 3. **Attendance:** Rebuilt from regular standings
 4. **Awards:** Recomputes the live podiums — Schemer, Ambassador, Ruler, Bounty Hunter, A New Hope.
    Champion is not recomputed mid-season; it materializes at close or by a post-close fire.

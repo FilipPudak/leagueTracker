@@ -282,7 +282,7 @@ describe('lib/leagueSync syncSeasonData (P4 Phase 2)', () => {
     assert.equal(db.getStore().season_standings.length, 1, 'seed row untouched');
   });
 
-  it('T2.5b refetches a synced round while the source is not Ended (torn snapshot heals)', async () => {
+  it('T2.5b never fetches a synced round while the source is not Ended (no provisional refresh)', async () => {
     const tables = engineTables();
     tables.season_standings = [
       { season_id: 6, round: 1, player_id: 'P001', wins: 2, losses: 0, draws: 0, match_points: 6, rank: 1 },
@@ -298,16 +298,16 @@ describe('lib/leagueSync syncSeasonData (P4 Phase 2)', () => {
       weekMap: makeWeekMap([{ meleeId: 201, round: 1, status: 2 }]),
     });
 
-    assert.equal(result.roundsSkipped, 0, 'not-Ended rounds are never skipped');
-    assert.equal(result.roundsProcessed, 1);
-    assert.equal(client.calls.standings.length, 1, 'provisional round is re-fetched');
+    assert.equal(result.roundsSkipped, 1, 'not-Ended rounds are skipped, never refreshed');
+    assert.equal(result.roundsProcessed, 0);
+    assert.equal(client.calls.standings.length, 0, 'no fetch while the source runs');
     const store = db.getStore();
-    assert.ok(!store.match_results.find(m => m.melee_match_id === 'torn-guid'), 'torn rows replaced');
+    assert.ok(store.match_results.find(m => m.melee_match_id === 'torn-guid'), 'existing rows untouched while source not Ended');
     const alice = store.season_standings.find(s => s.player_id === 'P001');
-    assert.equal(alice.match_points, 9, 'final snapshot replaces the provisional one');
+    assert.equal(alice.match_points, 6, 'stays until Ended or admin resync — never mid-event');
   });
 
-  it('T2.5c treats missing status as provisional — refetches', async () => {
+  it('T2.5c treats missing status as not-final — skipped until Melee reports Ended', async () => {
     const tables = engineTables();
     tables.season_standings = [
       { season_id: 6, round: 1, player_id: 'P001', wins: 2, losses: 0, draws: 0, match_points: 6, rank: 1 },
@@ -321,8 +321,26 @@ describe('lib/leagueSync syncSeasonData (P4 Phase 2)', () => {
     const weekMap = new Map([[201, { meleeId: 201, round: 1, name: 'x', date: null, phase: 'regular' }]]);
     const result = await syncSeasonData(db, client, { seasonId: 6, weekMap });
 
-    assert.equal(result.roundsProcessed, 1, 'unknown status must default to provisional');
-    assert.equal(client.calls.standings.length, 1);
+    assert.equal(result.roundsProcessed, 0, 'unknown status must not default to fetch');
+    assert.equal(result.roundsSkipped, 1);
+    assert.equal(client.calls.standings.length, 0);
+  });
+
+  it('T2.5e never fetches a FRESH round while the source is not Ended (2026-11-04 night-9 freeze)', async () => {
+    const db = createMockDb(engineTables());
+    const client = engineClient();
+
+    const result = await syncSeasonData(db, client, {
+      seasonId: 6,
+      weekMap: makeWeekMap([{ meleeId: 201, round: 1, status: 2 }]),
+    });
+
+    assert.equal(result.roundsProcessed, 0, 'mid-event fetch of a fresh round is what froze night 9');
+    assert.equal(client.calls.standings.length, 0, 'a running event must never be fetched');
+    const store = db.getStore();
+    assert.equal(store.season_standings.length, 0, 'no standings rows written while running');
+    assert.equal(store.attendance.length, 0, 'no attendance rows written while running');
+    assert.equal(store.match_results.length, 0, 'no match rows written while running');
   });
 
   it('T2.5d skips a synced round identified final by statusDescription only', async () => {

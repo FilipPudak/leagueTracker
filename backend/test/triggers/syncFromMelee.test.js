@@ -63,7 +63,8 @@ function buildMockFetch(overrides = {}) {
   const mockFetch = async (url) => {
     calls.push(url);
     if (url.includes('/api/tournament/list')) {
-      return { ok: true, status: 200, text: async () => JSON.stringify({ Content: tournaments, TotalCount: tournaments.length }) };
+      const list = tournaments.map(t => ({ Status: 4, ...t }));
+      return { ok: true, status: 200, text: async () => JSON.stringify({ Content: list, TotalCount: list.length }) };
     }
     if (url.includes('/api/standing/list/current/')) {
       return { ok: true, status: 200, text: async () => JSON.stringify({ Content: standings }) };
@@ -408,7 +409,7 @@ describe('triggers/syncFromMelee', () => {
     db = createMockDb(withSeasonStarted(makeTables()));
     const partialClient = class {
       async listTournaments() {
-        return { Content: [TOURNAMENTS[0]], TotalCount: 1 };
+        return { Content: [{ Status: 4, ...TOURNAMENTS[0] }], TotalCount: 1 };
       }
       async getStandings() {
         return { Content: STANDINGS };
@@ -634,13 +635,6 @@ describe('triggers/syncFromMelee', () => {
       tables.melee_tournaments.push(
         { melee_id: 200, season_id: 6, round: 12, name: 'SWU Wednesday league season 6 Top 8', date: '2026-09-09', phase: 'cut' }
       );
-      tables.season_standings.push(
-        { season_id: 6, round: 12, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
-        { season_id: 6, round: 12, player_id: 'P005', wins: 2, losses: 1, draws: 0, match_points: 6, rank: 2 }
-      );
-      tables.match_results.push(
-        { season_id: 6, round: 12, melee_match_id: 'semi1', player1_id: 'P001', player2_id: 'P005', winner_id: 'P001', result: '2-1', is_bye: 0 }
-      );
       db = createMockDb(tables);
 
       const f1 = buildMockFetch({ tournaments: [{ ...cutTournament, Status: 2 }], standings: cutStandings, matches: [] });
@@ -652,8 +646,10 @@ describe('triggers/syncFromMelee', () => {
       assert.equal(result1.status, 'season-ended');
       assert.ok(!db.getStore().awards.find(a => a.award_name === 'Galactic Champion' && a.season_id === 6),
         'Champion must NOT materialize from a mid-bracket snapshot');
-      const healed = db.getStore().season_standings.find(s => s.round === 12 && s.rank === 1);
-      assert.equal(healed.player_id, 'P005', 'cut standings data still self-heals on the not-Ended refresh');
+      assert.ok(!db.getStore().season_standings.find(s => s.round === 12),
+        'a running cut writes nothing — mid-event fetch is what froze night 9 (2026-11-04)');
+      assert.equal(f1.calls.filter(u => u.includes('/standing/')).length, 0,
+        'not-Ended source is never fetched');
 
       const f2 = buildMockFetch({ tournaments: [{ ...cutTournament, Status: 4, StatusDescription: 'Ended' }], standings: cutStandings, matches: [] });
       globalThis.fetch = f2.mockFetch;

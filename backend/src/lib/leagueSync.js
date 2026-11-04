@@ -46,20 +46,21 @@ export async function resolveMatchCompetitors(comps, finder) {
 }
 
 // A round's source data is final only when Melee reports the tournament Ended
-// (numeric code or description). Anything else — Running, Pending, Not
-// Published, or an unknown/missing status — is provisional: standings and
-// matches are fetched as two separate calls, so a fire during a still
-// in-progress night can persist a torn snapshot; the not-Ended state must
-// therefore keep the round eligible for re-fetch so a later fire heals it.
+// (Status 4 / StatusDescription 'Ended'). Standings and matches are fetched as
+// two separate calls, so fetching mid-event can persist a torn snapshot — and a
+// snapshot written before Ended would be frozen forever by the rows-exist skip
+// (2026-11-04 night 9). Therefore a not-Ended (or unknown-status) round is
+// never fetched at all: rows are written only once Ended, so rows exist ⇒
+// final by construction. Admin resync (force) is the only bypass.
 export function isRoundFinal(info) {
   return info?.status === MELEE_STATUS_ENDED || info?.statusDescription === 'Ended';
 }
 
 // Per-round order (hard invariant):
-// skip check (rows exist AND source Ended, unless force) → fetch standings →
-// resolve players → attended set from RESPONSE → batch replace standings →
-// write attendance (regular, ≤ maxAttendanceWeek) → fetch matches → batch
-// replace matches → audit (if opted in and complete).
+// not-Ended skip (unless force) → rows-exist skip (unless force) → fetch
+// standings → resolve players → attended set from RESPONSE → batch replace
+// standings → write attendance (regular, ≤ maxAttendanceWeek) → fetch matches
+// → batch replace matches → audit (if opted in and complete).
 export async function syncSeasonData(DB, client, {
   seasonId,
   weekMap,
@@ -116,12 +117,14 @@ export async function syncSeasonData(DB, client, {
   for (const [meleeId, info] of weekMap) {
     const round = info.round;
     if (processedRounds.has(round)) continue;
+    if (!force && !isRoundFinal(info)) {
+      result.roundsSkipped++;
+      console.log(`${logPrefix} Round ${round} source not Ended (status ${info?.status ?? 'unknown'}) — skipping until final`);
+      continue;
+    }
     if (!force && syncedStandingsRounds.has(round) && syncedMatchesRounds.has(round)) {
-      if (isRoundFinal(info)) {
-        result.roundsSkipped++;
-        continue;
-      }
-      console.log(`${logPrefix} Round ${round} synced but source not Ended (status ${info?.status ?? 'unknown'}) — refreshing provisional snapshot`);
+      result.roundsSkipped++;
+      continue;
     }
     if (result.roundsProcessed >= budget) break;
 

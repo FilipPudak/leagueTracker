@@ -53,7 +53,8 @@ function buildMockFetch(overrides = {}) {
 
   return async (url) => {
     if (url.includes('/api/tournament/list')) {
-      return { ok: true, status: 200, text: async () => JSON.stringify({ Content: tournaments, TotalCount: tournaments.length }) };
+      const list = tournaments.map(t => ({ Status: 4, ...t }));
+      return { ok: true, status: 200, text: async () => JSON.stringify({ Content: list, TotalCount: list.length }) };
     }
     if (url.includes('/api/standing/list/current/')) {
       return { ok: true, status: 200, text: async () => JSON.stringify({ Content: standings }) };
@@ -194,7 +195,7 @@ describe('triggers/backfillFromMelee (engine)', () => {
     db = createMockDb(tables);
     const partialClient = class {
       async listTournaments() {
-        return { Content: ALL_TOURNAMENTS.filter(t => t.ID === 100), TotalCount: 1 };
+        return { Content: ALL_TOURNAMENTS.filter(t => t.ID === 100).map(t => ({ Status: 4, ...t })), TotalCount: 1 };
       }
       async getStandings() { throw new Error('Standings API down'); }
       async getMatches() { return { Content: [] }; }
@@ -211,7 +212,7 @@ describe('triggers/backfillFromMelee (engine)', () => {
     db = createMockDb(tables);
     const partialClient = class {
       async listTournaments() {
-        return { Content: ALL_TOURNAMENTS.filter(t => t.ID === 100), TotalCount: 1 };
+        return { Content: ALL_TOURNAMENTS.filter(t => t.ID === 100).map(t => ({ Status: 4, ...t })), TotalCount: 1 };
       }
       async getStandings() { return { Content: STANDINGS }; }
       async getMatches() { throw new Error('Matches API down'); }
@@ -445,7 +446,8 @@ describe('backfillFromMelee P4 (wrapper contract)', () => {
       class: class {
         async listTournaments() {
           if (failList) throw new Error('API down');
-          return { Content: list || ALL_TOURNAMENTS, TotalCount: (list || ALL_TOURNAMENTS).length };
+          const rows = (list || ALL_TOURNAMENTS).map(t => ({ Status: 4, ...t }));
+          return { Content: rows, TotalCount: rows.length };
         }
         async getStandings(id) {
           standingsCalls.push(id);
