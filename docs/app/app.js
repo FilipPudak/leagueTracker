@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.19.4';
+const APP_VERSION = '4.19.5';
 
 const appState = {
   status: 'unlinked',
@@ -2121,7 +2121,9 @@ function renderSeasonContent(s, opts = {}) {
   let awardsHtml = '';
   if (s.awards && s.awards.length > 0) {
     awardsHtml = head('Awards') +
-      s.awards.map(a => `<div class="player-modal-award"><strong style="color:#fbbf24;">${escapeHtml(a.award_name)}</strong></div>`).join('');
+      '<div class="player-modal-items">' +
+      s.awards.map(a => `<div class="player-modal-award"><strong style="color:#fbbf24;">${escapeHtml(a.award_name)}</strong></div>`).join('') +
+      '</div>';
   }
 
   return statsHtml + awardsHtml + nightsHtml + leadersHtml;
