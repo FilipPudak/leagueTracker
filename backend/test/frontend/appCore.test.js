@@ -352,6 +352,12 @@ describe('frontend wiring', () => {
     assert.match(app, /limit: 5,\s*\n\s*expandable: true/);
   });
 
+  it('every leader list renders through one shared leader row builder', () => {
+    assert.equal((app.match(/function leaderRowHtml\(/g) || []).length, 1, 'exactly one leader-row template');
+    assert.ok(app.includes('getRowHtml: (item) => leaderRowHtml(item)'), 'My Stats routes through it');
+    assert.ok(app.includes('s.leaders.map(l => leaderRowHtml(l))'), 'modal + profile route through it');
+  });
+
   it('award podiums expand per-container with a players label', () => {
     assert.ok(!/mostPlayedExpanded/.test(app), 'no shared expansion flag left');
     assert.match(app, /let listExpanded = \{\};/);

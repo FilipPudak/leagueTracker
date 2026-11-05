@@ -177,11 +177,13 @@ describe('CSP hardening Phase D: aspect icons are same-origin only (v4.18.0)', (
     assert.ok(!/url\(\s*['"]?https?:/.test(css), 'styles.css must not reference external urls');
   });
 
-  it('both leader surfaces route through aspectIconMarkup', () => {
+  it('all leader surfaces route through aspectIconMarkup', () => {
     const js = readSource(JS);
-    assert.equal((js.match(/getIcons:/g) || []).length, 2, 'renderStatsList configs: topLeaders + myseason leaders');
-    const seasonBody = js.slice(js.indexOf('function renderSeasonContent'), js.indexOf('function renderPlayerModal'));
-    assert.ok(seasonBody.includes('LeagueCore.aspectIconMarkup'), 'profile/modal leader rows render icons too');
+    assert.equal((js.match(/getIcons:/g) || []).length, 1, 'only the most-played config still uses the default row template');
+    const builder = js.slice(js.indexOf('function leaderRowHtml'), js.indexOf('function renderPlayerModal'));
+    assert.ok(builder.includes('LeagueCore.aspectIconMarkup'), 'shared leader row renders icons');
+    assert.ok(js.includes('getRowHtml: (item) => leaderRowHtml(item)'), 'My Stats renders through the shared leader row');
+    assert.ok(js.includes('s.leaders.map(l => leaderRowHtml(l))'), 'profile/modal leader rows render through the shared leader row');
   });
 
   it('index.html ships no external img sources', () => {

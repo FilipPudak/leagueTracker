@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.19.3';
+const APP_VERSION = '4.19.4';
 
 const appState = {
   status: 'unlinked',
@@ -1351,13 +1351,7 @@ function renderMySeasonStats(res) {
   }
 
   renderStatsList('myseason-leaders-container', res.leaders || [], {
-    getTitle: (item) => LeagueCore.leaderOptionLabel(item),
-    getIcons: (item) => LeagueCore.aspectIconMarkup(item),
-    getScore: (item) => {
-      const parts = [`${item.plays} Plays`];
-      if (item.winPct != null) parts.push(`${item.winPct}% Win`);
-      return parts.join(' · ');
-    },
+    getRowHtml: (item) => leaderRowHtml(item),
     limit: Infinity
   });
 
@@ -1571,6 +1565,10 @@ function renderStatsList(containerId, items, config) {
   const shown = LeagueCore.visibleListSlice(items, limit, expanded);
   let html = '<div class="stats-list">';
   shown.forEach((item, i) => {
+    if (config.getRowHtml) {
+      html += config.getRowHtml(item, i);
+      return;
+    }
     const rankNumber = item.displayRank !== undefined ? item.displayRank : (i + 1);
     const safeRank = Math.floor(Number(rankNumber)) || 0;
     const title = config.getTitle(item, i);
@@ -2115,14 +2113,8 @@ function renderSeasonContent(s, opts = {}) {
   let leadersHtml = '';
   if (s.leaders && s.leaders.length > 0) {
     leadersHtml = head('Leaders Played') +
-      '<div class="player-modal-items">' +
-      s.leaders.map(l => {
-        const wp = l.winPct != null ? l.winPct + '%' : '—';
-        return `<div class="player-modal-item">
-          <span>${LeagueCore.aspectIconMarkup(l)}${escapeHtml(LeagueCore.leaderOptionLabel(l))}</span>
-          <span>${escapeHtml(l.plays)} plays · ${escapeHtml(l.wins)}W ${escapeHtml(l.draws)}D ${escapeHtml(l.losses)}L · ${wp}</span>
-        </div>`;
-      }).join('') +
+      '<div class="stats-list">' +
+      s.leaders.map(l => leaderRowHtml(l)).join('') +
       '</div>';
   }
 
@@ -2133,6 +2125,20 @@ function renderSeasonContent(s, opts = {}) {
   }
 
   return statsHtml + awardsHtml + nightsHtml + leadersHtml;
+}
+
+function leaderRowHtml(leader) {
+  const stats = [
+    escapeHtml(`${leader.plays} plays`),
+    escapeHtml(`${leader.wins}W ${leader.draws}D ${leader.losses}L`)
+  ];
+  if (leader.winPct != null) {
+    stats.push(`<strong style="color:#38bdf8;">${escapeHtml(leader.winPct)}%</strong>`);
+  }
+  return `<div class="leader-row">
+          <div class="leader-row-name">${LeagueCore.aspectIconMarkup(leader)}${escapeHtml(LeagueCore.leaderOptionLabel(leader))}</div>
+          <div class="leader-row-stats">${stats.join(' · ')}</div>
+        </div>`;
 }
 
 function renderPlayerModal(data) {
