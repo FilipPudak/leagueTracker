@@ -428,6 +428,16 @@ describe('Flow & accessibility: guards', () => {
     assert.ok(phone && phone[0].includes('.nav-tabs') && phone[0].includes('position: fixed'), 'nav must be fixed at bottom below 768px');
   });
 
+  it('fixed bottom nav keeps its own compositing layer (Firefox Android missed-repaint guard)', () => {
+    const css = readCSS();
+    const blocks = (css.match(/\.nav-tabs\s*\{[^}]*\}/g) || []).filter((b) => b.includes('position: fixed'));
+    assert.equal(blocks.length, 2, 'tablet and phone fixed .nav-tabs blocks must both exist');
+    blocks.forEach((b) => {
+      assert.ok(b.includes('transform: translateZ(0)'), 'fixed nav must declare transform: translateZ(0) — without its own layer Firefox Android stops repainting the tab labels/icons until a touch or scroll');
+    });
+    assert.ok(!/\.tab-btn\s*\{[^}]*transition:\s*all/.test(css), 'tab-btn transition must stay narrowed to background-color/color/box-shadow (transition: all churns layers)');
+  });
+
   it('link picker renders accessible rows with an empty state', () => {
     const html = readHTML();
     const js = readJS();

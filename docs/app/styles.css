@@ -194,10 +194,10 @@ body:not(.is-linked) .signin-cta { display: inline-block; }
 .tab-btn {
   flex: 1; padding: 8px 0; border: none; background: transparent; color: #64748b;
   font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: var(--font-size-tab); letter-spacing: 0.5px;
-  border-radius: 6px; cursor: pointer; transition: all 0.25s ease;
+  border-radius: 6px; cursor: pointer; transition: background-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
   display: flex; flex-direction: column; align-items: center; gap: 3px;
 }
-.tab-btn svg { transition: color 0.25s ease; }
+.tab-btn svg { transition: stroke 0.25s ease; }
 .tab-btn.active { background: #38bdf8; color: #050811; box-shadow: 0 0 8px rgba(56, 189, 248, 0.4); }
 .tab-btn.active svg { stroke: #050811; }
 
@@ -555,6 +555,7 @@ details[open].section-block > summary::before { content: '\25BE '; }
     border-radius: 0;
     z-index: 50;
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    transform: translateZ(0);
   }
 
   .app-container {
@@ -573,6 +574,7 @@ details[open].section-block > summary::before { content: '\25BE '; }
     border-radius: 0;
     z-index: 50;
     padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+    transform: translateZ(0);
   }
 
   .app-container {
