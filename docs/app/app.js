@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.19.6';
+const APP_VERSION = '4.19.7';
 
 const appState = {
   status: 'unlinked',
@@ -173,6 +173,8 @@ function applyVersion() {
 }
 
 function setActiveView(viewId) {
+  const currentTab = document.querySelector('.tab-btn.active');
+  const fallbackView = currentTab ? currentTab.getAttribute('aria-controls') : appState.lastView;
   document.querySelectorAll('.view-panel').forEach((v) => v.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach((b) => {
     b.classList.remove('active');
@@ -180,7 +182,9 @@ function setActiveView(viewId) {
   });
   const viewEl = $(viewId);
   if (viewEl) viewEl.classList.add('active');
-  const activeTab = document.querySelector(`.tab-btn[aria-controls="${viewId}"]`);
+  const matchedTab = document.querySelector(`.tab-btn[aria-controls="${viewId}"]`);
+  const activeTab = matchedTab
+    || (fallbackView ? document.querySelector(`.tab-btn[aria-controls="${fallbackView}"]`) : null);
   if (activeTab) {
     activeTab.classList.add('active');
     activeTab.setAttribute('aria-selected', 'true');
@@ -1338,7 +1342,7 @@ function renderMySeasonStats(res) {
   if (awardsContainer && awardsSection) {
     if (awards.length > 0) {
       awardsContainer.innerHTML = awards
-        .map((a) => `<div class="card" style="padding:10px 12px; margin-bottom:8px;">
+        .map((a) => `<div class="card card-tight">
                        <span style="font-weight:700; color:#fbbf24;">Award:</span>
                        <span style="font-weight:700; color:#f8fafc;">${escapeHtml(a)}</span>
                      </div>`)

@@ -7,10 +7,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Star Wars Unlimited League Stockholm</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="stylesheet" href="styles.css?v=4.19.6">
+  <link rel="stylesheet" href="styles.css?v=4.19.7">
 </head>
 <body>
-  <script src="boot.js?v=4.19.6"></script>
+  <script src="boot.js?v=4.19.7"></script>
   <div class="app-container">
     <div class="header">
       <div class="header-content">
@@ -61,7 +61,7 @@
 
     <!-- VOTE PANEL -->
     <div id="vote-view" class="view-panel" role="tabpanel" aria-labelledby="tab-vote">
-      <div id="deadline-copy" class="card" style="display: none; margin-bottom: 12px; padding: 10px 14px; font-size: 0.85rem; color: #94a3b8;">
+      <div id="deadline-copy" class="card card-note" style="display: none; margin-bottom: 12px;">
         <span id="deadline-text"></span>
       </div>
       <form id="vote-form">
@@ -87,7 +87,7 @@
         <p style="font-size: 0.9rem; color: #94a3b8;">You didn't play this week — only players who attended can vote.</p>
       </div>
 
-      <div id="weekly-participation-card" class="card" style="display: none; margin-top: 12px; padding: 10px 14px; font-size: 0.85rem; color: #94a3b8;">
+      <div id="weekly-participation-card" class="card card-note" style="display: none; margin-top: 12px;">
         <span id="weekly-participation-text"></span>
       </div>
     </div>
@@ -150,44 +150,44 @@
         <select id="season-filter" data-season-sync="true"></select>
       </div>
 
-      <div id="awards-participation-card" class="card" style="display: none; margin-bottom: 16px; padding: 10px 14px; font-size: 0.85rem; color: #94a3b8;">
+      <div id="awards-participation-card" class="card card-note" style="display: none;">
         <span id="awards-participation-text"></span>
       </div>
 
       <div id="awards-content" style="display: none;">
         <div id="champion-section" style="margin-top: 16px;">
           <h3 class="section-heading">Galactic Champion</h3>
-          <div id="champion-container"></div>
+          <div class="card card-tight"><div id="champion-container"></div></div>
         </div>
 
         <div id="ruler-section" style="margin-top: 20px;">
           <h3 class="section-heading">Galactic Ruler</h3>
-          <div id="ruler-container"></div>
+          <div class="card card-tight"><div id="ruler-container"></div></div>
         </div>
 
         <div id="schemer-section" style="margin-top: 20px;">
           <h3 class="section-heading">Galactic Schemer</h3>
-          <div id="schemer-container"></div>
+          <div class="card card-tight"><div id="schemer-container"></div></div>
         </div>
 
         <div id="ambassador-section" style="margin-top: 20px;">
           <h3 class="section-heading">Galactic Ambassador</h3>
-          <div id="ambassador-container"></div>
+          <div class="card card-tight"><div id="ambassador-container"></div></div>
         </div>
 
         <div id="new-hope-section" style="margin-top: 20px;">
           <h3 class="section-heading">A New Hope</h3>
-          <div id="new-hope-container"></div>
+          <div class="card card-tight"><div id="new-hope-container"></div></div>
         </div>
 
         <div id="bounty-hunter-section" style="margin-top: 20px;">
           <h3 class="section-heading">Bounty Hunter</h3>
-          <div id="bounty-hunter-container"></div>
+          <div class="card card-tight"><div id="bounty-hunter-container"></div></div>
         </div>
 
         <div style="margin-top: 20px;">
           <h3 class="section-heading">Most Played Leaders</h3>
-          <div id="most-played-container"></div>
+          <div class="card card-tight"><div id="most-played-container"></div></div>
         </div>
       </div>
     </div>
@@ -288,7 +288,7 @@
 
           <div style="margin-top: 16px;">
             <h3 class="section-heading">Leaders Played</h3>
-            <div id="myseason-leaders-container"></div>
+            <div class="card card-tight"><div id="myseason-leaders-container"></div></div>
           </div>
         </div>
       </details>
@@ -359,7 +359,7 @@
     </div>
   </div>
 
-  <script src="app-core.js?v=4.19.6"></script>
-<script src="app.js?v=4.19.6"></script>
+  <script src="app-core.js?v=4.19.7"></script>
+<script src="app.js?v=4.19.7"></script>
 </body>
 </html>

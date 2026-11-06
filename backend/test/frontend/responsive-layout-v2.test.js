@@ -109,7 +109,11 @@ describe('Layout: desktop 2-panel', () => {
   it('nav-tabs and heading share equal chrome heights on desktop', () => {
     const css = readCSS();
     assert.ok(css.match(/\.myseason-heading\s*\{[^}]*min-height:/), 'heading must have min-height matching the tab bar');
-    assert.ok(css.match(/\.myseason-heading\s*\{[^}]*background-color:\s*#090d16/), 'heading must use the tab-bar pill background');
+    const headingBg = css.match(/\.myseason-heading\s*\{[^}]*background(?:-color)?:\s*([^;}]+)/);
+    const tabsBg = css.match(/\.nav-tabs\s*\{[^}]*background(?:-color)?:\s*([^;}]+)/);
+    assert.ok(headingBg && tabsBg, 'heading and nav-tabs must both declare a background');
+    assert.strictEqual(headingBg[1].trim(), tabsBg[1].trim(), 'heading must use the tab-bar pill background');
+    assert.ok(/--surface-card:\s*#/.test(css), 'shared card surface token must be declared in :root');
   });
 
   it('My Stats tab hidden from nav-tabs on desktop', () => {
