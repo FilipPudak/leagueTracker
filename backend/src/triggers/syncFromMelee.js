@@ -231,8 +231,9 @@ export async function syncFromMelee(env, deps = {}) {
       return { status: 'season-ended' };
     }
     // The just-played night counts as data only once a round beyond the open
-    // week has attendance. Close decisions above never defer: their target is
-    // a cut round, which produces no regular attendance by definition.
+    // week has attendance. Close decisions above never defer: their night is
+    // never a regular one — a same-night cut or the off week(s) before the
+    // championship both require no regular attendance.
     const newWeekData = latestRegularAttended > (currentWeek || 0);
     if (isPrimaryFire(now) && !newWeekData) {
       console.log('[SyncFromMelee] Try-1 with no new-round data; deferring advance to the retry fire.');

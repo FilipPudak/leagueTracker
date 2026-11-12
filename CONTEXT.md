@@ -47,7 +47,7 @@ username that is literally a GUID (P022).
 | **Voting window** | Opens at night N's sync; closes when night N+1's sync advances the week. The stored weekly deadline (Wed 17:45) is **displayed only** — a courtesy reminder before games start — and never enforced. |
 | **Cron** | Fires **three times on Wednesday (20:15, 21:15 and 22:15 UTC)** and once on **Thursday (07:00 UTC)** — configured with `WED`/`THU` **abbreviations**, never numbers: Cloudflare counts weekdays 1=Sunday, so a numeric `3` is Tuesday (this exact trap silently disabled automatic week-advance until Sep 30 2026). Exactly **two** Wednesday fires are ever time-gate-eligible: they land at **22:15** (primary try) and **23:15** (retry) Stockholm in *both* DST states. The Thursday fire is a data-backed retry: if Wednesday's results weren't published in time, it opens voting early without advancing. |
 | **Advance gate** | Week-advance and voting-open happen only when computed Stockholm local day is **Wednesday** (league night) **and** local time ≥ 22:10 **and** the `LAST_ADVANCED` marker (YYYY-MM-DD) is not today's date — so a manual `triggerWeeklyCycle` or any stray trigger on another day can never close a voting window early. The Thursday fire uses `weekDataPresent` (attendance row exists for current week) instead of the time gate. Data sync itself runs idempotently on *every* fire: late-published Melee results are picked up automatically. |
-| **Two-try open** | The primary Wednesday try (22:15) may act only if the night it opens/advances to has attendance data; a data-less primary defers (sync only, no lifecycle writes) and the retry try (23:15) **always** acts, with or without data — so voting opens every league night ~1 h later at worst and a week's votes are never lost. The season **close is never deferred**: its target is a cut round, which by definition produces no regular attendance. |
+| **Two-try open** | The primary Wednesday try (22:15) may act only if the night it opens/advances to has attendance data; a data-less primary defers (sync only, no lifecycle writes) and the retry try (23:15) **always** acts, with or without data — so voting opens every league night ~1 h later at worst and a week's votes are never lost. The season **close is never deferred**: its target is never a regular night — whether that fire's night is a same-night cut or an off week between the regular season and the championship, no regular attendance is required. |
 | **Paused** | `SEASON_PAUSED=TRUE`: sync continues, but no advance, no voting open/close. Toggled by `pauseCurrentSeason` / `resumeCurrentSeason`. |
 
 **Rationale:** Cloudflare crons are UTC-only. Three Wednesday UTC fires + deterministic local-time gate yields
@@ -73,13 +73,21 @@ Wednesday run for night N:
   else if N+1 > length: CLOSE — see below
   else: CURRENT_WEEK="Week N+1", record LAST_ADVANCED
 
-Close sequence (runs on the fire after the last regular week's window — usually the
-championship night):
-  sync that night's events (including the cut!) → compute & materialize awards →
-  VOTING_OPEN=FALSE, SEASON_STARTED=FALSE, CURRENT_WEEK="Season Ended"
-  The Galactic Champion is materialized only while the cut event reports Ended; closing during a
-  still-running bracket defers the award (never the close itself — §3 "close is never deferred"),
-  and a post-close fire materializes it from the final standings.
+Close sequence (runs on the FIRST Wednesday fire after the last regular week's voting
+window opens — i.e. during the off week(s) between the regular season and the
+championship, NOT on championship night. There is typically one week off, but it may be
+more. S7 example: week 11 = Nov 18 → close = Nov 25 → championship = Dec 2, possibly Dec 9):
+  sync whatever events exist that night → compute & materialize the regular-season
+  awards → VOTING_OPEN=FALSE, SEASON_STARTED=FALSE, CURRENT_WEEK="Season Ended"
+  The gap until the championship is inert by design: cron fires continue every Wed/Thu
+  year-round, post-close fires keep syncing (side/cut events land whenever played), and
+  voting stays closed — no regular night is being played. "Season Ended" therefore
+  appears BEFORE the championship night — only the week counter reads that way, all
+  regular-season awards are already final at that point.
+  The Galactic Champion is the only award allowed to wait: it materializes from a
+  post-close fire whenever the cut event finally reports Ended — one or more weeks
+  after close (never the close itself — §3 "close is never deferred"). A cut played on
+  a non-Wednesday day still lands at the next Wed/Thu fire.
 ```
 
 ## 5. Season Configuration

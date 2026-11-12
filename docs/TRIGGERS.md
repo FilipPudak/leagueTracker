@@ -28,18 +28,24 @@ Three Wednesday fires (20:15, 21:15 and 22:15 UTC) — exactly two are time-gate
    bypass. The lifecycle below is unchanged and stays inline here.
 3. **Attendance:** Rebuilt from regular standings
 4. **Awards:** Recomputes the live podiums — Schemer, Ambassador, Ruler, Bounty Hunter, A New Hope.
-   Champion is not recomputed mid-season; it materializes at close or by a post-close fire.
+   Champion is not recomputed mid-season; it materializes at close, or — the normal case when the
+   championship is played one or more weeks after the regular season ends — by a post-close fire.
 5. **Advance gate:** `shouldAdvance(isoNow, marker)` checks:
    - Stockholm local weekday is Wednesday (league night)
    - Stockholm local time ≥ 22:10
    - `LAST_ADVANCED` marker ≠ today's date (YYYY-MM-DD)
 6. **First run of season:** Sets `VOTING_OPEN=TRUE`, sets `LAST_ADVANCED=today`
 7. **Subsequent runs:** Advances `CURRENT_WEEK` to next week, sets `LAST_ADVANCED=today`
-8. **Season close:** When next week > `seasons.length` → syncs cut event, materializes all awards
-   (Galactic Champion deferred while the cut event is still running — a post-close fire
-   materializes it once the bracket reports `Ended`), sets `VOTING_OPEN=FALSE`, `SEASON_STARTED=FALSE`, `CURRENT_WEEK='Season Ended'`
+8. **Season close:** When next week > `seasons.length` → syncs the night's events, materializes the
+   regular-season awards, sets `VOTING_OPEN=FALSE`, `SEASON_STARTED=FALSE`, `CURRENT_WEEK='Season Ended'`.
+   Close fires on the **first eligible Wednesday after the last regular week's voting window opens** —
+   normally during the off week(s) *before* the championship (typically 1 week off, possibly more),
+   **not** on championship night. Never deferred (its night is never a regular night). If a cut is
+   already present but still running, Galactic Champion is deferred (never the close)
 9. **Paused:** If `SEASON_PAUSED=TRUE` → syncs data only, skips advance/open/close
-10. **Post-close fires:** Still sync data and fill the Champion award if a deferred close left it unwritten
+10. **Post-close fires:** Still sync data every Wed/Thu — this is what lands the championship cut
+    whenever it is finally played (1+ weeks after close is the normal case) and fills the Galactic
+    Champion award as soon as the bracket reports `Ended`
 
 **Late data handling:** Data sync runs on every fire. If Melee publishes results after both fires, the next week's sync picks them up automatically.
 

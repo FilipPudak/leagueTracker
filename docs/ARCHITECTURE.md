@@ -191,6 +191,17 @@ without the time gate.
 the retry fire always acts. This ensures voting opens every league night ~1h later at
 worst.
 
+**Close vs. championship night:** close fires on the **first eligible Wednesday after the
+last regular week's voting window opens** — there is normally one week off (sometimes
+more) between the last regular night and the championship, so close happens *during that
+gap*, not on championship night (S7: week 11 Nov 18 → close Nov 25 → cut Dec 2 or Dec 9).
+The gap is inert: cron fires continue every Wed/Thu year-round, post-close fires keep
+syncing side/cut events, and voting stays closed. `CURRENT_WEEK='Season Ended'` therefore
+appears before the championship is played; all regular-season awards are already final.
+The **Galactic Champion** is the only award that waits — a post-close fire materializes it
+whenever the cut reports `Ended`, one or more weeks after close (a same-night cut is
+caught at close itself; a cut still running then is deferred, never the close).
+
 ## Sync lifecycle
 
 Runs on every cron fire. Idempotent — catches late-published Melee results.
