@@ -77,7 +77,7 @@ function computeSweepCount(matches, playerId) {
   return sweepCount;
 }
 
-// 3+ wins with each of 6 different leaders within ONE season; the leader a
+// 3+ wins with each of 5 different leaders within ONE season; the leader a
 // player "played" is the leader they voted for that week (attribution rule).
 function computeDeckMaster(matches, votes, playerId) {
   const voteByWeekSeason = new Map(votes.map(v => [`${v.season_id}-${v.week}`, v.leader_id]));
@@ -95,7 +95,7 @@ function computeDeckMaster(matches, votes, playerId) {
     for (const count of leaderWinCount.values()) {
       if (count >= 3) leadersWithThreeWins++;
     }
-    if (leadersWithThreeWins >= 6) return true;
+    if (leadersWithThreeWins >= 5) return true;
   }
   return false;
 }
@@ -194,7 +194,7 @@ export async function computeBadges(db, playerId, activeSeasonId = null, isSeaso
       type: 'flat',
       earned: hasDeckMaster,
       icon: 'cards',
-      tooltip: 'Win 3+ matches each with 6 different leaders in a single season',
+      tooltip: 'Win 3+ matches each with 5 different leaders in a single season',
     },
     {
       id: 'nightWins',

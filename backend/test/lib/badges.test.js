@@ -480,11 +480,11 @@ describe('lib/badges computeBadges', () => {
     });
 
     describe('Deck Master', () => {
-      it('earned when won 3+ matches each with 6 different leaders in a season', async () => {
+      it('earned when won 3+ matches each with 5 different leaders in a season', async () => {
         const matches = [];
         const votes = [];
-        const leaders = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6'];
-        for (let i = 0; i < 6; i++) {
+        const leaders = ['L1', 'L2', 'L3', 'L4', 'L5'];
+        for (let i = 0; i < 5; i++) {
           for (let w = 0; w < 3; w++) {
             matches.push(matchRow('P001', 'P002', 'P001', 'Alice won 2-0-0', { season_id: 6, round: i * 3 + w + 1 }));
             votes.push({ season_id: 6, week: i * 3 + w + 1, player_id: 'P001', leader_id: leaders[i] });
@@ -510,12 +510,12 @@ describe('lib/badges computeBadges', () => {
         assert.equal(b.earned, false);
       });
 
-      it('not earned when only 5 leaders have 3+ wins', async () => {
+      it('not earned when only 4 leaders have 3+ wins', async () => {
         const matches = [];
         const votes = [];
         const leaders = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6'];
         for (let i = 0; i < 6; i++) {
-          const winCount = i < 5 ? 3 : 1;
+          const winCount = i < 4 ? 3 : 1;
           for (let w = 0; w < winCount; w++) {
             matches.push(matchRow('P001', 'P002', 'P001', 'Alice won 2-0-0', { season_id: 6, round: i * 3 + w + 1 }));
             votes.push({ season_id: 6, week: i * 3 + w + 1, player_id: 'P001', leader_id: leaders[i] });
