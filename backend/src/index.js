@@ -15,16 +15,23 @@ import { handlePauseSeason, handleResumeSeason } from './handlers/pauseSeason.js
 import { handleAddLeaders, handleSetLeadersActive, handleRemoveLeaders } from './handlers/leaderManagement.js';
 import { handleMaterializePastAwards } from './handlers/materializePastAwards.js';
 import { handleGetVoteBootstrap } from './handlers/getVoteBootstrap.js';
+import { handleRequestRename } from './handlers/requestRename.js';
+import { handleListRenameRequests } from './handlers/listRenameRequests.js';
+import { handleApproveRename } from './handlers/approveRename.js';
+import { handleRejectRename } from './handlers/rejectRename.js';
+import { handleMergePlayers } from './handlers/mergePlayers.js';
 import { findSessionByToken, touchSessionTimestamp } from './lib/auth.js';
 
-const TOKEN_REQUIRED = ['submitVote', 'updateVote', 'unlinkAccount', 'getMySeasonStats', 'getMyCareerStats'];
+const TOKEN_REQUIRED = ['submitVote', 'updateVote', 'unlinkAccount', 'getMySeasonStats', 'getMyCareerStats', 'requestRename'];
 const TOKEN_OPTIONAL = ['getAppData', 'getVoteBootstrap'];
 
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_READS_MAX = 90;
 const RATE_LIMIT_WRITES_MAX = 10;
-const WRITE_ACTIONS = new Set(['submitVote', 'updateVote', 'linkAccount', 'unlinkAccount']);
+const RATE_LIMIT_RENAMES_MAX = 3;
+const WRITE_ACTIONS = new Set(['submitVote', 'updateVote', 'linkAccount', 'unlinkAccount', 'requestRename']);
+const RENAME_ACTIONS = new Set(['requestRename']);
 const RATE_LIMIT_SWEEP_INTERVAL_MS = 5 * 60_000;
 let lastSweep = 0;
 
@@ -38,9 +45,12 @@ function checkRateLimit(ip, action) {
       if (now - entry.start > RATE_LIMIT_WINDOW_MS) rateLimitMap.delete(key);
     }
   }
+  // Rename requests get their own bucket so a league-night crowd on one shared
+  // venue IP cannot spend the vote-write budget on rename submissions.
+  const isRename = RENAME_ACTIONS.has(action);
   const isWrite = WRITE_ACTIONS.has(action);
-  const max = isWrite ? RATE_LIMIT_WRITES_MAX : RATE_LIMIT_READS_MAX;
-  const key = isWrite ? `${ip}:w` : `${ip}:r`;
+  const max = isRename ? RATE_LIMIT_RENAMES_MAX : isWrite ? RATE_LIMIT_WRITES_MAX : RATE_LIMIT_READS_MAX;
+  const key = isRename ? `${ip}:rn` : isWrite ? `${ip}:w` : `${ip}:r`;
   const entry = rateLimitMap.get(key);
   if (!entry || now - entry.start > RATE_LIMIT_WINDOW_MS) {
     rateLimitMap.set(key, { start: now, count: 1 });
@@ -134,6 +144,11 @@ export default {
       removeLeaders: handleRemoveLeaders,
       materializePastAwards: handleMaterializePastAwards,
       getVoteBootstrap: handleGetVoteBootstrap,
+      requestRename: handleRequestRename,
+      listRenameRequests: handleListRenameRequests,
+      approveRename: handleApproveRename,
+      rejectRename: handleRejectRename,
+      mergePlayers: handleMergePlayers,
     };
 
     const handler = handlers[action];

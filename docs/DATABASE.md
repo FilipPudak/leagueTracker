@@ -21,12 +21,15 @@ Player roster. Auto-created from Melee data on first sync.
 
 | Column | Type | Notes |
 |--------|------|-------|
-| `id` | TEXT PRIMARY KEY | `P###` format, never reused |
-| `name` | TEXT NOT NULL | Display name (Melee DisplayName → Name → Username fallback) |
+| `id` | TEXT PRIMARY KEY | `P###` format, not reused — `settings.PLAYER_SEQ` keeps the high-water mark after a merge deletes the newest row |
+| `name` | TEXT NOT NULL | Display name (Melee `DisplayName`, or the username when it is blank), then refreshed on every sync from `DisplayName` **only** — a blank DisplayName never rewrites it to the legal-looking `Name`. Owned by the sync; an approved rename does not touch it |
 | `melee_name` | TEXT | Melee.gg username — identity join key |
-| `melee_guid` | TEXT | Reserved, unpopulated |
+| `melee_guid` | TEXT | Melee `AsmoConnectId` — account-level verification signal, never a join key (may be NULL or reassigned) |
 | `email` | TEXT | One email ↔ one player |
 | `active` | INTEGER | `1` = active, `0` = inactive |
+
+`melee_guid` was declared in `schema.sql` from the start but only reached production with
+`migrations/M7.sql` (nothing read or wrote it before the multi-username work).
 
 ### `leaders`
 Leader options for voting.
@@ -156,6 +159,53 @@ Match results from Melee.gg.
 
 Constraint: `UNIQUE(season_id, round, melee_match_id)`
 
+### `player_usernames`
+Every Melee handle a player has held. `players.melee_name` stays the current value;
+this table is the bridge the sync finder uses so a declared rename does not split a
+player into two rows. Internal only — never exposed by any public endpoint.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `player_id` | TEXT NOT NULL | FK → `players.id` |
+| `melee_name` | TEXT NOT NULL | Exact case as last seen on Melee |
+| `name_lower` | TEXT NOT NULL | Normalized lookup key (not unique — names can be recycled) |
+| `source` | TEXT NOT NULL | `seed` / `sync` / `admin` / `merge` |
+| `first_seen` | TEXT | `NULL` when learned retroactively |
+| `last_seen` | TEXT NOT NULL | Refreshed whenever the finder hits the name |
+
+Constraint: `PRIMARY KEY (player_id, name_lower)`
+
+Keyed on the normalized name so a case change refreshes the row instead of adding a
+second one; `melee_name` keeps the freshest casing.
+
+Seeded at migration time from every existing `players.melee_name` (`source='seed'`,
+`first_seen=NULL` — honest: we do not know when those names started). The seed is
+`INSERT OR IGNORE`, so re-running M6 is safe.
+
+### `rename_requests`
+Member-declared rename queue, resolved by an admin action (no admin GUI).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER PRIMARY KEY AUTOINCREMENT | |
+| `player_id` | TEXT NOT NULL | FK → `players.id` |
+| `old_melee_name` | TEXT NOT NULL | Snapshot at request time |
+| `new_melee_name` | TEXT NOT NULL | Declared handle |
+| `status` | TEXT NOT NULL DEFAULT 'pending' | `pending` / `approved` / `rejected` |
+| `melee_hint` | TEXT | Best-effort existence check: `found` / `not-found` / `NULL` |
+| `requested_at` | TEXT NOT NULL | ISO-8601 UTC |
+| `resolved_at` | TEXT | |
+| `resolved_by` | TEXT | `admin` |
+| `note` | TEXT | Rejection reason, `admin-direct`, or the merge summary |
+
+Approval sets `players.melee_name` only — `players.name` is owned by the sync and follows
+Melee's `DisplayName`. It records the old name in `player_usernames`, and — when
+email-less auto-created rows hold the new name — merges them into the member's row in
+the same `DB.batch()`. Absorbing rows that hold stored results requires an explicit
+`confirmMerge: true`. The request row is claimed (`status='approved'` guarded by
+`status='pending'`) before any work, so a double submit cannot build a second merge
+plan.
+
 ## Indexes
 
 ```sql
@@ -168,6 +218,8 @@ CREATE INDEX idx_votes_player ON votes(player_id);
 CREATE INDEX idx_melee_tournaments_season ON melee_tournaments(season_id);
 CREATE INDEX idx_season_standings_season ON season_standings(season_id, round);
 CREATE INDEX idx_match_results_season ON match_results(season_id, round);
+CREATE INDEX idx_player_usernames_lower ON player_usernames(name_lower);
+CREATE INDEX idx_rename_requests_player ON rename_requests(player_id);
 ```
 
 ## Award Computation

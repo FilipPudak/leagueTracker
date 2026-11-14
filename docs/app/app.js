@@ -18,11 +18,12 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.19.7';
+const APP_VERSION = '4.20.0';
 
 const appState = {
   status: 'unlinked',
   linkedPlayer: null,
+  renameRequest: null,
   votingOpen: false,
   settings: {},
   seasons: [],
@@ -251,6 +252,90 @@ function closeSignIn(event) {
   closeOverlay('link-modal-overlay');
 }
 
+/* ------------------------------------------------------- rename requests -- */
+
+function showRenameStatus(msg, isSuccess) {
+  const box = $('rename-modal-status');
+  if (!box) return;
+  box.textContent = msg;
+  box.className = 'status-msg ' + (isSuccess ? 'status-success' : 'status-error');
+  box.style.display = 'block';
+}
+
+function renderRenameStatus() {
+  const box = $('rename-modal-status');
+  const input = $('rename-new-name');
+  const submit = $('rename-submit');
+  if (!box) return;
+  box.style.display = 'none';
+  box.className = 'status-msg status-error';
+  if (input) input.disabled = false;
+  if (submit) {
+    submit.disabled = false;
+    submit.textContent = 'Request Review';
+  }
+  const req = appState.renameRequest;
+  if (!req) return;
+  if (req.status === 'pending') {
+    box.textContent = 'Request in progress: ' + (req.oldMeleeName || 'current name') + ' → ' + req.newMeleeName
+      + '. Submit again to change it — your profile updates once it is approved.';
+    box.className = 'status-msg';
+    box.style.display = 'block';
+    if (input) input.value = req.newMeleeName;
+    if (submit) submit.textContent = 'Update Request';
+  } else if (req.status === 'approved') {
+    box.textContent = 'Approved — your Melee username is now ' + req.newMeleeName + '.';
+    box.className = 'status-msg status-success';
+    box.style.display = 'block';
+  } else if (req.status === 'rejected') {
+    box.textContent = 'Your last request (' + req.newMeleeName + ') was not approved. You can submit a new one.'
+      + (req.note ? ' Reason: ' + req.note : '');
+    box.className = 'status-msg status-error';
+    box.style.display = 'block';
+  }
+}
+
+function openRenameModal() {
+  const overlay = $('rename-modal');
+  if (!overlay) return;
+  const input = $('rename-new-name');
+  if (input) input.value = '';
+  renderRenameStatus();
+  openOverlay('rename-modal');
+  if (input && !input.disabled) input.focus();
+}
+
+function closeRenameModal(event) {
+  if (event && event.target !== event.currentTarget) return;
+  closeOverlay('rename-modal');
+}
+
+async function submitRenameRequest() {
+  const input = $('rename-new-name');
+  const submit = $('rename-submit');
+  const value = input ? input.value.trim() : '';
+  if (!value) {
+    showRenameStatus('Enter your new Melee username.', false);
+    return;
+  }
+  if (submit) submit.disabled = true;
+  try {
+    const result = await callApi('requestRename', { newMeleeName: value });
+    appState.renameRequest = {
+      status: result.status,
+      oldMeleeName: result.oldMeleeName,
+      newMeleeName: result.newMeleeName,
+      requestedAt: result.requestedAt,
+      note: null
+    };
+    showLinkedPresence(appState.linkedPlayer);
+    renderRenameStatus();
+  } catch (err) {
+    showRenameStatus(err.userMessage || err.message || 'Could not send your request.', false);
+    if (submit) submit.disabled = false;
+  }
+}
+
 /* -------------------------------------------------------------- boot state -- */
 
 function applyBoot(boot) {
@@ -258,6 +343,7 @@ function applyBoot(boot) {
   document.body.classList.toggle('is-linked', boot.status === 'linked');
   appState.settings = LeagueCore.mapSettings(boot.settings);
   appState.linkedPlayer = boot.linkedPlayer || null;
+  appState.renameRequest = boot.renameRequest || null;
   appState.votingOpen = Boolean(boot.votingOpen);
   appState.seasons = boot.seasons || [];
   appState.players = boot.players || [];
@@ -386,6 +472,11 @@ function applyBoot(boot) {
   } else {
     showLinkedPresence(null);
     showTabs(false);
+    if (boot.status === 'invalid-token') {
+      // The row behind this session is gone (unlinked or merged away). Drop the
+      // stored identity before the picker prefills a possibly recycled id.
+      clearSession();
+    }
     populateLinkPicker(LeagueCore.resolvePlayerChoices(boot));
     setLinkMode('email');
     normalizeBootHash();
@@ -443,6 +534,11 @@ function showLinkedPresence(player) {
   }
   const chipName = $('chip-name');
   if (chipName) chipName.textContent = player.name;
+  const note = $('chip-rename-note');
+  if (note) {
+    const pending = appState.renameRequest && appState.renameRequest.status === 'pending';
+    note.style.display = pending ? 'inline' : 'none';
+  }
   chip.style.display = 'flex';
 }
 
@@ -1646,6 +1742,7 @@ function wireEvents() {
   };
 
   on('chip-unlink', 'click', () => unlinkCurrentDevice());
+  on('chip-rename', 'click', openRenameModal);
   on('signin-cta', 'click', () => openSignIn(true));
   on('guest-pitch-signin', 'click', () => openSignIn(true));
   on('guest-banner-close', 'click', dismissGuestBanner);
@@ -1657,15 +1754,21 @@ function wireEvents() {
   on('confirm-unlink-btn', 'click', () => confirmUnlink());
   on('player-modal-close', 'click', () => closePlayerModal());
   on('link-modal-close', 'click', () => closeSignIn());
+  on('rename-modal-close', 'click', () => closeRenameModal());
   on('link-mode-toggle', 'click', () => toggleLinkMode());
   on('link-player-search', 'input', () => filterLinkPicker());
   on('player-modal-profile-link', 'click', openPlayerProfile);
   wireBackdrop($('player-modal-overlay'), closePlayerModal);
   wireBackdrop($('link-modal-overlay'), closeSignIn);
+  wireBackdrop($('rename-modal'), closeRenameModal);
 
   on('vote-form', 'submit', (e) => {
     e.preventDefault();
     submitVotes();
+  });
+  on('rename-form', 'submit', (e) => {
+    e.preventDefault();
+    submitRenameRequest();
   });
   on('link-form', 'submit', (e) => {
     e.preventDefault();
@@ -1766,12 +1869,17 @@ function initModalKeys() {
         closeSignIn();
         return;
       }
+      const rm = $('rename-modal');
+      if (rm && rm.style.display === 'flex') {
+        closeRenameModal();
+        return;
+      }
       const uc = $('unlink-confirm');
       if (uc && uc.style.display === 'flex') cancelUnlink();
       return;
     }
     if (e.key === 'Tab') {
-      ['player-modal-overlay', 'link-modal-overlay', 'unlink-confirm'].forEach((id) => {
+      ['player-modal-overlay', 'link-modal-overlay', 'unlink-confirm', 'rename-modal'].forEach((id) => {
         const el = $(id);
         if (el && el.style.display === 'flex') trapFocus(e, el);
       });
@@ -1937,7 +2045,7 @@ function initBadgeTooltips() {
 
 const VIEW_HASHES = { 'vote-view': 'vote', 'standings-view': 'standings', 'awards-view': 'awards', 'myseason-view': 'mystats' };
 const HASH_VIEWS = { vote: 'vote-view', standings: 'standings-view', awards: 'awards-view', mystats: 'myseason-view' };
-const OVERLAY_IDS = ['player-modal-overlay', 'link-modal-overlay', 'unlink-confirm'];
+const OVERLAY_IDS = ['player-modal-overlay', 'link-modal-overlay', 'unlink-confirm', 'rename-modal'];
 let routingFromHash = false;
 let overlayProgrammaticPop = false;
 

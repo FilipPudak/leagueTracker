@@ -131,39 +131,122 @@ export function createPlayerFinder(DB, { onCreated } = {}) {
     for (const p of allPlayers) {
       if (p.melee_name) playerMap.set(p.melee_name.toLowerCase(), p);
     }
-    nextPlayerNum = allPlayers.reduce((max, p) => {
+    const liveMax = allPlayers.reduce((max, p) => {
       const m = p.id?.match(/^P(\d+)$/);
       return m ? Math.max(max, parseInt(m[1], 10)) : max;
-    }, 0) + 1;
+    }, 0);
+    // Merging away the highest id would otherwise recycle it; PLAYER_SEQ is the
+    // durable high-water mark written by the merge.
+    const seqRow = await DB.prepare("SELECT value FROM settings WHERE key = 'PLAYER_SEQ'").first();
+    const seq = seqRow ? parseInt(seqRow.value, 10) : 0;
+    nextPlayerNum = Math.max(liveMax, Number.isFinite(seq) ? seq : 0) + 1;
     initialized = true;
   }
 
-  async function find(username, displayName) {
+  // AsmoConnectId is an account-level Melee id: verification signal only, never
+  // a join key (Melee can reassign it). Fill when unknown; a mismatch on an
+  // existing value signals an account change or a recycled username.
+  async function captureAsmo(player, asmoConnectId, username) {
+    if (!asmoConnectId) return;
+    const stored = player.melee_guid;
+    if (!stored) {
+      await DB.prepare('UPDATE players SET melee_guid = ? WHERE id = ?').bind(asmoConnectId, player.id).run();
+      player.melee_guid = asmoConnectId;
+      return;
+    }
+    if (String(stored) !== String(asmoConnectId)) {
+      console.warn(`[Finder] AsmoConnectId mismatch for ${player.id} (${username}): stored ${stored}, payload ${asmoConnectId} — possible account change or recycled username`);
+    }
+  }
+
+  // players.name follows Melee's DisplayName, never the Name fallback: Name is the
+  // legal-looking real name, so a blank DisplayName must leave the stored (possibly
+  // member-chosen) name alone instead of publishing it.
+  async function refreshName(player, meleeDisplayName, username) {
+    if (!meleeDisplayName) return;
+    const next = String(meleeDisplayName).trim();
+    if (!next || next === player.name) return;
+    await DB.prepare('UPDATE players SET name = ? WHERE id = ?').bind(next, player.id).run();
+    console.log(`[Finder] DisplayName ${player.id} (${username}) "${player.name}" → "${next}"`);
+    player.name = next;
+  }
+
+  async function create(username, displayName, asmoConnectId) {
+    const id = `P${String(nextPlayerNum++).padStart(3, '0')}`;
+    const name = displayName || username;
+    const now = new Date().toISOString();
+    await DB.batch([
+      DB.prepare('INSERT INTO players (id, name, melee_name, melee_guid, active) VALUES (?, ?, ?, ?, 1)')
+        .bind(id, name, username, asmoConnectId || null),
+      DB.prepare('INSERT INTO player_usernames (player_id, melee_name, name_lower, source, first_seen, last_seen) VALUES (?, ?, ?, ?, ?, ?)')
+        .bind(id, username, username.toLowerCase(), 'sync', now, now),
+    ]);
+    const player = { id, name, melee_name: username, melee_guid: asmoConnectId || null, active: 1 };
+    playerMap.set(username.toLowerCase(), player);
+    if (onCreated) onCreated({ ...player });
+    return id;
+  }
+
+  async function find(username, displayName, asmoConnectId) {
     await init();
     const key = username.toLowerCase();
 
     if (playerMap.has(key)) {
       const cached = playerMap.get(key);
-      const dbCheck = await DB.prepare('SELECT id FROM players WHERE id = ?').bind(cached.id).first();
-      if (dbCheck) return cached.id;
+      const dbCheck = await DB.prepare('SELECT id, name FROM players WHERE id = ?').bind(cached.id).first();
+      if (dbCheck) {
+        cached.name = dbCheck.name;
+        await refreshName(cached, displayName, username);
+        await captureAsmo(cached, asmoConnectId, username);
+        return cached.id;
+      }
       playerMap.delete(key);
     }
 
-    const existing = await DB.prepare('SELECT id FROM players WHERE melee_name = ?').bind(username).first();
+    const existing = await DB.prepare(
+      'SELECT id, name, melee_guid FROM players WHERE LOWER(melee_name) = LOWER(?)'
+    ).bind(username).first();
     if (existing) {
-      const player = { id: existing.id, name: displayName || username, melee_name: username, active: 1 };
+      const player = { id: existing.id, name: existing.name, melee_name: username, melee_guid: existing.melee_guid || null, active: 1 };
       playerMap.set(key, player);
+      await refreshName(player, displayName, username);
+      await captureAsmo(player, asmoConnectId, username);
       return existing.id;
     }
 
-    const id = `P${String(nextPlayerNum++).padStart(3, '0')}`;
-    const name = displayName || username;
-    await DB.prepare('INSERT INTO players (id, name, melee_name, active) VALUES (?, ?, ?, 1)')
-      .bind(id, name, username).run();
-    const player = { id, name, melee_name: username, active: 1 };
-    playerMap.set(key, player);
-    if (onCreated) onCreated({ ...player });
-    return id;
+    const history = await DB.prepare(
+      'SELECT player_id, melee_name FROM player_usernames WHERE name_lower = ?'
+    ).bind(key).all();
+    const matches = history.results || [];
+    if (matches.length === 1) {
+      const candidate = await DB.prepare('SELECT id, name, melee_guid FROM players WHERE id = ?')
+        .bind(matches[0].player_id).first();
+      const recycled = candidate && candidate.melee_guid && asmoConnectId
+        && String(candidate.melee_guid) !== String(asmoConnectId);
+      if (candidate && !recycled) {
+        console.log(`[Finder] Username history ${username} → ${candidate.id}`);
+        await DB.prepare('UPDATE player_usernames SET last_seen = ? WHERE player_id = ? AND name_lower = ?')
+          .bind(new Date().toISOString(), matches[0].player_id, key).run();
+        const player = {
+          id: candidate.id,
+          name: candidate.name ?? (displayName || username),
+          melee_name: username,
+          melee_guid: candidate.melee_guid || null,
+          active: 1,
+        };
+        await captureAsmo(player, asmoConnectId, username);
+        await refreshName(player, displayName, username);
+        playerMap.set(key, player);
+        return candidate.id;
+      }
+      if (recycled) {
+        console.warn(`[Finder] Recycled username ${username}: history owner ${candidate.id} has AsmoConnectId ${candidate.melee_guid}, payload has ${asmoConnectId} — auto-creating`);
+      }
+    } else if (matches.length > 1) {
+      console.warn(`[Finder] Ambiguous username history for ${username} (${matches.length} past owners) — auto-creating instead of guessing`);
+    }
+
+    return create(username, displayName, asmoConnectId);
   }
 
   function getMap() { return playerMap; }

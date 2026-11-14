@@ -7,10 +7,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Star Wars Unlimited League Stockholm</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="stylesheet" href="styles.css?v=4.19.7">
+  <link rel="stylesheet" href="styles.css?v=4.20.0">
 </head>
 <body>
-  <script src="boot.js?v=4.19.7"></script>
+  <script src="boot.js?v=4.20.0"></script>
   <div class="app-container">
     <div class="header">
       <div class="header-content">
@@ -27,6 +27,8 @@
         <div id="identity-chip" class="identity-chip">
           <span class="chip-name" id="chip-name">—</span>
           <button type="button" id="chip-unlink" class="not-you">· Not you?</button>
+          <button type="button" id="chip-rename" class="not-you">· Rename</button>
+          <span id="chip-rename-note" class="chip-rename-note" style="display:none;">rename pending</span>
         </div>
         <button type="button" id="signin-cta" class="signin-cta">Sign in</button>
       </div>
@@ -333,6 +335,24 @@
     </div>
   </div>
 
+  <div id="rename-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="rename-modal-title">
+    <div class="modal-box">
+      <div class="player-modal-head">
+        <h3 id="rename-modal-title" style="margin:0;">Changed your Melee username?</h3>
+        <button type="button" id="rename-modal-close" class="btn-ghost player-modal-close" aria-label="Close rename dialog">&#10005;</button>
+      </div>
+      <p class="guest-pitch-text" style="margin:0 0 14px;">Your stats stay with you — we'll review the change before it goes live. Melee usernames are 3–25 characters: letters, numbers, dot, dash or underscore.</p>
+      <div id="rename-modal-status" class="status-msg status-error" style="display:none;"></div>
+      <form id="rename-form" novalidate>
+        <div class="form-group">
+          <label for="rename-new-name">Your new Melee username</label>
+          <input type="text" id="rename-new-name" class="text-input" placeholder="new_username" autocomplete="off" required>
+        </div>
+        <button type="submit" id="rename-submit" class="btn-submit">Request Review</button>
+      </form>
+    </div>
+  </div>
+
   <div id="link-modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="link-modal-title">
     <div class="modal-box link-modal-box">
       <div class="player-modal-head">
@@ -359,7 +379,7 @@
     </div>
   </div>
 
-  <script src="app-core.js?v=4.19.7"></script>
-<script src="app.js?v=4.19.7"></script>
+  <script src="app-core.js?v=4.20.0"></script>
+<script src="app.js?v=4.20.0"></script>
 </body>
 </html>

@@ -145,3 +145,34 @@ CREATE TABLE IF NOT EXISTS match_results (
 CREATE INDEX IF NOT EXISTS idx_melee_tournaments_season ON melee_tournaments(season_id);
 CREATE INDEX IF NOT EXISTS idx_season_standings_season ON season_standings(season_id, round);
 CREATE INDEX IF NOT EXISTS idx_match_results_season ON match_results(season_id, round);
+
+-- Username history (M6): every Melee handle a player has held.
+-- players.melee_name stays the current-state record; this table bridges old
+-- and newly declared names in the sync finder.
+CREATE TABLE IF NOT EXISTS player_usernames (
+  player_id   TEXT NOT NULL,
+  melee_name  TEXT NOT NULL,
+  name_lower  TEXT NOT NULL,
+  source      TEXT NOT NULL,
+  first_seen  TEXT,
+  last_seen   TEXT NOT NULL,
+  PRIMARY KEY (player_id, name_lower),
+  FOREIGN KEY (player_id) REFERENCES players(id)
+);
+CREATE INDEX IF NOT EXISTS idx_player_usernames_lower ON player_usernames(name_lower);
+
+-- Rename request queue (M6): member-declared, admin-approved.
+CREATE TABLE IF NOT EXISTS rename_requests (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  player_id       TEXT NOT NULL,
+  old_melee_name  TEXT NOT NULL,
+  new_melee_name  TEXT NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'pending',
+  melee_hint      TEXT,
+  requested_at    TEXT NOT NULL,
+  resolved_at     TEXT,
+  resolved_by     TEXT,
+  note            TEXT,
+  FOREIGN KEY (player_id) REFERENCES players(id)
+);
+CREATE INDEX IF NOT EXISTS idx_rename_requests_player ON rename_requests(player_id);

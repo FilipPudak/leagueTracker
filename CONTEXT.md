@@ -26,7 +26,7 @@ sync lifecycle are documented in [`ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 | Term | Definition |
 |---|---|
 | **Player** | A roster entry with a permanent ID `P###`. IDs are never reused or merged away silently. |
-| **Roster** | All player rows. Anyone seen in Melee data may be **auto-created** (`active=1`, `melee_name` set, display name = Melee `DisplayName` → `Name` → `Username` fallback chain). All roster players are shown in the link picker — a one-time opponent is still a player who deserves a link. |
+| **Roster** | All player rows. Anyone seen in Melee data may be **auto-created** (`active=1`, `melee_name` set, display name = Melee `DisplayName`, falling back to the username — never the legal-looking `Name`). All roster players are shown in the link picker — a one-time opponent is still a player who deserves a link. |
 | **Email claim** | Honor-based linking: player picks their name + enters an email; the email is permanently bound to that player on first claim. One email ↔ one player. Changing an email requires an admin. |
 | **Device** | Browser/local-storage UUID. Sessions are per (player, device). |
 | **Session** | Token minted at link. **90-day rolling TTL** from last activity. Unlink is **device-scoped**: other devices of the same player are untouched. |
@@ -34,7 +34,11 @@ sync lifecycle are documented in [`ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 **Fragile contract:** `players.melee_name` is *the* identity join key to all Melee data. A player
 renaming on Melee, or an organizer typo, silently orphans their results. The site has even seen a
-username that is literally a GUID (P022).
+username that is literally a GUID (P022). Mitigations now in place: the roster keeps a
+`player_usernames` history (old handles resolve to the same `P###` on sync) and members can
+declare a rename in the app, which an admin approves (merging the orphan row if the new handle
+already auto-created one). Melee cannot be queried for old handles — it serves only the current
+username — so our own history is the sole record of a rename.
 
 ## 3. Time Model
 
@@ -306,4 +310,7 @@ voted"), never per-player rankings.
 9. Vote rows are never deleted by opponent-matching heuristics; the merged votes table makes
    edit-by-(voter, week) trivial.
 10. Rate limiting is best-effort per Worker isolate (documented, not a security guarantee).
-11. `melee_guid` column exists and is unpopulated — reserved; do not depend on it.
+11. `melee_guid` holds Melee's `AsmoConnectId` when known — an account-level
+    verification signal, **not** a join key (NULL on some registrations, and Melee can
+    reassign it). Player identity is `melee_name` + our own `player_usernames` history;
+    there is no stable Melee player id to key on.

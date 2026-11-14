@@ -244,6 +244,38 @@ describe('meleeLeague', () => {
       assert.equal(player.active, 1);
     });
 
+    it('refreshes players.name from the Melee DisplayName on every hit', async () => {
+      const tables = basicTables();
+      tables.players.push({ id: 'P010', name: 'Old Name', melee_name: 'TestMelee', active: 1 });
+      db = createMockDb(tables);
+      finder = createPlayerFinder(db);
+
+      await finder.find('TestMelee', 'New Display');
+      assert.equal(db.getStore().players.find(p => p.id === 'P010').name, 'New Display');
+    });
+
+    it('never rewrites players.name from a blank DisplayName', async () => {
+      const tables = basicTables();
+      tables.players.push({ id: 'P010', name: 'Chosen Name', melee_name: 'TestMelee', active: 1 });
+      db = createMockDb(tables);
+      finder = createPlayerFinder(db);
+
+      await finder.find('TestMelee', null);
+      await finder.find('TestMelee', '');
+      assert.equal(db.getStore().players.find(p => p.id === 'P010').name, 'Chosen Name');
+    });
+
+    it('writes nothing when the display name is unchanged', async () => {
+      const tables = basicTables();
+      tables.players.push({ id: 'P010', name: 'Same Name', melee_name: 'TestMelee', active: 1 });
+      db = createMockDb(tables);
+      finder = createPlayerFinder(db);
+
+      await finder.find('TestMelee', 'Same Name');
+      const writes = db.getCalls().filter(c => /UPDATE\s+players\s+SET\s+name/i.test(c.sql));
+      assert.equal(writes.length, 0);
+    });
+
     it('uses cache on subsequent calls', async () => {
       db = createMockDb(basicTables());
       finder = createPlayerFinder(db);
@@ -263,6 +295,104 @@ describe('meleeLeague', () => {
 
       const id = await finder.find('StaleMelee', 'Stale');
       assert.equal(id, 'P099');
+    });
+  });
+
+  describe('createPlayerFinder – username history (M6)', () => {
+    function playerTables() {
+      const tables = basicTables();
+      tables.players.push({ id: 'P053', name: 'Takras_Ola', melee_name: 'Takras_Ola', melee_guid: null, email: 'ola@test.com', active: 1 });
+      tables.player_usernames = [
+        { player_id: 'P053', melee_name: 'Takras_Ola', name_lower: 'takras_ola', source: 'seed', first_seen: null, last_seen: '2026-01-01T00:00:00.000Z' },
+      ];
+      return tables;
+    }
+
+    it('resolves a declared-before-rename name through history without creating a row', async () => {
+      const tables = playerTables();
+      tables.player_usernames.push({ player_id: 'P053', melee_name: 'ola_la', name_lower: 'ola_la', source: 'admin', first_seen: null, last_seen: '2026-10-01T00:00:00.000Z' });
+      const db = createMockDb(tables);
+      const finder = createPlayerFinder(db);
+
+      const id = await finder.find('ola_la', 'ola_la');
+      assert.equal(id, 'P053');
+      assert.equal(db.getStore().players.length, tables.players.length, 'history hit must not auto-create');
+      const historyRow = db.getStore().player_usernames.find(r => r.melee_name === 'ola_la');
+      assert.ok(historyRow.last_seen > '2026-10-01T00:00:00.000Z', 'history hit bumps last_seen');
+    });
+
+    it('auto-creates an unknown name and seeds its history row', async () => {
+      const db = createMockDb(playerTables());
+      const finder = createPlayerFinder(db);
+
+      const id = await finder.find('brand_new', 'Brand New');
+      const created = db.getStore().players.find(p => p.id === id);
+      assert.ok(created);
+      const historyRow = db.getStore().player_usernames.find(r => r.player_id === id);
+      assert.equal(historyRow.melee_name, 'brand_new');
+      assert.equal(historyRow.source, 'sync');
+      assert.equal(historyRow.name_lower, 'brand_new');
+      assert.ok(historyRow.first_seen, 'freshly seen name records first_seen');
+    });
+
+    it('auto-creates when history points at multiple past owners', async () => {
+      const tables = playerTables();
+      tables.players.push({ id: 'P060', name: 'Other', melee_name: 'other_name', email: null, active: 1 });
+      tables.player_usernames.push(
+        { player_id: 'P053', melee_name: 'shared_name', name_lower: 'shared_name', source: 'merge', first_seen: null, last_seen: '2026-01-01T00:00:00.000Z' },
+        { player_id: 'P060', melee_name: 'shared_name', name_lower: 'shared_name', source: 'merge', first_seen: null, last_seen: '2026-01-01T00:00:00.000Z' },
+      );
+      const db = createMockDb(tables);
+      const finder = createPlayerFinder(db);
+
+      const id = await finder.find('shared_name', 'Shared Name');
+      assert.notEqual(id, 'P053');
+      assert.notEqual(id, 'P060');
+      assert.equal(db.getStore().players.filter(p => p.melee_name === 'shared_name').length, 1);
+    });
+
+    it('auto-creates instead of trusting history when AsmoConnectId differs (recycled name)', async () => {
+      const tables = playerTables();
+      tables.players = tables.players.map(p => p.id === 'P053' ? { ...p, melee_guid: 'ASMO-OLD' } : p);
+      tables.player_usernames.push({ player_id: 'P053', melee_name: 'recycled', name_lower: 'recycled', source: 'merge', first_seen: null, last_seen: '2026-01-01T00:00:00.000Z' });
+      const db = createMockDb(tables);
+      const finder = createPlayerFinder(db);
+
+      const id = await finder.find('recycled', 'Recycled', 'ASMO-NEW');
+      assert.notEqual(id, 'P053', 'mismatched AsmoConnectId must not inherit the history owner');
+    });
+
+    it('accepts a single history match when AsmoConnectId is missing on either side', async () => {
+      const tables = playerTables();
+      tables.players = tables.players.map(p => p.id === 'P053' ? { ...p, melee_guid: 'ASMO-OLD' } : p);
+      tables.player_usernames.push({ player_id: 'P053', melee_name: 'no_asmo', name_lower: 'no_asmo', source: 'merge', first_seen: null, last_seen: '2026-01-01T00:00:00.000Z' });
+      const db = createMockDb(tables);
+      const finder = createPlayerFinder(db);
+
+      const id = await finder.find('no_asmo', 'No Asmo');
+      assert.equal(id, 'P053');
+    });
+
+    it('captures AsmoConnectId onto players.melee_guid when unknown', async () => {
+      const tables = playerTables();
+      const db = createMockDb(tables);
+      const finder = createPlayerFinder(db);
+
+      await finder.find('Takras_Ola', 'Takras_Ola', 'ASMO-1');
+      assert.equal(db.getStore().players.find(p => p.id === 'P053').melee_guid, 'ASMO-1');
+    });
+
+    it('matches the DB fallback case-insensitively for names added after init', async () => {
+      const tables = playerTables();
+      const db = createMockDb(tables);
+      const finder = createPlayerFinder(db);
+
+      await finder.find('warmup_name', 'Warmup');
+      db.getStore().players.push({ id: 'P100', name: 'Case Player', melee_name: 'CasePlayer', email: null, active: 1 });
+
+      const id = await finder.find('caseplayer', 'Case Player');
+      assert.equal(id, 'P100');
+      assert.equal(db.getStore().players.filter(p => p.melee_name === 'CasePlayer').length, 1);
     });
   });
 

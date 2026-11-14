@@ -601,8 +601,8 @@ describe('Sign-in & guest: modal, banner, header sizing', () => {
     assert.ok(js.includes("history.pushState({ ...(history.state || {}), overlay: id }"), 'overlay opens must push a sentinel entry');
     assert.ok(js.includes("overlayProgrammaticPop = true"), 'explicit closes must consume the sentinel');
     assert.ok(js.includes("window.addEventListener('popstate'"), 'popstate must intercept the back gesture');
-    assert.equal((js.match(/openOverlay\('/g) || []).length, 3, 'all three overlays route through openOverlay');
-    assert.ok((js.match(/closeOverlay\('/g) || []).length >= 3, 'all three overlays route through closeOverlay');
+    assert.equal((js.match(/openOverlay\('/g) || []).length, 4, 'all four overlays route through openOverlay');
+    assert.ok((js.match(/closeOverlay\('/g) || []).length >= 4, 'all four overlays route through closeOverlay');
   });
 });
 

@@ -25,11 +25,6 @@ export function decideWinner(p1Wins, p2Wins, p1Id, p2Id) {
   return null;
 }
 
-// Melee player name fallback chain: DisplayName → Name → username.
-export function resolveMeleeName(meleePlayer, username) {
-  return meleePlayer?.DisplayName || meleePlayer?.Name || username;
-}
-
 // Resolves both competitor slots to roster player ids (auto-creating unknown
 // Melee names via the finder — invariant 4). Returns null when either slot
 // lacks a username or a competitor is missing.
@@ -40,8 +35,8 @@ export async function resolveMatchCompetitors(comps, finder) {
   const p2Username = p2Player?.Username;
   if (!p1Username || !p2Username) return null;
 
-  const p1Id = await finder.find(p1Username, resolveMeleeName(p1Player, p1Username));
-  const p2Id = await finder.find(p2Username, resolveMeleeName(p2Player, p2Username));
+  const p1Id = await finder.find(p1Username, p1Player?.DisplayName || null, p1Player?.AsmoConnectId);
+  const p2Id = await finder.find(p2Username, p2Player?.DisplayName || null, p2Player?.AsmoConnectId);
   return { p1Id, p2Id };
 }
 
@@ -148,7 +143,7 @@ export async function syncSeasonData(DB, client, {
       const meleePlayer = s.Team?.Players?.[0];
       const username = meleePlayer?.Username;
       if (!username) continue;
-      const playerId = await finder.find(username, resolveMeleeName(meleePlayer, username));
+      const playerId = await finder.find(username, meleePlayer?.DisplayName || null, meleePlayer?.AsmoConnectId);
       attendedThisRound.add(playerId);
       standingRows.push([seasonId, round, playerId, s.MatchWins || 0, s.MatchLosses || 0, s.MatchDraws || 0, s.Points || 0, s.Rank || null]);
     }

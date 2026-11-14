@@ -9,6 +9,7 @@ const UNIQUE_CONSTRAINTS = {
   match_results: [['season_id', 'round', 'melee_match_id']],
   season_standings: [['season_id', 'round', 'player_id']],
   attendance: [['season_id', 'week', 'player_id']],
+  player_usernames: [['player_id', 'name_lower']],
 };
 
 export function createMockDb(tables = {}) {

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { decideWinner, resolveMeleeName, resolveMatchCompetitors, syncSeasonData } from '../../src/lib/leagueSync.js';
+import { decideWinner, resolveMatchCompetitors, syncSeasonData } from '../../src/lib/leagueSync.js';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables } from '../helpers/fixtures.js';
 
@@ -26,24 +26,21 @@ describe('lib/leagueSync pure helpers (P4 Phase 1)', () => {
     assert.equal(decideWinner(1, 1, 'P001', 'P002'), null);
   });
 
-  it('T1.2 resolveMeleeName prefers DisplayName over Name and username', () => {
-    assert.equal(resolveMeleeName({ DisplayName: 'Gold Leader', Name: 'Alice', Username: 'alice42' }, 'alice42'), 'Gold Leader');
-  });
-
-  it('T1.2 resolveMeleeName falls back to Name when DisplayName missing', () => {
-    assert.equal(resolveMeleeName({ Name: 'Alice', Username: 'alice42' }, 'alice42'), 'Alice');
-  });
-
-  it('T1.2 resolveMeleeName falls back to username when both names missing', () => {
-    assert.equal(resolveMeleeName({ Username: 'alice42' }, 'alice42'), 'alice42');
-  });
-
-  it('T1.2 resolveMeleeName uses the passed username when player object lacks names', () => {
-    assert.equal(resolveMeleeName({}, 'alice42'), 'alice42');
-  });
-
-  it('T1.2 resolveMeleeName tolerates a null player object', () => {
-    assert.equal(resolveMeleeName(null, 'alice42'), 'alice42');
+  it('T1.2 resolveMatchCompetitors hands the DisplayName to the finder, never the legal Name', async () => {
+    const seen = [];
+    const finder = {
+      async find(username, displayName) {
+        seen.push([username, displayName]);
+        return seen.length === 1 ? 'P001' : 'P002';
+      },
+    };
+    const comps = [
+      { Team: { Players: [{ Username: 'alice42', DisplayName: 'Alice', Name: 'Alice Smith' }] } },
+      { Team: { Players: [{ Username: 'bob55', Name: 'Bob Jones' }] } },
+    ];
+    const ids = await resolveMatchCompetitors(comps, finder);
+    assert.deepEqual(ids, { p1Id: 'P001', p2Id: 'P002' });
+    assert.deepEqual(seen, [['alice42', 'Alice'], ['bob55', null]]);
   });
 
   it('T1.3 resolveMatchCompetitors resolves both slots to player ids', async () => {
@@ -482,8 +479,10 @@ describe('lib/leagueSync syncSeasonData (P4 Phase 2)', () => {
       awards: db.getStore().awards,
     });
     assert.equal(after, before, 'settings/awards store untouched');
-    const forbidden = db.getCalls().filter(c => /\b(settings|awards)\b/i.test(c.sql));
-    assert.equal(forbidden.length, 0, 'no SQL touches settings/awards');
+    const forbidden = db.getCalls().filter(c =>
+      /^\s*(INSERT|UPDATE|DELETE|REPLACE)/i.test(c.sql) && /\b(settings|awards)\b/i.test(c.sql)
+    );
+    assert.equal(forbidden.length, 0, 'no SQL writes settings/awards (reads are fine)');
   });
 
   it('T2.11 uses DB.batch for standings, attendance and matches writes', async () => {

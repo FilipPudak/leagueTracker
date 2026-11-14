@@ -2,6 +2,24 @@ import { getSettings, getPlayerById, getAllActiveLeaders, getAllSeasons, parseSe
 import { getWeeklyParticipation, getAttendedStatus } from '../lib/participation.js';
 import { filterFacedOpponents } from '../lib/voteValidation.js';
 
+// Latest rename request for the signed-in player, if any. Session-scoped: only
+// ever the caller's own row (public surfaces stay current-name-only).
+async function getLatestRenameRequest(DB, playerId) {
+  const row = await DB.prepare(
+    'SELECT status, old_melee_name, new_melee_name, requested_at, note FROM rename_requests WHERE player_id = ? ORDER BY requested_at DESC, id DESC LIMIT 1'
+  ).bind(playerId).first();
+  if (!row) return null;
+  return {
+    status: row.status,
+    oldMeleeName: row.old_melee_name,
+    newMeleeName: row.new_melee_name,
+    requestedAt: row.requested_at,
+    // Only a rejection carries text meant for the member; the approval note is
+    // an internal merge summary.
+    note: row.status === 'rejected' ? row.note : null,
+  };
+}
+
 // Caller link state from the router-resolved session: unlinked / linked /
 // invalid-token, plus this week's already-voted flag and vote content.
 async function resolveLinkStatus(DB, session, token, activeSeasonId, currentWeek) {
@@ -9,12 +27,14 @@ async function resolveLinkStatus(DB, session, token, activeSeasonId, currentWeek
   let linkedPlayer = null;
   let alreadyVoted = false;
   let currentVote = null;
+  let renameRequest = null;
 
   if (session) {
     const player = await getPlayerById(DB, session.player_id);
     if (player) {
       status = 'linked';
       linkedPlayer = { id: player.id, name: player.name, email: player.email };
+      renameRequest = await getLatestRenameRequest(DB, player.id);
       if (activeSeasonId && currentWeek) {
         currentVote = await getCurrentVote(DB, activeSeasonId, currentWeek, player.id);
         alreadyVoted = Boolean(currentVote);
@@ -26,7 +46,7 @@ async function resolveLinkStatus(DB, session, token, activeSeasonId, currentWeek
     status = 'invalid-token';
   }
 
-  return { status, linkedPlayer, alreadyVoted, currentVote };
+  return { status, linkedPlayer, alreadyVoted, currentVote, renameRequest };
 }
 
 export async function handleGetAppData(body, env, session) {
@@ -48,7 +68,7 @@ export async function handleGetAppData(body, env, session) {
     DB, allPlayers, votingOpen, activeSeasonId, currentWeek, session && session.player_id
   );
 
-  const { status, linkedPlayer, alreadyVoted, currentVote } = await resolveLinkStatus(
+  const { status, linkedPlayer, alreadyVoted, currentVote, renameRequest } = await resolveLinkStatus(
     DB, session, token, activeSeasonId, currentWeek
   );
 
@@ -82,6 +102,7 @@ export async function handleGetAppData(body, env, session) {
   return {
     status,
     linkedPlayer,
+    renameRequest,
     votingOpen,
     settings: safeSettings,
     seasons: seasons.results || [],

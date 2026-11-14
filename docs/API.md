@@ -21,7 +21,9 @@ Error statuses: `400` (bad request / unknown action), `401` (missing/invalid tok
 | **Token (optional)** | `token` field used if present and valid; public if absent |
 | **Admin** | `adminToken` field must match the `ADMIN_SECRET` env var (constant-time compare) |
 
-Rate limits (per IP, 60s window): writes capped at 10; reads capped at 90.
+Rate limits (per IP, 60s window): writes capped at 10; reads capped at 90; `requestRename`
+has its own bucket capped at 3 so rename submissions cannot spend the vote-write budget
+on a shared venue IP.
 
 ## Public actions
 
@@ -38,7 +40,7 @@ Session is resolved if a valid token is present; the handler receives `session` 
 
 | Action | Payload | Description |
 |--------|---------|-------------|
-| `getAppData` | — | Bootstrap bundle: settings, link status, current vote, seasons. If linked: `linkedPlayer`, `alreadyVoted`, `currentVote`. |
+| `getAppData` | — | Bootstrap bundle: settings, link status, current vote, seasons. If linked: `linkedPlayer`, `alreadyVoted`, `currentVote`, `renameRequest` (`{status, oldMeleeName, newMeleeName, requestedAt, note} \| null`, caller's own latest request only; `note` carries the rejection reason for `rejected` rows and is `null` otherwise). |
 | `getVoteBootstrap` | — | Vote-tab bootstrap: participation count, voting state, week. If linked: attended state, current vote, opponent list. |
 
 ## Token-required actions
@@ -52,6 +54,7 @@ No valid session → `401`.
 | `unlinkAccount` | — | Deletes the session for this (player, device) pair only. Other devices untouched. |
 | `getMySeasonStats` | `seasonId?` | Linked player's private season stats: tickets, streaks, badges, leader win-rates, voting-milestone and 80%-rule progress, awards. |
 | `getMyCareerStats` | — | Linked player's private career: record, rivalry, season progression, badges. |
+| `requestRename` | `newMeleeName` (required) | Declares a Melee username change. Validates format, rejects a name held by another email-bearing player. A second submission while one is pending **overwrites** that row (`updated: true`, fresh `requested_at`) so a typo never locks the member out. Stores the `pending` row (+ best-effort `melee_hint`) and notifies the admin webhook ("Rename request updated" on overwrite). Label follows the row until approved. |
 
 ## Admin actions
 
@@ -85,6 +88,10 @@ All require `adminToken` matching `ADMIN_SECRET`.
 | `addLeaders` | `leaders: [{ name, set?, aspects? }]` | Inserts leaders with aspect enrichment: explicit `aspects` (whitelist-validated) wins, else one offline lookup against FFG's official card data per distinct set. Returns `{ added, skipped, filled, summary: { requested, added, skipped, filled, unresolved } }`; `added` entries carry `aspects`, `aspectsResolved`, `reason?` and `swuDbSuggestion?` (near-misses are advisory, never auto-applied — replay the row with explicit `aspects`). A name+set duplicate whose stored aspects is NULL is repaired via `filled`. Fully-clean batch ⇔ `summary.unresolved === 0 && summary.skipped === 0 && summary.added === summary.requested`. |
 | `setLeadersActive` | `leaderIds: []`, `active: bool` | Activates or deactivates leaders. |
 | `removeLeaders` | `leaderIds: []` | Deletes leaders; refuses any referenced by votes. |
+| `listRenameRequests` | — | Full rename queue (newest first) with `status`, `melee_hint`, timestamps and `note`. Pending rows also carry `conflictPlayerId` (email-bearing holder that blocks the rename) and `mergeTargets` (`[{playerId, name, rows}]` email-less rows approval would absorb). |
+| `approveRename` | `requestId` **or** `playerId` + `newMeleeName`; `confirmMerge?` | Sets `players.melee_name` (identity only — the public `name` belongs to the Melee DisplayName sync), keeps the old handle in `player_usernames`, and merges email-less rows that already hold the new handle (all FKs re-pointed, survivor wins on UNIQUE collisions, self-votes dropped) in one batch. Absorbing rows with stored results requires `confirmMerge: true` (`400` lists the targets otherwise). Idempotent on an already-approved request. |
+| `rejectRename` | `requestId`, `note?` | Marks the request `rejected`. Cannot reject an approved request. |
+| `mergePlayers` | `survivorId`, `orphanId` | Standalone merge (no rename): re-points standings/matches/votes/attendance/awards, moves username history, drops the orphan row. Refuses rows with two different emails. |
 
 ## Session model
 

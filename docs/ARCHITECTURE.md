@@ -33,9 +33,9 @@ flowchart LR
 
 - **Frontend** (`docs/app/`) — static HTML/JS on GitHub Pages. No build step. Calls the
   Worker directly with `fetch`.
-- **Worker** (`backend/src/`) — single entry point. Routes POST requests to 20 action
+- **Worker** (`backend/src/`) — single entry point. Routes POST requests to 25 action
   handlers. Runs the sync lifecycle on cron fires.
-- **D1** — 11 tables, 9 indexes. Schema in `backend/schema.sql`.
+- **D1** — 13 tables, 12 indexes (one `UNIQUE`). Schema in `backend/schema.sql`.
 - **Melee.gg** — external source of truth for tournament results. See
   [`MELEE.md`](MELEE.md) for API notes.
 
@@ -74,6 +74,8 @@ erDiagram
     players ||--o{ season_standings : "player_id"
     players ||--o{ match_results : "player1_id"
     players ||--o{ match_results : "player2_id"
+    players ||--o{ player_usernames : "player_id"
+    players ||--o{ rename_requests : "player_id"
 
     leaders ||--o{ votes : "leader_id"
 
@@ -146,6 +148,19 @@ erDiagram
         string device_id
         string email
     }
+    player_usernames {
+        string player_id PK,FK
+        string melee_name PK
+        string name_lower
+        string source
+    }
+    rename_requests {
+        int id PK
+        string player_id FK
+        string old_melee_name
+        string new_melee_name
+        string status
+    }
 ```
 
 **Notes:**
@@ -154,6 +169,9 @@ erDiagram
 - `votes.opponent_id` points to another player (the favorite opponent).
 - `awards.rank` (Galactic Ruler 1/2/3) was migrated out-of-band (M4) and is now
   also declared in `schema.sql` — the two match.
+- `player_usernames` is the history behind the *current* `players.melee_name`: the sync
+  finder resolves declared old names to the same `P###` instead of auto-creating an
+  orphan. Never surfaced publicly (audit + lookup only).
 
 ## Season lifecycle state machine
 
@@ -211,8 +229,12 @@ Runs on every cron fire. Idempotent — catches late-published Melee results.
 3. **Sync records:** standings + matches for unsynced rounds — delegated to the
    shared data engine `lib/leagueSync.js` (`syncSeasonData`), which the cron sync
    and the admin backfill both call. The engine writes only players /
-   melee_tournaments / season_standings / match_results / attendance (never
-   `settings`/`awards`); lifecycle logic stays in this trigger.
+   player_usernames / melee_tournaments / season_standings / match_results /
+   attendance (never `settings`/`awards`); lifecycle logic stays in this trigger.
+   `players.name` is refreshed from Melee's `DisplayName` only — a missing
+   DisplayName never adopts the legal-looking `Name`. Unknown handles are
+   auto-created, except names found in `player_usernames` for a single player — those
+   resolve to that player (approved renames), so a renamed member keeps one `P###`.
 4. **Attendance:** rebuilt from regular standings (engine, per round)
 5. **Awards refresh:** recompute live podiums (Schemer, Ambassador, Ruler, etc.)
 6. **Pause gate:** if paused → return (data synced, no lifecycle writes)

@@ -72,6 +72,8 @@ export function basicTables() {
     ],
     season_standings: [],
     match_results: [],
+    player_usernames: [],
+    rename_requests: [],
   };
 }
 
@@ -89,6 +91,8 @@ export function emptyTables() {
     melee_tournaments: [],
     season_standings: [],
     match_results: [],
+    player_usernames: [],
+    rename_requests: [],
   };
 }
 

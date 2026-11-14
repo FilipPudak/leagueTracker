@@ -150,9 +150,15 @@ body {
   display: none;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
   white-space: nowrap;
 }
-.identity-chip .chip-name { color: #38bdf8; font-weight: 700; font-size: 0.9rem; }
+.identity-chip .chip-name {
+  color: #38bdf8; font-weight: 700; font-size: 0.9rem;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
+}
+.chip-rename-note { color: #fbbf24; font-size: 0.75rem; font-style: italic; }
+#chip-rename:hover { color: #38bdf8; }
 
 .not-you {
   background: none; border: none; padding: 0; color: #64748b;

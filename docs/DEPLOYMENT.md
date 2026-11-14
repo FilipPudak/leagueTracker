@@ -45,7 +45,32 @@ npx wrangler deploy
 npx wrangler dev
 
 # Apply schema changes (if schema.sql changed)
-npx wrangler d1 execute league-tracker --remote --file=schema.sql
+npx wrangler d1 execute ccf38d5e-1639-4eb3-8447-9f3644127e4b --remote --file=schema.sql
+
+# Incremental migrations (see backend/migrations/), in order. The database name
+# `league-tracker` is rejected for D1 calls — use the UUID.
+npx wrangler d1 execute ccf38d5e-1639-4eb3-8447-9f3644127e4b --remote --file=backend/migrations/M6.sql
+npx wrangler d1 execute ccf38d5e-1639-4eb3-8447-9f3644127e4b --remote --file=backend/migrations/M7.sql
+```
+
+M6 is re-runnable (`IF NOT EXISTS` / `OR IGNORE`). **M7 is one-shot** — it does
+`ALTER TABLE players ADD COLUMN melee_guid TEXT`, and SQLite has no
+`ADD COLUMN IF NOT EXISTS`, so a second run fails harmlessly with
+"duplicate column name". Both must be applied **before** deploying code that
+references `melee_guid` or `player_usernames`; otherwise every sync fails with
+`no such column`.
+
+Post-migration check (expect `history` = number of players with a handle, `no_guid` = all of them until the first sync):
+
+```bash
+npx wrangler d1 execute ccf38d5e-1639-4eb3-8447-9f3644127e4b --remote --command \
+  "SELECT (SELECT COUNT(*) FROM player_usernames) AS history, (SELECT COUNT(*) FROM players WHERE melee_guid IS NULL) AS no_guid"
+```
+
+Optional rename-notification webhook (rename requests post to it):
+
+```bash
+npx wrangler secret put DISCORD_WEBHOOK_URL
 ```
 
 ## Deploying the static client (GitHub Pages)

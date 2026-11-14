@@ -16,7 +16,12 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for how sync fits into the system.
 | `GET /api/tournament/list` | Discover league tournaments |
 | `GET /api/standing/list/current/{tournamentId}` | Player standings per tournament |
 | `GET /api/match/list/{tournamentId}` | Match results per tournament |
-| `GET /api/player/{username}` | Player profile lookup |
+| `GET /api/player/{registrationId}` | Registration record — **not** a username lookup |
+
+`GET /api/player/{username}` is **not** a working endpoint (404s). There is no
+username→player lookup and no stable account id: a player has one
+`Team.Players[].ID` per registration (per tournament), so those ids cannot be used
+as join keys either.
 
 ## Pagination
 
@@ -43,6 +48,9 @@ All response fields are **PascalCase**.
 | No `NumberOfRounds` | Derive from `Phases[0].Rounds.length` |
 | No search endpoint | Tournament discovery is name-pattern matching only |
 | No decklists | Leader attribution is vote-based (CONTEXT §8) |
+| `Team.Players[].ID` is per registration | Not an account id — never join on it |
+| `AsmoConnectId` is account-level | Stable in practice, but NULL on some registrations and melee can reassign it ⇒ verification signal only (`players.melee_guid`), never a join key |
+| Usernames resolve **live** | Every endpoint serves the account's *current* username; old names are erased, so renames are only recoverable from our own `player_usernames` history |
 
 ## Standings fields
 
