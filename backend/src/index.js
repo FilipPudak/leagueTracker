@@ -8,6 +8,7 @@ import { handleGetMySeasonStats } from './handlers/getMySeasonStats.js';
 import { handleGetMyCareerStats } from './handlers/getMyCareerStats.js';
 import { handleGetStandingsData } from './handlers/getStandingsData.js';
 import { handleGetPlayerProfile } from './handlers/getPlayerProfile.js';
+import { handleGetSeasonRewards } from './handlers/getSeasonRewards.js';
 import { handleStartNewSeason } from './handlers/startNewSeason.js';
 import { handleBackfillFromMelee } from './handlers/backfillFromMelee.js';
 import { handleTriggerWeeklyCycle } from './handlers/triggerWeeklyCycle.js';
@@ -134,6 +135,7 @@ export default {
       getMyCareerStats: handleGetMyCareerStats,
       getStandingsData: handleGetStandingsData,
       getPlayerProfile: handleGetPlayerProfile,
+      getSeasonRewards: handleGetSeasonRewards,
       startNewSeason: handleStartNewSeason,
       backfillFromMelee: handleBackfillFromMelee,
       triggerWeeklyCycle: handleTriggerWeeklyCycle,

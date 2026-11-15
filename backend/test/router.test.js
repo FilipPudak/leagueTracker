@@ -387,6 +387,37 @@ describe('router/index.js – fetch handler', () => {
     assert.equal(json.success, false);
   });
 
+  it('getSeasonRewards routes to handler with valid admin token', async () => {
+    const resp = await worker.fetch(
+      post({ action: 'getSeasonRewards', adminToken: 'test-secret-123', seasonId: 6 }, {
+        headers: { 'Content-Type': 'application/json', 'cf-connecting-ip': 'ip-season-rewards' },
+      }),
+      env(basicTables(), { ADMIN_SECRET: 'test-secret-123' })
+    );
+
+    assert.equal(resp.status, 200);
+    const json = await resp.json();
+    assert.equal(json.success, true);
+    assert.equal(json.data.seasonId, 6);
+    assert.equal(json.data.seasonName, 'Season 6');
+    assert.equal(json.data.playerCount, 2);
+    assert.equal(json.data.totalTickets, 3);
+  });
+
+  it('getSeasonRewards missing adminToken → 403', async () => {
+    const resp = await worker.fetch(
+      post({ action: 'getSeasonRewards', seasonId: 6 }, {
+        headers: { 'Content-Type': 'application/json', 'cf-connecting-ip': 'ip-season-rewards' },
+      }),
+      env(basicTables(), { ADMIN_SECRET: 'test-secret-123' })
+    );
+
+    assert.equal(resp.status, 403);
+    const json = await resp.json();
+    assert.equal(json.success, false);
+    assert.match(json.error, /Unauthorized/i);
+  });
+
   it('unknown action returns 400 with error message', async () => {
     const req = new Request('https://example.com', {
       method: 'POST',

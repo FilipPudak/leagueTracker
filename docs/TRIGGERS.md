@@ -58,6 +58,7 @@ All require `adminToken` matching `ADMIN_SECRET` env var.
 | `triggerWeeklyCycle` | Runs sync immediately, bypasses time gate, honors LAST_ADVANCED marker |
 | `pauseCurrentSeason` | Sets `SEASON_PAUSED=TRUE` — sync continues, no advance |
 | `resumeCurrentSeason` | Sets `SEASON_PAUSED=FALSE` |
+| `getSeasonRewards` | `seasonId` (required) — read-only finals-night extract: per-voter tickets, milestone, 80% compliance and best streak for that season only. Admin-only because individual participation metrics are private. |
 | `startNewSeason` | Creates new season row, sets `SEASON_STARTED=TRUE`, `CURRENT_WEEK='Week 1'`, `VOTING_OPEN=FALSE` |
 | `materializePastAwards` | Computes awards for S1-S5 only; `dryRun` prints podiums first |
 | `backfillFromMelee` | `seasonId?`, `maxTournaments?` (default 5), `resync?`, `allowActiveSeason?` — re-fetches historical Melee data. Shared engine, no vote audit, no reactivation. Refuses an explicit active season (`ACTIVE_SEASON_ID` + `SEASON_STARTED`) unless `allowActiveSeason: true`; sweeps are never refused. With the flag, active-season attendance writes are capped at `CURRENT_WEEK`. Tallies are row/insert counts. |

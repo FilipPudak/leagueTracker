@@ -66,6 +66,7 @@ All require `adminToken` matching `ADMIN_SECRET`.
 | `triggerWeeklyCycle` | — | Manually invokes the sync lifecycle (idempotent). |
 | `pauseCurrentSeason` | — | Sets `SEASON_PAUSED=TRUE` — sync continues, no advance/open/close. |
 | `resumeCurrentSeason` | — | Sets `SEASON_PAUSED=FALSE`. |
+| `getSeasonRewards` | `seasonId` (required) | Read-only finals-night extract for one season. Returns `seasonId`, `seasonName`, `isActiveSeason`, `seasonEnded`, `playerCount`, `totalTickets`, and `players[]` — one row per player who **voted that season**: `playerId`, `name`, `active`, `tickets`, `attended`, `votedInAttended`, `compliancePct`, `qualifies80`, `milestoneComplete`, `bestStreak`. Voters only (the list never grows across seasons); regular-phase attendance only; no opponent data. In the active season the ratio applies the same `CURRENT_WEEK` cutoff as My Stats; `seasonEnded` means the voting window has closed, not that no further Melee data can arrive. |
 | `backfillFromMelee` | `seasonId?`, `maxTournaments?`, `resync?`, `allowActiveSeason?` | Historical Melee backfill (bounded batch — see limits below). |
 
 ### Backfill semantics

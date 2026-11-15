@@ -223,7 +223,11 @@ gamification at all — zeros there would misrepresent absence of the feature as
 **Hard rule (public vs private):** individual participation metrics — tickets,
 streaks, badges, 80% rule status — appear **only in that player's own My Stats**. Public surfaces
 (Vote tab, Leaderboard/Awards) show **aggregates only** ("X of Y voters attended last night have
-voted"), never per-player rankings.
+voted"), never per-player rankings. The single whole-roster view is the **admin-only**
+`getSeasonRewards` season extract used on finals night (one row per player who voted that season:
+tickets, milestone, 80% compliance, best streak); it requires `adminToken`, is never linked from
+the frontend, and is scoped to the requested season so it cannot accumulate into a cross-season
+participation ranking.
 
 ## 11. Public Displays
 

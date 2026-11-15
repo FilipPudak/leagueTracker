@@ -1,6 +1,38 @@
 // Attendance, voting streaks, raffle tickets, and weekly/season participation
 import { PHASE, MILESTONE_VOTE_TARGET, COMPLIANCE_PCT } from './constants.js';
 
+export function bestStreakFromWeeks(weeks, votedWeeks) {
+  let best = 0;
+  let run = 0;
+  for (const week of [...weeks].sort((a, b) => a - b)) {
+    if (votedWeeks.has(week)) {
+      run++;
+      if (run > best) best = run;
+    } else {
+      run = 0;
+    }
+  }
+  return best;
+}
+
+export function summarizeCompliance(attendedWeeks, votedWeeks) {
+  const weeks = Array.from(attendedWeeks);
+  const attended = weeks.length;
+  const voted = weeks.filter(w => votedWeeks.has(w)).length;
+  const pct = attended > 0 ? Math.round((voted / attended) * 100) : null;
+  const qualifying = attended > 0
+    && voted >= MILESTONE_VOTE_TARGET
+    && voted * 100 >= attended * COMPLIANCE_PCT;
+  return {
+    attended,
+    voted,
+    pct,
+    qualifying,
+    target: COMPLIANCE_PCT,
+    minVotes: MILESTONE_VOTE_TARGET,
+  };
+}
+
 // Get player's current and best voting streak for a season.
 // cutoffWeek: the open voting week (CURRENT_WEEK). Attended weeks up to the
 // cutoff are final; the open week is pending — an unvoted open week must not
@@ -32,7 +64,6 @@ export async function getStreaks(db, seasonId, playerId, cutoffWeek = null) {
 
   // Calculate streaks
   let currentStreak = 0;
-  let bestStreak = 0;
 
   // Iterate from most recent to oldest for current streak
 
@@ -45,16 +76,7 @@ export async function getStreaks(db, seasonId, playerId, cutoffWeek = null) {
     }
   }
 
-  // Best streak: longest consecutive run of voted weeks
-  let tempStreak = 0;
-  for (const week of weeks) {
-    if (votedSet.has(week)) {
-      tempStreak++;
-      if (tempStreak > bestStreak) bestStreak = tempStreak;
-    } else {
-      tempStreak = 0;
-    }
-  }
+  const bestStreak = bestStreakFromWeeks(weeks, votedSet);
 
   return { currentStreak, bestStreak };
 }
@@ -80,14 +102,8 @@ export async function getVotingCompliance(db, seasonId, playerId, cutoffWeek = n
   const cutoff = typeof cutoffWeek === 'number' && Number.isFinite(cutoffWeek) ? cutoffWeek : Infinity;
   const attended = (attendedWeeks.results || []).map(r => r.week).filter(w => w <= cutoff);
   const votedSet = new Set((votedWeeks.results || []).map(r => r.week).filter(w => w <= cutoff));
-  const voted = attended.filter(w => votedSet.has(w)).length;
-  const attendedCount = attended.length;
-  const pct = attendedCount > 0 ? Math.round((voted / attendedCount) * 100) : null;
-  const qualifying = attendedCount > 0
-    && voted >= MILESTONE_VOTE_TARGET
-    && voted * 100 >= attendedCount * COMPLIANCE_PCT;
 
-  return { attended: attendedCount, voted, pct, qualifying, target: COMPLIANCE_PCT, minVotes: MILESTONE_VOTE_TARGET };
+  return summarizeCompliance(attended, votedSet);
 }
 
 // Get player's raffle ticket count for a season

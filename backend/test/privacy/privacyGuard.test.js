@@ -69,4 +69,12 @@ describe('Privacy guard: no voter+opponent leak', () => {
     });
     assert.equal(suspect.length, 0, 'getAppData should not expose opponent_id in responses (except currentVote which is own data)');
   });
+
+  it('the frontend never calls the admin-only season rewards extract', () => {
+    const appFiles = readFiles(join(__dirname, '../../../docs/app'));
+    const offenders = appFiles
+      .filter(file => file.content.includes('getSeasonRewards'))
+      .map(file => file.path);
+    assert.deepEqual(offenders, [], 'getSeasonRewards is admin-only and must never be reachable from docs/app');
+  });
 });

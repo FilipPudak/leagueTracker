@@ -29,16 +29,21 @@ Cloudflare Worker backend with static frontend (GitHub Pages). No shared secret,
 Lint-style test (`test/privacy/privacyGuard.test.js`) asserts:
 - No handler returns `opponent_id` alongside voter identity in the same response
 - `getAppData` does not expose `opponent_id` except in `currentVote` (own data)
+- The frontend never references the admin-only `getSeasonRewards` extract
+
+The only whole-roster individual-participation view is `getSeasonRewards` (finals-night
+tickets/milestone/80%/streak per voter). It is admin-gated, season-scoped, returns no opponent
+data, and is not reachable from `docs/app`; public surfaces stay aggregate-only.
 
 ## Admin Actions
 
 - Require `adminToken` in request body matching `ADMIN_SECRET` env var
 - **Constant-time comparison** — prevents timing side-channel
-- Actions: `startNewSeason`, `triggerWeeklyCycle`, `pauseCurrentSeason`, `resumeCurrentSeason`, `materializePastAwards`, leader management
+- Actions: `startNewSeason`, `triggerWeeklyCycle`, `pauseCurrentSeason`, `resumeCurrentSeason`, `materializePastAwards`, `getSeasonRewards` (read-only), leader management, rename queue (`listRenameRequests`, `approveRename`, `rejectRename`, `mergePlayers`)
 
 ## Rate Limiting
 
-- Best-effort per Worker isolate (30 requests/minute per IP)
+- Best-effort per Worker isolate: 90 reads, 10 writes, 3 rename requests per minute per IP
 - Documented, not a security guarantee
 
 ## Accepted Limitation: Email Not Verified
