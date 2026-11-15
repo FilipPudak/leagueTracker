@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.20.0';
+const APP_VERSION = '4.20.1';
 
 const appState = {
   status: 'unlinked',
@@ -196,7 +196,7 @@ function setActiveView(viewId) {
 }
 
 function renderGuestCopy() {
-  document.querySelectorAll('.guest-pitch-text').forEach((el) => { el.textContent = LeagueCore.GUEST_PITCH; });
+  document.querySelectorAll('[data-guest-pitch]').forEach((el) => { el.textContent = LeagueCore.GUEST_PITCH; });
 }
 
 function updateGuestBanner() {
@@ -272,13 +272,16 @@ function renderRenameStatus() {
   if (input) input.disabled = false;
   if (submit) {
     submit.disabled = false;
-    submit.textContent = 'Request Review';
+    submit.textContent = 'Send Rename Request';
   }
   const req = appState.renameRequest;
   if (!req) return;
   if (req.status === 'pending') {
     box.textContent = 'Request in progress: ' + (req.oldMeleeName || 'current name') + ' → ' + req.newMeleeName
-      + '. Submit again to change it — your profile updates once it is approved.';
+      + '. An admin still has to approve it. Submit again to change it — your profile updates once it is approved.'
+      + (req.meleeHint === 'not-found'
+        ? ' We could not find that name in the latest Melee standings — double-check the spelling matches Melee exactly.'
+        : '');
     box.className = 'status-msg';
     box.style.display = 'block';
     if (input) input.value = req.newMeleeName;
@@ -326,7 +329,8 @@ async function submitRenameRequest() {
       oldMeleeName: result.oldMeleeName,
       newMeleeName: result.newMeleeName,
       requestedAt: result.requestedAt,
-      note: null
+      note: null,
+      meleeHint: result.meleeHint || null
     };
     showLinkedPresence(appState.linkedPlayer);
     renderRenameStatus();

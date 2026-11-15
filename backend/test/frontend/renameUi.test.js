@@ -22,6 +22,16 @@ describe('rename UI – markup', () => {
     assert.ok(HTML.includes('id="chip-rename"'), 'the chip needs a rename entry point');
     assert.ok(HTML.includes('id="chip-rename-note"'), 'the chip needs the pending marker');
     assert.match(HTML, /id="chip-rename" class="not-you"/, 'rename is a secondary chip action');
+    assert.ok(HTML.includes('· Change username'), 'the chip label must say what it does, not just "rename"');
+  });
+
+  it('explains the admin review in its own hint element', () => {
+    const modal = HTML.slice(HTML.indexOf('id="rename-modal"'), HTML.indexOf('id="link-modal-overlay"'));
+    assert.ok(modal.includes('class="modal-hint"'), 'the explanation needs its own class');
+    assert.ok(!modal.includes('guest-pitch-text'), 'renderGuestCopy() would overwrite the explanation');
+    assert.match(modal, /admins will review it/i);
+    assert.match(modal, /nothing changes until it is approved/i);
+    assert.match(modal, /stay attached to you/i);
   });
 
   it('marks the dialog as modal and labelled by its heading', () => {
@@ -46,6 +56,19 @@ describe('rename UI – behaviour in app.js', () => {
     assert.match(JS, /req\.status === 'pending'[\s\S]*?input\.value = req\.newMeleeName/);
     assert.match(JS, /req\.status === 'pending'[\s\S]*?submit\.textContent = 'Update Request'/);
     assert.ok(JS.includes('Submit again to change it'), 'the member must be told the request stays editable');
+    assert.match(JS, /An admin still has to approve it/, 'pending state must not read as already applied');
+  });
+
+  it('fills the shared guest pitch only in the marked slots', () => {
+    assert.ok(JS.includes("document.querySelectorAll('[data-guest-pitch]')"), 'the pitch fill must target its own marker');
+    assert.ok(!JS.includes("document.querySelectorAll('.guest-pitch-text')"), 'the class is too broad — it also styles non-pitch copy');
+    const marked = HTML.match(/data-guest-pitch/g) || [];
+    assert.equal(marked.length, 3, 'banner + guest card + sign-in modal are the only pitch slots');
+  });
+
+  it('warns when the declared handle is missing from the latest Melee standings', () => {
+    assert.match(JS, /meleeHint: result\.meleeHint \|\| null/);
+    assert.match(JS, /meleeHint === 'not-found'[\s\S]*?double-check the spelling/);
   });
 
   it('shows the rejection reason the backend sends, but nothing for approvals', () => {

@@ -7,10 +7,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Star Wars Unlimited League Stockholm</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="stylesheet" href="styles.css?v=4.20.0">
+  <link rel="stylesheet" href="styles.css?v=4.20.1">
 </head>
 <body>
-  <script src="boot.js?v=4.20.0"></script>
+  <script src="boot.js?v=4.20.1"></script>
   <div class="app-container">
     <div class="header">
       <div class="header-content">
@@ -27,7 +27,7 @@
         <div id="identity-chip" class="identity-chip">
           <span class="chip-name" id="chip-name">—</span>
           <button type="button" id="chip-unlink" class="not-you">· Not you?</button>
-          <button type="button" id="chip-rename" class="not-you">· Rename</button>
+          <button type="button" id="chip-rename" class="not-you">· Change username</button>
           <span id="chip-rename-note" class="chip-rename-note" style="display:none;">rename pending</span>
         </div>
         <button type="button" id="signin-cta" class="signin-cta">Sign in</button>
@@ -97,7 +97,7 @@
     <!-- STANDINGS PANEL -->
     <div id="standings-view" class="view-panel" role="tabpanel" aria-labelledby="tab-standings">
       <div id="guest-banner" class="guest-banner">
-        <span class="guest-pitch-text"></span>
+        <span class="guest-pitch-text" data-guest-pitch></span>
         <button type="button" id="guest-banner-close" class="guest-banner-close" aria-label="Dismiss sign-in reminder">&#10005;</button>
       </div>
       <div id="vote-cta" style="display:none;" class="vote-cta">
@@ -224,7 +224,7 @@
     <!-- GUEST PITCH CARD (desktop left column for guests; the sign-in form itself is a modal) -->
     <div id="guest-pitch" class="card">
       <h3 class="section-heading">Sign In</h3>
-      <p class="guest-pitch-text" style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 12px;"></p>
+      <p class="guest-pitch-text" data-guest-pitch style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 12px;"></p>
       <button type="button" id="guest-pitch-signin" class="btn-submit">Sign In</button>
       <p class="guest-pitch-note">Your email is only used to recognize this device — the league runs on Melee results.</p>
     </div>
@@ -338,17 +338,17 @@
   <div id="rename-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="rename-modal-title">
     <div class="modal-box">
       <div class="player-modal-head">
-        <h3 id="rename-modal-title" style="margin:0;">Changed your Melee username?</h3>
+        <h3 id="rename-modal-title" style="margin:0;">Request a username change</h3>
         <button type="button" id="rename-modal-close" class="btn-ghost player-modal-close" aria-label="Close rename dialog">&#10005;</button>
       </div>
-      <p class="guest-pitch-text" style="margin:0 0 14px;">Your stats stay with you — we'll review the change before it goes live. Melee usernames are 3–25 characters: letters, numbers, dot, dash or underscore.</p>
+      <p class="modal-hint" style="margin:0 0 14px;">Changed your handle on Melee? Send the new username here and the league admins will review it. Your results, votes and badges stay attached to you, and nothing changes until it is approved. You can replace the request until then. Melee usernames are 3–25 characters: letters, numbers, dot, dash or underscore, starting with a letter or number.</p>
       <div id="rename-modal-status" class="status-msg status-error" style="display:none;"></div>
       <form id="rename-form" novalidate>
         <div class="form-group">
           <label for="rename-new-name">Your new Melee username</label>
           <input type="text" id="rename-new-name" class="text-input" placeholder="new_username" autocomplete="off" required>
         </div>
-        <button type="submit" id="rename-submit" class="btn-submit">Request Review</button>
+        <button type="submit" id="rename-submit" class="btn-submit">Send Rename Request</button>
       </form>
     </div>
   </div>
@@ -360,7 +360,7 @@
         <button type="button" id="link-modal-close" class="btn-ghost player-modal-close" aria-label="Close sign in">&#10005;</button>
       </div>
       <div id="link-modal-error" class="status-msg status-error"></div>
-      <p class="guest-pitch-text" style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 14px;"></p>
+      <p class="guest-pitch-text" data-guest-pitch style="font-size: 0.85rem; color: #94a3b8; margin: 0 0 14px;"></p>
       <form id="link-form" novalidate>
       <div class="form-group">
         <label for="link-email">Your Email</label>
@@ -379,7 +379,7 @@
     </div>
   </div>
 
-  <script src="app-core.js?v=4.20.0"></script>
-<script src="app.js?v=4.20.0"></script>
+  <script src="app-core.js?v=4.20.1"></script>
+<script src="app.js?v=4.20.1"></script>
 </body>
 </html>

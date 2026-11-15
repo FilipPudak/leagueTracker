@@ -332,6 +332,7 @@ select[size] option { padding: 6px 8px; }
 }
 .modal-box h3 { margin: 0 0 8px; font-family: 'Orbitron', sans-serif; color: #38bdf8; }
 .modal-box p { font-size: 0.9rem; color: #94a3b8; margin: 0 0 16px; }
+.modal-box .modal-hint { font-size: 0.85rem; line-height: 1.5; }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
 .player-modal-stat { text-align: center; padding: 8px; background: transparent; border: 1px solid var(--border-subtle); border-radius: var(--radius-card); }
 .player-modal-stat-value { font-size: 1.2rem; font-weight: 700; color: #f8fafc; }
