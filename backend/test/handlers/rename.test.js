@@ -195,6 +195,42 @@ describe('handleRequestRename – Discord notification', () => {
     assert.equal(result.status, 'pending');
     assert.equal(db.getStore().rename_requests.length, 1);
   });
+
+  it('never treats a rejected webhook post as delivered', async () => {
+    const warns = [];
+    const originalWarn = console.warn;
+    console.warn = (msg) => warns.push(String(msg));
+    try {
+      globalThis.fetch = async () => ({
+        ok: false,
+        status: 404,
+        text: async () => '{"message": "Unknown Webhook", "code": 10015}',
+      });
+      const db = createMockDb(seedHistory(basicTables(), []));
+      const result = await handleRequestRename(
+        { newMeleeName: 'alice_two' },
+        env(db, { DISCORD_WEBHOOK_URL: 'https://discord.example/hook' }),
+        SESSION
+      );
+      assert.equal(result.status, 'pending', 'a dead webhook must not fail the member request');
+      assert.equal(db.getStore().rename_requests.length, 1);
+      assert.ok(warns.some((msg) => msg.includes('404') && msg.includes('Unknown Webhook')), 'the rejection must be logged');
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+
+  it('trims whitespace around the stored webhook secret', async () => {
+    const calls = [];
+    globalThis.fetch = async (url, init) => { calls.push({ url, init }); return { ok: true, status: 204 }; };
+    const db = createMockDb(seedHistory(basicTables(), []));
+    await handleRequestRename(
+      { newMeleeName: 'alice_two' },
+      env(db, { DISCORD_WEBHOOK_URL: 'https://discord.example/hook\n' }),
+      SESSION
+    );
+    assert.equal(calls[0].url, 'https://discord.example/hook', 'a pasted trailing newline must not break the post');
+  });
 });
 
 describe('handleListRenameRequests', () => {

@@ -12,7 +12,9 @@ export async function notifyRenameRequest(env, { playerId, oldName, newName, upd
   if (!url) return false;
   const label = updated ? 'Rename request updated' : 'Rename request';
   try {
-    await fetch(url, {
+    // Discord answers 204 on success and 4xx for a wrong/revoked webhook; without
+    // this check a bad secret looks exactly like a delivered message.
+    const res = await fetch(url.trim(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -21,6 +23,11 @@ export async function notifyRenameRequest(env, { playerId, oldName, newName, upd
       }),
       signal: timeoutSignal(),
     });
+    if (res && res.ok === false) {
+      const detail = typeof res.text === 'function' ? await res.text().catch(() => '') : '';
+      console.warn(`[Rename] Discord rejected the notification: ${res.status} ${String(detail).slice(0, 200)}`);
+      return false;
+    }
     return true;
   } catch (err) {
     console.warn(`[Rename] Discord notification failed: ${err.message}`);
