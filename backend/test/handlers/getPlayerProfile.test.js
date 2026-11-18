@@ -139,6 +139,31 @@ describe('handleGetPlayerProfile', () => {
     assert.equal(result.season.points, 3 * result.season.won + result.season.drawn);
   });
 
+  it('counts only regular-season matches in career totals', async () => {
+    const tables = makeTables({
+      melee_tournaments: [
+        { melee_id: 100, season_id: 6, round: 1, name: 'week 1', date: '2026-06-15', phase: 'regular' },
+        { melee_id: 102, season_id: 6, round: 3, name: 'TOP 4', date: '2026-06-29', phase: 'cut' },
+      ],
+      season_standings: [
+        { season_id: 6, round: 1, player_id: 'P001', wins: 2, losses: 1, draws: 0, match_points: 6, rank: 2 },
+        { season_id: 6, round: 1, player_id: 'P002', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+        { season_id: 6, round: 3, player_id: 'P001', wins: 3, losses: 0, draws: 0, match_points: 9, rank: 1 },
+      ],
+      match_results: [
+        { season_id: 6, round: 1, melee_match_id: 'm1', player1_id: 'P001', player2_id: 'P002', winner_id: 'P002', result: 'Bob won 2-1-0', is_bye: 0 },
+        { season_id: 6, round: 3, melee_match_id: 'm2', player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: 'Alice won 2-0-0', is_bye: 0 },
+      ],
+    });
+    env = { DB: createMockDb(tables) };
+
+    const result = await handleGetPlayerProfile({ playerId: 'P001', seasonId: 6 }, env);
+
+    assert.deepEqual(result.career.totalWDLL, { won: 0, drawn: 0, lost: 1 }, 'the cut win is not a career win');
+    assert.equal(result.career.nightsPlayed, 1, 'the cut night is not a career night');
+    assert.equal(result.career.finals, undefined, 'finals live in My Stats, not the public profile');
+  });
+
   it('returns null rank for player with no season standings', async () => {
     const tables = makeTables({
       melee_tournaments: [

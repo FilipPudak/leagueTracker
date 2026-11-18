@@ -1,9 +1,10 @@
 import { parseMatchResult } from './careerStats.js';
+import { nightKey, buildRoundCountByNight, isLosslessNight } from './nights.js';
 import { AWARD, PHASE } from './constants.js';
 
 const TIER_THRESHOLDS = {
   nightWins:       { bronze: 5,  silver: 15, gold: 30 },
-  undefeatedNights:{ bronze: 1,  silver: 3,  gold: 5 },
+  cleanSheetNights:{ bronze: 1,  silver: 3,  gold: 5 },
   attendance:      { bronze: 10, silver: 25, gold: 50 },
   leaderVariety:   { bronze: 3,  silver: 6,  gold: 10 },
   sweepMaster:     { bronze: 5,  silver: 15, gold: 30 },
@@ -56,14 +57,15 @@ async function computeGiantSlayer(db, beatenOpponentIds) {
   return false;
 }
 
-function computeWinTotals(standings) {
+function computeWinTotals(standings, roundCounts) {
   let totalWins = 0;
-  let undefeatedNights = 0;
+  let cleanSheetNights = 0;
   for (const s of standings) {
     totalWins += s.wins || 0;
-    if ((s.losses || 0) === 0) undefeatedNights++;
+    const roundCount = roundCounts.get(nightKey(s.season_id, s.round));
+    if (isLosslessNight(s, roundCount)) cleanSheetNights++;
   }
-  return { totalWins, undefeatedNights };
+  return { totalWins, cleanSheetNights };
 }
 
 function computeSweepCount(matches, playerId) {
@@ -100,10 +102,10 @@ function computeDeckMaster(matches, votes, playerId) {
   return false;
 }
 
-export async function computeBadges(db, playerId, activeSeasonId = null, isSeasonActive = false) {
-  const [attendanceRows, standingsRows, matchRows, votesRows, votesReceivedRows, leaderCount, champAsP1, champAsP2] = await Promise.all([
+export async function computeBadges(db, playerId, activeSeasonId = null, isSeasonActive = false, { standings: preloadedStandings = null } = {}) {
+  const [attendanceRows, standingsRows, matchRows, votesRows, votesReceivedRows, leaderCount, champAsP1, champAsP2, tournaments] = await Promise.all([
     db.prepare("SELECT a.season_id, a.week FROM attendance a JOIN melee_tournaments t ON t.season_id = a.season_id AND t.round = a.week WHERE a.player_id = ? AND t.phase = ?").bind(playerId, PHASE.REGULAR).all(),
-    db.prepare('SELECT season_id, round, wins, losses, rank FROM season_standings WHERE player_id = ?').bind(playerId).all(),
+    preloadedStandings ? { results: preloadedStandings } : db.prepare('SELECT season_id, round, player_id, wins, losses, draws, rank FROM season_standings').all(),
     db.prepare(
       `SELECT player1_id, player2_id, winner_id, result, is_bye, season_id, round FROM match_results
        WHERE player1_id = ? OR player2_id = ?`
@@ -114,24 +116,31 @@ export async function computeBadges(db, playerId, activeSeasonId = null, isSeaso
     ).bind(playerId).all(),
     db.prepare('SELECT COUNT(DISTINCT leader_id) as cnt FROM votes WHERE player_id = ?').bind(playerId).first(),
     db.prepare(
-      `SELECT DISTINCT player1_id as opponent_id FROM match_results
+      `SELECT DISTINCT player1_id as opponent_id, season_id, round FROM match_results
        WHERE winner_id = ? AND player2_id IS NOT NULL AND is_bye = 0`
     ).bind(playerId).all(),
     db.prepare(
-      `SELECT DISTINCT player2_id as opponent_id FROM match_results
+      `SELECT DISTINCT player2_id as opponent_id, season_id, round FROM match_results
        WHERE winner_id = ? AND player1_id IS NOT NULL AND is_bye = 0`
     ).bind(playerId).all(),
+    db.prepare('SELECT DISTINCT season_id, round, phase FROM melee_tournaments').all(),
   ]);
 
+  const finalNights = new Set((tournaments.results || [])
+    .filter(t => t.phase !== PHASE.REGULAR)
+    .map(t => nightKey(t.season_id, t.round)));
+  const isRegular = row => !finalNights.has(nightKey(row.season_id, row.round));
+
   const attendance = attendanceRows.results || [];
-  const standings = standingsRows.results || [];
-  const matches = matchRows.results || [];
+  const regularStandings = (standingsRows.results || []).filter(isRegular);
+  const standings = regularStandings.filter(s => s.player_id === playerId);
+  const matches = (matchRows.results || []).filter(isRegular);
   const votes = votesRows.results || [];
   const receivedVotes = votesReceivedRows.results || [];
   const distinctLeaders = (leaderCount && leaderCount.cnt) || 0;
   const beatenOpponentIds = new Set([
-    ...(champAsP1.results || []).map(r => r.opponent_id),
-    ...(champAsP2.results || []).map(r => r.opponent_id),
+    ...(champAsP1.results || []).filter(isRegular).map(r => r.opponent_id),
+    ...(champAsP2.results || []).filter(isRegular).map(r => r.opponent_id),
   ]);
 
   const hasAttendance = attendance.length > 0;
@@ -141,7 +150,7 @@ export async function computeBadges(db, playerId, activeSeasonId = null, isSeaso
   const loyalist = computeLoyalist(attendance);
   const giantSlayer = await computeGiantSlayer(db, beatenOpponentIds);
 
-  const { totalWins, undefeatedNights } = computeWinTotals(standings);
+  const { totalWins, cleanSheetNights } = computeWinTotals(standings, buildRoundCountByNight(regularStandings));
   const sweepCount = computeSweepCount(matches, playerId);
   const hasDeckMaster = computeDeckMaster(matches, votes, playerId);
 
@@ -162,7 +171,7 @@ export async function computeBadges(db, playerId, activeSeasonId = null, isSeaso
       type: 'flat',
       earned: hasRankOne,
       icon: 'darth-vader',
-      tooltip: 'Finish a night in 1st place',
+      tooltip: 'Finish a regular-season night in 1st place',
     },
     {
       id: 'giantSlayer',
@@ -170,7 +179,7 @@ export async function computeBadges(db, playerId, activeSeasonId = null, isSeaso
       type: 'flat',
       earned: giantSlayer,
       icon: 'boba-fett',
-      tooltip: 'Beat a previous Ruler or Champion',
+      tooltip: 'Beat a previous Ruler or Champion in a regular-season match',
     },
     {
       id: 'crowdFavorite',
@@ -194,7 +203,7 @@ export async function computeBadges(db, playerId, activeSeasonId = null, isSeaso
       type: 'flat',
       earned: hasDeckMaster,
       icon: 'cards',
-      tooltip: 'Win 3+ matches each with 5 different leaders in a single season',
+      tooltip: 'Win 3+ matches each with 5 different leaders in one regular season',
     },
     {
       id: 'nightWins',
@@ -205,18 +214,18 @@ export async function computeBadges(db, playerId, activeSeasonId = null, isSeaso
       ...nextTierInfo(totalWins, TIER_THRESHOLDS.nightWins),
       earned: totalWins >= TIER_THRESHOLDS.nightWins.bronze,
       icon: 'lightsaber',
-      tooltip: 'Win matches across league nights — Bronze: 5, Silver: 15, Gold: 30',
+      tooltip: 'Win regular-season matches — Bronze: 5, Silver: 15, Gold: 30',
     },
     {
       id: 'cleanSheet',
       name: 'Clean Sheet',
       type: 'tiered',
-      value: undefeatedNights,
-      tier: tierFor(undefeatedNights, TIER_THRESHOLDS.undefeatedNights),
-      ...nextTierInfo(undefeatedNights, TIER_THRESHOLDS.undefeatedNights),
-      earned: undefeatedNights >= TIER_THRESHOLDS.undefeatedNights.bronze,
+      value: cleanSheetNights,
+      tier: tierFor(cleanSheetNights, TIER_THRESHOLDS.cleanSheetNights),
+      ...nextTierInfo(cleanSheetNights, TIER_THRESHOLDS.cleanSheetNights),
+      earned: cleanSheetNights >= TIER_THRESHOLDS.cleanSheetNights.bronze,
       icon: 'death-star',
-      tooltip: 'Complete a night with no losses — Bronze: 1, Silver: 3, Gold: 5',
+      tooltip: 'Play every round of a regular-season night without losing a match — Bronze: 1, Silver: 3, Gold: 5',
     },
     {
       id: 'attendance',
@@ -249,7 +258,7 @@ export async function computeBadges(db, playerId, activeSeasonId = null, isSeaso
       ...nextTierInfo(sweepCount, TIER_THRESHOLDS.sweepMaster),
       earned: sweepCount >= TIER_THRESHOLDS.sweepMaster.bronze,
       icon: 'crossed-lightsabers',
-      tooltip: 'Win matches 2-0 — Bronze: 5, Silver: 15, Gold: 30',
+      tooltip: 'Win regular-season matches 2-0 — Bronze: 5, Silver: 15, Gold: 30',
     },
     {
       id: 'voter',

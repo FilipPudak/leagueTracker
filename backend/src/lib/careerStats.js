@@ -1,4 +1,5 @@
 import { computeSeasonTable } from './seasonTable.js';
+import { nightKey, playedCount, isUndefeatedNight } from './nights.js';
 import { DEFAULT_TOP_RESULTS } from './constants.js';
 
 const WON_RE = /^(.*) won (\d+)-(\d+)-(\d+)$/;
@@ -55,8 +56,8 @@ export function buildRivalry(matches, playerId, names = new Map(), { minMeetings
   };
 }
 
-export function buildCareerRecord(standingsRows, matches, playerId) {
-  const nightKeys = new Set(standingsRows.map(s => `${s.season_id}-${s.round}`));
+export function buildCareerRecord(standingsRows, matches, playerId, roundCounts) {
+  const nightKeys = new Set(standingsRows.map(s => nightKey(s.season_id, s.round)));
   const seasonSeen = new Set(standingsRows.map(s => s.season_id));
 
   let wins = 0, losses = 0, draws = 0;
@@ -67,7 +68,7 @@ export function buildCareerRecord(standingsRows, matches, playerId) {
   for (const s of myStandings) {
     const nightPoints = (s.wins || 0) * 3 + (s.draws || 0);
     totalNightPoints += nightPoints;
-    if ((s.losses || 0) === 0) undefeated++;
+    if (isUndefeatedNight(s, roundCounts.get(nightKey(s.season_id, s.round)))) undefeated++;
   }
 
   for (const m of matches) {
@@ -103,6 +104,35 @@ export function buildCareerRecord(standingsRows, matches, playerId) {
     undefeated,
     gameDiff: gamesWon - gamesLost,
     avgPtsPerNight: nightCount > 0 ? Math.round((totalNightPoints / nightCount) * 10) / 10 : 0,
+  };
+}
+
+export function buildFinalsRecord(standingsRows, matches, playerId) {
+  const myStandings = (standingsRows || [])
+    .filter(s => s.player_id === playerId && playedCount(s) > 0);
+  const nights = new Set(myStandings.map(s => nightKey(s.season_id, s.round))).size;
+
+  let bestFinish = null;
+  for (const s of myStandings) {
+    if (s.rank == null) continue;
+    if (bestFinish === null || s.rank < bestFinish) bestFinish = s.rank;
+  }
+
+  let wins = 0, losses = 0, draws = 0;
+  for (const m of matches || []) {
+    if (m.player1_id !== playerId && m.player2_id !== playerId) continue;
+    if (m.is_bye) continue;
+    if (!m.winner_id) draws++;
+    else if (m.winner_id === playerId) wins++;
+    else losses++;
+  }
+
+  const played = wins + losses + draws;
+  return {
+    nights,
+    matches: { played, wins, draws, losses },
+    winPct: pct(wins, played),
+    bestFinish,
   };
 }
 

@@ -71,15 +71,15 @@ cd backend && node --test "test/**/*.test.js"
 
 | Category | Files | Tests |
 |----------|-------|-------|
-| Library (aspectLookup, awards, auth, badges, careerStats, deckStats, leagueSync, melee, meleeLeague, pagination, participation, seasonTable, voteAudit) | 13 | 328 |
-| Handlers (getAppData, submitVote, updateVote, linkAccount, unlinkAccount, getStandingsData, getAwardsData, getMySeasonStats, getMyCareerStats, getPlayerProfile, getVoteBootstrap, startNewSeason, admin, backfill) | 14 | 241 |
-| Database (queries, schema) | 2 | 74 |
-| Triggers (syncFromMelee, backfillFromMelee) | 2 | 80 |
-| Router & rate limiter | 2 | 41 |
-| Frontend (app-core + responsive redesign + vote-state + voting milestones + CSP hardening) | 14 | 249 |
-| Privacy guard | 1 | 2 |
+| Library (`test/lib` — awards, auth, badges, careerStats, nights, deckStats, leagueSync, melee, participation, seasonTable, tables, voteAudit …) | 15 | 373 |
+| Handlers (`test/handlers` — getAppData, vote actions, accounts, standings, awards, my-season, career, profile, bootstrap, season, admin, backfill) | 16 | 319 |
+| Database (`test/db` — queries, schema) | 4 | 83 |
+| Triggers (`test/triggers` — syncFromMelee, backfillFromMelee) | 2 | 80 |
+| Router & rate limiter | 3 | 52 |
+| Frontend (`test/frontend` — app-core, responsive redesign, vote state, milestones, CSP, finals card) | 16 | 270 |
+| Privacy guard | 1 | 3 |
 | Test helpers (mock-db behavior) | 1 | 10 |
-| **Total** | **49** | **1025** |
+| **Total** | **58** | **1190** |
 
 Test infrastructure: `backend/test/helpers/mock-db.js` (D1 mock), `mock-fetch.js`,
 `mock-crypto.js`, `fixtures.js`, `test-utils.js`, `read-source.js` (EOL-normalized source reader).

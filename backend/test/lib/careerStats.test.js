@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMatchResult, buildRivalry, buildCareerRecord, buildSeasonProgression, computeLeaderWinRates } from '../../src/lib/careerStats.js';
+import { parseMatchResult, buildRivalry, buildCareerRecord, buildFinalsRecord, buildSeasonProgression, computeLeaderWinRates } from '../../src/lib/careerStats.js';
+import { buildRoundCountByNight } from '../../src/lib/nights.js';
 import { createMockDb } from '../helpers/mock-db.js';
 import { basicTables } from '../helpers/fixtures.js';
 
@@ -104,7 +105,7 @@ describe('lib/careerStats buildCareerRecord', () => {
       { season_id: 6, round: 2, player1_id: 'P001', player2_id: 'P002', winner_id: null, result: '1-1-0 Draw', is_bye: 0 },
       { season_id: 6, round: 3, player1_id: 'P001', player2_id: null, winner_id: 'P001', result: null, is_bye: 1 },
     ];
-    const rec = buildCareerRecord(standings, matches, 'P001');
+    const rec = buildCareerRecord(standings, matches, 'P001', buildRoundCountByNight(standings));
     assert.equal(rec.nights, 2);
     assert.equal(rec.sinceSeason, 5);
     assert.equal(rec.matches.played, 4);
@@ -123,16 +124,36 @@ describe('lib/careerStats buildCareerRecord', () => {
     assert.equal(rec.avgPtsPerNight, 7.5);
   });
 
+  it('counts only full nights won outright as undefeated', () => {
+    const standings = [
+      { season_id: 6, round: 1, player_id: 'P001', wins: 4, losses: 0, draws: 0 },
+      { season_id: 6, round: 1, player_id: 'P002', wins: 2, losses: 2, draws: 0 },
+      { season_id: 6, round: 2, player_id: 'P001', wins: 3, losses: 0, draws: 1 },
+      { season_id: 6, round: 2, player_id: 'P002', wins: 2, losses: 2, draws: 0 },
+      { season_id: 6, round: 3, player_id: 'P001', wins: 1, losses: 0, draws: 0 },
+      { season_id: 6, round: 3, player_id: 'P002', wins: 3, losses: 1, draws: 0 },
+      { season_id: 6, round: 4, player_id: 'P001', wins: 0, losses: 0, draws: 0 },
+      { season_id: 6, round: 4, player_id: 'P002', wins: 4, losses: 0, draws: 0 },
+    ];
+    const rec = buildCareerRecord(standings, [], 'P001', buildRoundCountByNight(standings));
+    assert.equal(rec.undefeated, 1);
+  });
+
+  it('requires the round-max map', () => {
+    const standings = [{ season_id: 6, round: 1, player_id: 'P001', wins: 3, draws: 0, losses: 0 }];
+    assert.throws(() => buildCareerRecord(standings, [], 'P001'), TypeError);
+  });
+
   it('unparsable results still count the match outcome, not games', () => {
     const matches = [matchRow('P001', 'P002', 'P001', 'retirement')];
-    const rec = buildCareerRecord([], matches, 'P001');
+    const rec = buildCareerRecord([], matches, 'P001', buildRoundCountByNight([]));
     assert.equal(rec.matches.wins, 1);
     assert.equal(rec.games.won, 0);
     assert.equal(rec.games.parsed, 0);
   });
 
   it('empty career yields nulls and zeros', () => {
-    const rec = buildCareerRecord([], [], 'P001');
+    const rec = buildCareerRecord([], [], 'P001', buildRoundCountByNight([]));
     assert.equal(rec.sinceSeason, null);
     assert.equal(rec.nights, 0);
     assert.equal(rec.matches.played, 0);
@@ -140,6 +161,45 @@ describe('lib/careerStats buildCareerRecord', () => {
     assert.equal(rec.undefeated, 0);
     assert.equal(rec.gameDiff, 0);
     assert.equal(rec.avgPtsPerNight, 0);
+  });
+});
+
+describe('lib/careerStats buildFinalsRecord', () => {
+  it('counts finals nights, match record, and best finish', () => {
+    const standings = [
+      { season_id: 3, round: 17, player_id: 'P001', wins: 1, draws: 0, losses: 1, rank: 3 },
+      { season_id: 3, round: 17, player_id: 'P002', wins: 2, draws: 0, losses: 0, rank: 1 },
+      { season_id: 6, round: 12, player_id: 'P001', wins: 1, draws: 0, losses: 0, rank: 1 },
+    ];
+    const matches = [
+      { season_id: 3, round: 17, player1_id: 'P001', player2_id: 'P002', winner_id: 'P002', result: 'B won 2-1-0', is_bye: 0 },
+      { season_id: 6, round: 12, player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: 'A won 2-0-0', is_bye: 0 },
+      { season_id: 6, round: 12, player1_id: 'P001', player2_id: null, winner_id: 'P001', result: null, is_bye: 1 },
+      { season_id: 6, round: 12, player1_id: 'P002', player2_id: 'P003', winner_id: null, result: '1-1-0 Draw', is_bye: 0 },
+    ];
+    const rec = buildFinalsRecord(standings, matches, 'P001');
+    assert.equal(rec.nights, 2);
+    assert.deepEqual(rec.matches, { played: 2, wins: 1, draws: 0, losses: 1 });
+    assert.equal(rec.winPct, 50);
+    assert.equal(rec.bestFinish, 1, 'lowest rank across finals nights');
+  });
+
+  it('is empty without finals nights', () => {
+    const rec = buildFinalsRecord([], [], 'P001');
+    assert.equal(rec.nights, 0);
+    assert.equal(rec.matches.played, 0);
+    assert.equal(rec.winPct, null);
+    assert.equal(rec.bestFinish, null);
+  });
+
+  it('ignores a finals row the player never played', () => {
+    const standings = [
+      { season_id: 6, round: 12, player_id: 'P001', wins: 0, draws: 0, losses: 0, rank: 12 },
+      { season_id: 6, round: 12, player_id: 'P002', wins: 3, draws: 0, losses: 0, rank: 1 },
+    ];
+    const rec = buildFinalsRecord(standings, [], 'P001');
+    assert.equal(rec.nights, 0);
+    assert.equal(rec.bestFinish, null, 'a zero-game row has no meaningful finish');
   });
 });
 

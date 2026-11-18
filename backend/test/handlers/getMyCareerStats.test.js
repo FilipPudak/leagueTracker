@@ -72,6 +72,82 @@ describe('handleGetMyCareerStats', () => {
     assert.equal(s6.nightsPlayed, 2, 'cut standing not counted as played night');
   });
 
+  it('splits the career record into regular season and finals', async () => {
+    const tables = seededTables();
+    tables.match_results.push({
+      season_id: 6, round: 3, melee_match_id: 'm5',
+      player1_id: 'P001', player2_id: 'P002', winner_id: 'P001', result: 'Alice won 2-0-0', is_bye: 0,
+    });
+    const result = await handleGetMyCareerStats({}, { DB: createMockDb(tables) }, aliceSession);
+
+    assert.equal(result.record.matches.played, 3, 'regular-season matches only');
+    assert.equal(result.record.sweeps.count, 1, 'the cut sweep is not a career sweep');
+
+    assert.equal(result.finals.nights, 1);
+    assert.equal(result.finals.matches.played, 1);
+    assert.equal(result.finals.matches.wins, 1);
+    assert.equal(result.finals.winPct, 100);
+    assert.equal(result.finals.bestFinish, 1);
+  });
+
+  it('treats a side-event night as finals', async () => {
+    const tables = seededTables();
+    tables.melee_tournaments.push({
+      melee_id: 104, season_id: 6, round: 4, name: 'SWU Wednesday league season 6 SIDE EVENT', date: '2026-07-22', phase: 'side',
+    });
+    tables.season_standings.push(
+      { season_id: 6, round: 4, player_id: 'P001', wins: 1, losses: 1, draws: 0, match_points: 3, rank: 3 }
+    );
+    tables.match_results.push({
+      season_id: 6, round: 4, melee_match_id: 'm6',
+      player1_id: 'P001', player2_id: 'P002', winner_id: 'P002', result: 'Bob won 2-0-0', is_bye: 0,
+    });
+    const result = await handleGetMyCareerStats({}, { DB: createMockDb(tables) }, aliceSession);
+
+    assert.equal(result.record.matches.played, 3, 'side-event match stays out of the career record');
+    assert.equal(result.record.nights, 3, 'side-event night stays out of career nights');
+    assert.equal(result.finals.nights, 2);
+    assert.deepEqual(result.finals.matches, { played: 1, wins: 0, draws: 0, losses: 1 });
+    assert.equal(result.finals.bestFinish, 1, 'best of cut 1st and side 3rd');
+  });
+
+  it('treats a night with no tournament row as regular season', async () => {
+    const tables = seededTables();
+    tables.melee_tournaments = tables.melee_tournaments.filter(t => !(t.season_id === 6 && t.round === 2));
+    const result = await handleGetMyCareerStats({}, { DB: createMockDb(tables) }, aliceSession);
+
+    assert.equal(result.record.nights, 3, 'unclassified night keeps its career night');
+    assert.equal(result.record.matches.played, 3, 'unclassified night keeps its career matches');
+    assert.equal(result.finals.nights, 1, 'only the cut night is finals');
+  });
+
+  it('keeps a finals-only career visible', async () => {
+    const tables = seededTables();
+    tables.season_standings = [
+      { season_id: 6, round: 3, player_id: 'P001', wins: 4, losses: 0, draws: 0, match_points: 12, rank: 1 },
+    ];
+    const result = await handleGetMyCareerStats({}, { DB: createMockDb(tables) }, aliceSession);
+
+    assert.equal(result.record.nights, 0);
+    assert.equal(result.hasCareerData, true, 'finals history still counts as career data');
+    assert.equal(result.finals.nights, 1);
+  });
+
+  it('counts only full nights won outright in the career undefeated total', async () => {
+    const tables = seededTables();
+    tables.season_standings = [
+      { season_id: 6, round: 1, player_id: 'P001', wins: 4, losses: 0, draws: 0, match_points: 12, rank: 1 },
+      { season_id: 6, round: 1, player_id: 'P002', wins: 2, losses: 2, draws: 0, match_points: 6, rank: 2 },
+      { season_id: 6, round: 2, player_id: 'P001', wins: 2, losses: 0, draws: 0, match_points: 6, rank: 2 },
+      { season_id: 6, round: 2, player_id: 'P002', wins: 4, losses: 0, draws: 0, match_points: 12, rank: 1 },
+    ];
+    tables.match_results = [];
+    const result = await handleGetMyCareerStats({}, { DB: createMockDb(tables) }, aliceSession);
+
+    assert.equal(result.record.nights, 2);
+    assert.equal(result.record.undefeated, 1, 'round 2 is a short night — only round 1 counts');
+  });
+
   it('marks active season with asOfRound of latest synced regular round', async () => {
     const result = await handleGetMyCareerStats({}, env, aliceSession);
     const s6 = result.progression.find(p => p.seasonId === 6);

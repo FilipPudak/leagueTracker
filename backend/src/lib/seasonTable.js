@@ -1,9 +1,13 @@
+import { nightKey, buildRoundCountByNight, isUndefeatedNight } from './nights.js';
+
 export function nightPoints(s) {
   return 3 * (s.wins || 0) + (s.draws || 0);
 }
 
 export function computeSeasonTable(entries, topResults) {
   const playerMap = new Map();
+  const roundKey = n => nightKey(n.season_id, n.round);
+  const roundCounts = buildRoundCountByNight(entries, roundKey);
 
   for (const entry of entries) {
     const pid = entry.playerId;
@@ -27,7 +31,7 @@ export function computeSeasonTable(entries, topResults) {
     const drawn = best.reduce((s, n) => s + (n.draws || 0), 0);
     const lost = best.reduce((s, n) => s + (n.losses || 0), 0);
     const points = best.reduce((s, n) => s + nightPoints(n), 0);
-    const undefeatedNights = best.filter(n => (n.losses || 0) === 0).length;
+    const undefeatedNights = best.filter(n => isUndefeatedNight(n, roundCounts.get(roundKey(n)))).length;
     const nightRankSum = best.reduce((s, n) => s + (n.rank || 0), 0);
 
     rows.push({ playerId, rounds: best, played, won, drawn, lost, points, undefeatedNights, nightRankSum });

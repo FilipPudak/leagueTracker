@@ -31,7 +31,7 @@ on a shared venue IP.
 |--------|---------|-------------|
 | `getAwardsData` | `seasonId?` | Award podiums, most-played leaders, participation. Ambassador names are callsign-masked while voting is open; Bounty Hunter renders live (since v4.19.1). |
 | `getStandingsData` | `seasonId` (required), `asOfRound?` | Derived season table (best-X nights) + per-night results with phase labels. |
-| `getPlayerProfile` | `playerId` (required), `seasonId?` | Full public profile: season stats, career record, badges, leader win-rates. Omits gamification and rivalry. |
+| `getPlayerProfile` | `playerId` (required), `seasonId?` | Full public profile: season stats, career record, badges, leader win-rates. Career record counts regular-season nights only (cut/side events excluded). Omits gamification, rivalry, and finals. |
 | `linkAccount` | `email` (required), `deviceId` (required), `playerId?` | Honor-based email claim + session mint. Returns token and link state. |
 
 ## Token-optional actions
@@ -53,7 +53,7 @@ No valid session → `401`.
 | `updateVote` | `voteData: { leaderId, opponentId }` | Replaces both choices for the current week. `404` if no prior vote (use `submitVote`). |
 | `unlinkAccount` | — | Deletes the session for this (player, device) pair only. Other devices untouched. |
 | `getMySeasonStats` | `seasonId?` | Linked player's private season stats: tickets, streaks, badges, leader win-rates, voting-milestone and 80%-rule progress, awards. |
-| `getMyCareerStats` | — | Linked player's private career: record, rivalry, season progression, badges. |
+| `getMyCareerStats` | — | Linked player's private career: regular-season record, rivalry, season progression, badges, and `finals` (`{ nights, matches: { played, wins, draws, losses }, winPct, bestFinish }` over cut/side nights only). |
 | `requestRename` | `newMeleeName` (required) | Declares a Melee username change. Validates format, rejects a name held by another email-bearing player. A second submission while one is pending **overwrites** that row (`updated: true`, fresh `requested_at`) so a typo never locks the member out. Stores the `pending` row (+ best-effort `melee_hint`) and notifies the admin webhook ("Rename request updated" on overwrite). Label follows the row until approved. |
 
 ## Admin actions

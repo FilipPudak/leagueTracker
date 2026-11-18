@@ -226,7 +226,7 @@ CREATE INDEX idx_rename_requests_player ON rename_requests(player_id);
 
 | Award | Source | Logic |
 |-------|--------|-------|
-| **Galactic Ruler** | Season table (derived) | Rank 1 after final regular week; best-X nights; points → undefeated → night-rank sum |
+| **Galactic Ruler** | Season table (derived) | Rank 1 after final regular week; best-X nights; points → undefeated (full night, all wins, byes count) → night-rank sum |
 | **Galactic Champion** | Cut tournament standings | Rank 1 of chronologically last cut event |
 | **Galactic Schemer** | Votes table | Most distinct leaders played |
 | **Galactic Ambassador** | Votes table | Most favorite-opponent votes received |
@@ -235,4 +235,4 @@ CREATE INDEX idx_rename_requests_player ON rename_requests(player_id);
 
 ## Season Table
 
-Derived (not stored): for each player, sum of their best `top_results` night results by night points (3W + D). Tie at boundary keeps earlier night. Ranks: points → undefeated nights → night-rank sum → shared.
+Derived (not stored): for each player, sum of their best `top_results` night results by night points (3W + D). Tie at boundary keeps earlier night. Ranks: points → undefeated nights (every round played and won; a bye is a win) → night-rank sum → shared.

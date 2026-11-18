@@ -1,5 +1,6 @@
-import { getSetting, parseSeasonId, parseWeek, getPlayerById, getAwardsForSeason } from '../db/queries.js';
+import { getSetting, getAllStandings, parseSeasonId, parseWeek, getPlayerById, getAwardsForSeason } from '../db/queries.js';
 import { buildCareerRecord, buildSeasonProgression, computeLeaderWinRates } from '../lib/careerStats.js';
+import { nightKey, buildRoundCountByNight } from '../lib/nights.js';
 import { computeBadges } from '../lib/badges.js';
 import { computeSeasonTable } from '../lib/seasonTable.js';
 import { badRequest } from '../lib/errors.js';
@@ -108,9 +109,10 @@ export async function handleGetPlayerProfile(body, env) {
   const playerRow = seasonTable.find(r => r.playerId === playerId);
   const season = buildSeasonSection(playerRow, seasonStandings, nightsAttended, totalNights, leaders, awardsWon);
 
-  const { record, progression, peak } = await loadCareerData(DB, playerId, activeSeasonId);
+  const careerStandings = await getAllStandings(DB);
+  const { record, progression, peak } = await loadCareerData(DB, playerId, activeSeasonId, careerStandings);
 
-  const badges = await computeBadges(DB, playerId, activeSeasonId, currentWeek !== null);
+  const badges = await computeBadges(DB, playerId, activeSeasonId, currentWeek !== null, { standings: careerStandings });
   const earnedBadges = badges.filter(b => b.earned);
 
   const championCount = (championTitleRows.results || []).length;
@@ -171,30 +173,33 @@ async function loadAwardsWon(DB, sid, playerId, isCurrentSeason) {
 }
 
 // Career aggregates over ALL regular-phase nights across all seasons.
-async function loadCareerData(DB, playerId, activeSeasonId) {
+async function loadCareerData(DB, playerId, activeSeasonId, allStandings) {
   const MATCH_COLS = 'season_id, round, player1_id, player2_id, winner_id, result, is_bye';
-  const [allStandingsResult, allMatchAsP1, allMatchAsP2, tournamentsResult, seasonsResult] = await Promise.all([
-    DB.prepare('SELECT season_id, round, player_id, wins, losses, draws, rank FROM season_standings').all(),
+  const [allMatchAsP1, allMatchAsP2, tournamentsResult, seasonsResult] = await Promise.all([
     DB.prepare(`SELECT ${MATCH_COLS} FROM match_results WHERE player1_id = ?`).bind(playerId).all(),
     DB.prepare(`SELECT ${MATCH_COLS} FROM match_results WHERE player2_id = ?`).bind(playerId).all(),
-    DB.prepare('SELECT season_id, round FROM melee_tournaments WHERE phase = ?').bind(PHASE.REGULAR).all(),
+    DB.prepare('SELECT season_id, round, phase FROM melee_tournaments').all(),
     DB.prepare('SELECT id, name, length, top_results FROM seasons ORDER BY id').all(),
   ]);
 
-  const allStandings = allStandingsResult.results || [];
   const allMatches = [...(allMatchAsP1.results || []), ...(allMatchAsP2.results || [])];
   const regularRoundsBySeason = new Map();
+  const finalNights = new Set();
   for (const t of tournamentsResult.results || []) {
+    if (t.phase !== PHASE.REGULAR) {
+      finalNights.add(nightKey(t.season_id, t.round));
+      continue;
+    }
     if (!regularRoundsBySeason.has(t.season_id)) regularRoundsBySeason.set(t.season_id, new Set());
     regularRoundsBySeason.get(t.season_id).add(t.round);
   }
 
   const seasons = seasonsResult.results || [];
-  const myRegularStandings = allStandings.filter(s =>
-    s.player_id === playerId && (regularRoundsBySeason.get(s.season_id) || new Set()).has(s.round)
-  );
+  const isFinalNight = row => finalNights.has(nightKey(row.season_id, row.round));
+  const myRegularStandings = allStandings.filter(s => s.player_id === playerId && !isFinalNight(s));
+  const myRegularMatches = allMatches.filter(m => !isFinalNight(m));
 
-  const record = buildCareerRecord(myRegularStandings, allMatches, playerId);
+  const record = buildCareerRecord(myRegularStandings, myRegularMatches, playerId, buildRoundCountByNight(allStandings));
   const { progression, peak } = buildSeasonProgression({
     seasons, allStandings, regularRoundsBySeason, playerId, activeSeasonId,
   });

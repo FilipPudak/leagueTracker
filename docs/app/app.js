@@ -1488,12 +1488,34 @@ function loadCareerStats() {
     });
 }
 
+function careerFinalsHtml(f) {
+  const fm = f.matches;
+  const winPct = f.winPct == null ? '—' : f.winPct + '%';
+  const bestFinish = f.bestFinish == null ? '—' : ordinal(f.bestFinish);
+  return `
+    <div class="section-heading">Finals &amp; Side Events</div>
+    <div class="career-record-grid">
+      <div><span style="color:#94a3b8;">Nights</span><br><strong style="color:#f8fafc;">${escapeHtml(f.nights)}</strong></div>
+      <div><span style="color:#94a3b8;">Matches</span><br><strong style="color:#f8fafc;">${escapeHtml(fm.played)}</strong></div>
+      <div><span style="color:#94a3b8;">W-D-L</span><br><strong style="color:#f8fafc;">${escapeHtml(fm.wins)}-${escapeHtml(fm.draws)}-${escapeHtml(fm.losses)}</strong></div>
+      <div><span style="color:#94a3b8;">Win %</span><br><strong style="color:#f8fafc;">${escapeHtml(winPct)}</strong></div>
+      <div><span style="color:#94a3b8;">Best finish</span><br><strong style="color:#f8fafc;">${escapeHtml(bestFinish)}</strong></div>
+    </div>`;
+}
+
+function renderFinalsCard(card, finals) {
+  const hasFinals = Boolean(finals && (finals.nights > 0 || finals.matches.played > 0));
+  card.innerHTML = hasFinals ? careerFinalsHtml(finals) : '';
+  card.style.display = hasFinals ? 'block' : 'none';
+}
+
 function renderCareerStats(res) {
   const section = $('career-details');
   const empty = $('career-empty');
   const recordCard = $('career-record-card');
   const rivalryCard = $('career-rivalry-card');
   const progressionCard = $('career-progression-card');
+  const finalsCard = $('career-finals-card');
   const badgesContainer = $('career-badges-container');
   if (!section) return;
 
@@ -1503,6 +1525,7 @@ function renderCareerStats(res) {
     recordCard.style.display = 'none';
     rivalryCard.style.display = 'none';
     progressionCard.style.display = 'none';
+    finalsCard.style.display = 'none';
     if (badgesContainer) badgesContainer.innerHTML = '';
     return;
   }
@@ -1516,6 +1539,7 @@ function renderCareerStats(res) {
     recordCard.style.display = 'none';
     rivalryCard.style.display = 'none';
     progressionCard.style.display = 'none';
+    finalsCard.style.display = 'none';
     return;
   }
 
@@ -1531,7 +1555,7 @@ function renderCareerStats(res) {
       <div><span style="color:#94a3b8;">Win %</span><br><strong style="color:#f8fafc;">${pct(r.winPct)}</strong></div>
       <div><span style="color:#94a3b8;">Game win %</span><br><strong style="color:#f8fafc;">${pct(r.games.winPct)}</strong></div>
       <div><span style="color:#94a3b8;">Sweeps (2-0s)</span><br><strong style="color:#f8fafc;">${escapeHtml(r.sweeps.count)}${r.sweeps.pctOfWins != null ? ' (' + r.sweeps.pctOfWins + '%)' : ''}</strong></div>
-      <div><span style="color:#94a3b8;">Undefeated</span><br><strong style="color:#f8fafc;">${escapeHtml(r.undefeated)}${r.nights > 0 ? ' (' + Math.round(r.undefeated / r.nights * 100) + '%)' : ''}</strong></div>
+      <div><span style="color:#94a3b8;">Undefeated nights</span><br><strong style="color:#f8fafc;">${escapeHtml(r.undefeated)}${r.nights > 0 ? ' (' + Math.round(r.undefeated / r.nights * 100) + '%)' : ''}</strong></div>
       <div><span style="color:#94a3b8;">Game diff</span><br><strong style="color:#f8fafc;">${r.gameDiff > 0 ? '+' : ''}${escapeHtml(r.gameDiff)}</strong></div>
       <div><span style="color:#94a3b8;">Avg pts/night</span><br><strong style="color:#f8fafc;">${escapeHtml(r.avgPtsPerNight)}</strong></div>
     </div>`;
@@ -1571,6 +1595,8 @@ function renderCareerStats(res) {
     progressionCard.innerHTML = seasonProgressionHtml(prog, res.peak);
   progressionCard.style.display = 'block';
 
+  renderFinalsCard(finalsCard, res.finals);
+
   const badges = res.badges || [];
   if (badgesContainer) {
     if (badges.length > 0) {
@@ -1604,6 +1630,12 @@ function renderCareerStats(res) {
 }
 
 /* -------------------------------------------------------------- utilities -- */
+
+function ordinal(n) {
+  const suffix = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (suffix[(v - 20) % 10] || suffix[v] || suffix[0]);
+}
 
 function formatNightDate(iso) {
   if (!iso) return null;

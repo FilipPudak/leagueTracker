@@ -60,6 +60,35 @@ describe('seasonTable', () => {
       assert.equal(result[1].playerId, 'P2');
     });
 
+    it('undefeated tiebreaker requires a full night won outright', () => {
+      const nights = [
+        { playerId: 'P1', round: 1, wins: 4, draws: 0, losses: 0, rank: 1 },
+        { playerId: 'P1', round: 2, wins: 2, draws: 0, losses: 2, rank: 3 },
+        { playerId: 'P2', round: 1, wins: 3, draws: 1, losses: 0, rank: 2 },
+        { playerId: 'P2', round: 2, wins: 2, draws: 2, losses: 0, rank: 2 },
+      ];
+      const result = computeSeasonTable(nights, 2);
+      assert.equal(result[0].playerId, 'P1');
+      assert.equal(result[0].points, 18);
+      assert.equal(result[0].undefeatedNights, 1);
+      assert.equal(result[1].playerId, 'P2');
+      assert.equal(result[1].points, 18);
+      assert.equal(result[1].undefeatedNights, 0);
+      assert.equal(result[1].nightRankSum, result[0].nightRankSum);
+    });
+
+    it('a short night with only wins is not undefeated', () => {
+      const nights = [
+        { playerId: 'P1', round: 1, wins: 2, draws: 0, losses: 0, rank: 1 },
+        { playerId: 'P2', round: 1, wins: 4, draws: 0, losses: 0, rank: 2 },
+      ];
+      const result = computeSeasonTable(nights, 1);
+      const p1 = result.find(r => r.playerId === 'P1');
+      const p2 = result.find(r => r.playerId === 'P2');
+      assert.equal(p1.undefeatedNights, 0);
+      assert.equal(p2.undefeatedNights, 1);
+    });
+
     it('shares rank when still tied after all tiebreakers', () => {
       const nights = [
         { playerId: 'P1', round: 1, wins: 3, draws: 0, losses: 0, rank: 1 },

@@ -11,13 +11,26 @@ function matchRow(p1, p2, winner, result, extra = {}) {
   return { season_id: 6, round: 1, player1_id: p1, player2_id: p2, winner_id: winner, result, is_bye: 0, ...extra };
 }
 
+// Badges count regular nights only, so every fixture night must exist as a
+// regular tournament row. Derive them from the standings/matches unless the
+// test seeds melee_tournaments explicitly.
+function createBadgeDb(tables = {}) {
+  const nights = new Map();
+  for (const row of [...(tables.season_standings || []), ...(tables.match_results || [])]) {
+    if (row.season_id == null || row.round == null) continue;
+    nights.set(`${row.season_id}-${row.round}`, { season_id: row.season_id, round: row.round, phase: 'regular' });
+  }
+  for (const t of tables.melee_tournaments || []) nights.set(`${t.season_id}-${t.round}`, t);
+  return createMockDb(Object.assign({}, tables, { melee_tournaments: [...nights.values()] }));
+}
+
 describe('lib/badges computeBadges', () => {
 
   describe('flat badges', () => {
 
     describe('First Night', () => {
       it('earned when player has any attendance', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [{ season_id: 6, week: 1, player_id: 'P001' }],
           melee_tournaments: [{ season_id: 6, round: 1, phase: 'regular' }],
           season_standings: [],
@@ -31,7 +44,7 @@ describe('lib/badges computeBadges', () => {
       });
 
       it('not earned when no attendance', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [],
           match_results: [],
@@ -46,7 +59,7 @@ describe('lib/badges computeBadges', () => {
 
     describe('Night Champion', () => {
       it('earned when player has rank 1 in any night', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [standingsRow('P001', 3, 0, 0, 1)],
           match_results: [],
@@ -59,7 +72,7 @@ describe('lib/badges computeBadges', () => {
       });
 
       it('not earned when never rank 1', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [standingsRow('P001', 2, 1, 0, 2)],
           match_results: [],
@@ -74,7 +87,7 @@ describe('lib/badges computeBadges', () => {
 
     describe('Giant Slayer', () => {
       it('earned when player beat a previous Ruler', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [],
           match_results: [
@@ -91,7 +104,7 @@ describe('lib/badges computeBadges', () => {
       });
 
       it('earned when player beat a previous Champion', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [],
           match_results: [
@@ -108,7 +121,7 @@ describe('lib/badges computeBadges', () => {
       });
 
       it('not earned when beating non-Ruler/Champion', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [],
           match_results: [
@@ -125,7 +138,7 @@ describe('lib/badges computeBadges', () => {
       });
 
       it('not earned when player lost to Ruler', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [],
           match_results: [
@@ -144,7 +157,7 @@ describe('lib/badges computeBadges', () => {
 
     describe('Crowd Favorite', () => {
       it('earned when player received 3+ favorite-opponent votes in one season', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [],
           match_results: [],
@@ -161,7 +174,7 @@ describe('lib/badges computeBadges', () => {
       });
 
       it('not earned with only 2 votes', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [],
           match_results: [],
@@ -177,7 +190,7 @@ describe('lib/badges computeBadges', () => {
       });
 
       it('same voter across 3 weeks counts as 1 distinct voter', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [],
           match_results: [],
@@ -194,7 +207,7 @@ describe('lib/badges computeBadges', () => {
       });
 
       it('not earned when votes are from active season', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [],
           match_results: [],
@@ -211,7 +224,7 @@ describe('lib/badges computeBadges', () => {
       });
 
       it('earned when votes are from a completed season', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [],
           match_results: [],
@@ -230,7 +243,7 @@ describe('lib/badges computeBadges', () => {
 
     describe('Loyalist', () => {
       it('earned when player attended 3+ consecutive seasons', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [
             { season_id: 4, week: 1, player_id: 'P001' },
             { season_id: 5, week: 1, player_id: 'P001' },
@@ -252,7 +265,7 @@ describe('lib/badges computeBadges', () => {
       });
 
       it('not earned with only 2 seasons', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [
             { season_id: 5, week: 1, player_id: 'P001' },
             { season_id: 6, week: 1, player_id: 'P001' },
@@ -272,7 +285,7 @@ describe('lib/badges computeBadges', () => {
       });
 
       it('not earned with non-consecutive seasons', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [
             { season_id: 3, week: 1, player_id: 'P001' },
             { season_id: 5, week: 1, player_id: 'P001' },
@@ -299,7 +312,7 @@ describe('lib/badges computeBadges', () => {
 
     describe('Night Wins', () => {
       it('returns correct tier based on total wins', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [
             standingsRow('P001', 3, 0, 0, 1, 6, 1),
@@ -321,7 +334,7 @@ describe('lib/badges computeBadges', () => {
         for (let i = 1; i <= 6; i++) {
           standings.push(standingsRow('P001', 3, 0, 0, 1, 6, i));
         }
-        const db = createMockDb({ attendance: [], season_standings: standings, match_results: [], votes: [], awards: [] });
+        const db = createBadgeDb({ attendance: [], season_standings: standings, match_results: [], votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'nightWins');
         assert.equal(b.value, 18);
@@ -333,7 +346,7 @@ describe('lib/badges computeBadges', () => {
         for (let i = 1; i <= 10; i++) {
           standings.push(standingsRow('P001', 3, 0, 0, 1, 6, i));
         }
-        const db = createMockDb({ attendance: [], season_standings: standings, match_results: [], votes: [], awards: [] });
+        const db = createBadgeDb({ attendance: [], season_standings: standings, match_results: [], votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'nightWins');
         assert.equal(b.value, 30);
@@ -341,9 +354,9 @@ describe('lib/badges computeBadges', () => {
       });
     });
 
-    describe('Undefeated Nights', () => {
-      it('bronze at 1 undefeated night', async () => {
-        const db = createMockDb({
+    describe('Clean Sheet', () => {
+      it('bronze at 1 clean sheet', async () => {
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [standingsRow('P001', 3, 0, 0, 1)],
           match_results: [],
@@ -357,7 +370,7 @@ describe('lib/badges computeBadges', () => {
       });
 
       it('silver at 3', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [
             standingsRow('P001', 3, 0, 0, 1, 6, 1),
@@ -375,11 +388,77 @@ describe('lib/badges computeBadges', () => {
       });
 
       it('night with losses does not count', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [
             standingsRow('P001', 3, 0, 0, 1, 6, 1),
             standingsRow('P001', 2, 1, 0, 2, 6, 2),
+          ],
+          match_results: [],
+          votes: [],
+          awards: [],
+        });
+        const badges = await computeBadges(db, 'P001');
+        const b = badges.find(x => x.id === 'cleanSheet');
+        assert.equal(b.value, 1);
+      });
+
+      it('draws are allowed on a full night', async () => {
+        const db = createBadgeDb({
+          attendance: [],
+          season_standings: [
+            standingsRow('P001', 2, 0, 2, 2, 6, 1),
+            standingsRow('P002', 3, 1, 0, 1, 6, 1),
+          ],
+          match_results: [],
+          votes: [],
+          awards: [],
+        });
+        const badges = await computeBadges(db, 'P001');
+        const b = badges.find(x => x.id === 'cleanSheet');
+        assert.equal(b.value, 1);
+      });
+
+      it('night without all rounds played does not count', async () => {
+        const db = createBadgeDb({
+          attendance: [],
+          season_standings: [
+            standingsRow('P001', 1, 0, 0, 3, 6, 1),
+            standingsRow('P002', 4, 0, 0, 1, 6, 1),
+          ],
+          match_results: [],
+          votes: [],
+          awards: [],
+        });
+        const badges = await computeBadges(db, 'P001');
+        const b = badges.find(x => x.id === 'cleanSheet');
+        assert.equal(b.value, 0);
+        assert.equal(b.earned, false);
+      });
+
+      it('empty standings row does not count as a clean sheet', async () => {
+        const db = createBadgeDb({
+          attendance: [],
+          season_standings: [
+            standingsRow('P001', 0, 0, 0, null, 6, 1),
+            standingsRow('P002', 4, 0, 0, 1, 6, 1),
+          ],
+          match_results: [],
+          votes: [],
+          awards: [],
+        });
+        const badges = await computeBadges(db, 'P001');
+        const b = badges.find(x => x.id === 'cleanSheet');
+        assert.equal(b.value, 0);
+      });
+
+      it('short three-round night counts at three wins', async () => {
+        const db = createBadgeDb({
+          attendance: [],
+          season_standings: [
+            standingsRow('P001', 3, 0, 0, 1, 6, 1),
+            standingsRow('P002', 2, 1, 0, 2, 6, 1),
+            standingsRow('P003', 1, 2, 0, 3, 6, 1),
           ],
           match_results: [],
           votes: [],
@@ -399,7 +478,7 @@ describe('lib/badges computeBadges', () => {
           attendance.push({ season_id: 6, week: w, player_id: 'P001' });
           melee_tournaments.push({ season_id: 6, round: w, phase: 'regular' });
         }
-        const db = createMockDb({ attendance, melee_tournaments, season_standings: [], match_results: [], votes: [], awards: [] });
+        const db = createBadgeDb({ attendance, melee_tournaments, season_standings: [], match_results: [], votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'attendance');
         assert.equal(b.value, 10);
@@ -415,7 +494,7 @@ describe('lib/badges computeBadges', () => {
           melee_tournaments.push({ season_id: 5, round: w, phase: 'regular' });
           melee_tournaments.push({ season_id: 6, round: w, phase: 'regular' });
         }
-        const db = createMockDb({ attendance, melee_tournaments, season_standings: [], match_results: [], votes: [], awards: [] });
+        const db = createBadgeDb({ attendance, melee_tournaments, season_standings: [], match_results: [], votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'attendance');
         assert.equal(b.value, 10);
@@ -425,7 +504,7 @@ describe('lib/badges computeBadges', () => {
 
     describe('Leader Variety', () => {
       it('bronze at 3 distinct leaders', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [],
           season_standings: [],
           match_results: [],
@@ -449,7 +528,7 @@ describe('lib/badges computeBadges', () => {
         for (let i = 1; i <= 5; i++) {
           matches.push(matchRow('P001', 'P002', 'P001', 'Alice won 2-0-0', { round: i }));
         }
-        const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes: [], awards: [] });
+        const db = createBadgeDb({ attendance: [], season_standings: [], match_results: matches, votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'sweepMaster');
         assert.equal(b.value, 5);
@@ -461,7 +540,7 @@ describe('lib/badges computeBadges', () => {
         for (let i = 1; i <= 5; i++) {
           matches.push(matchRow('P001', 'P002', 'P001', 'Alice won 2-1-0', { round: i }));
         }
-        const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes: [], awards: [] });
+        const db = createBadgeDb({ attendance: [], season_standings: [], match_results: matches, votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'sweepMaster');
         assert.equal(b.value, 0);
@@ -472,7 +551,7 @@ describe('lib/badges computeBadges', () => {
         const matches = [
           { season_id: 6, round: 1, player1_id: 'P001', player2_id: null, winner_id: 'P001', result: null, is_bye: 1 },
         ];
-        const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes: [], awards: [] });
+        const db = createBadgeDb({ attendance: [], season_standings: [], match_results: matches, votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'sweepMaster');
         assert.equal(b.value, 0);
@@ -490,7 +569,7 @@ describe('lib/badges computeBadges', () => {
             votes.push({ season_id: 6, week: i * 3 + w + 1, player_id: 'P001', leader_id: leaders[i] });
           }
         }
-        const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
+        const db = createBadgeDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'deckMaster');
         assert.equal(b.earned, true);
@@ -504,7 +583,7 @@ describe('lib/badges computeBadges', () => {
           matches.push(matchRow('P001', 'P002', 'P001', 'Alice won 2-0-0', { season_id: 6, round: i + 1 }));
           votes.push({ season_id: 6, week: i + 1, player_id: 'P001', leader_id: leaders[i] });
         }
-        const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
+        const db = createBadgeDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'deckMaster');
         assert.equal(b.earned, false);
@@ -521,7 +600,7 @@ describe('lib/badges computeBadges', () => {
             votes.push({ season_id: 6, week: i * 3 + w + 1, player_id: 'P001', leader_id: leaders[i] });
           }
         }
-        const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
+        const db = createBadgeDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'deckMaster');
         assert.equal(b.earned, false);
@@ -542,7 +621,7 @@ describe('lib/badges computeBadges', () => {
             votes.push({ season_id: 6, week: i * 3 + w + 1, player_id: 'P001', leader_id: 'L' + (i + 4) });
           }
         }
-        const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
+        const db = createBadgeDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'deckMaster');
         assert.equal(b.earned, false);
@@ -558,7 +637,7 @@ describe('lib/badges computeBadges', () => {
             votes.push({ season_id: 6, week: i * 3 + w + 1, player_id: 'P001', leader_id: leaders[i] });
           }
         }
-        const db = createMockDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
+        const db = createBadgeDb({ attendance: [], season_standings: [], match_results: matches, votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'deckMaster');
         assert.equal(b.earned, false);
@@ -571,7 +650,7 @@ describe('lib/badges computeBadges', () => {
         for (let i = 1; i <= 5; i++) {
           votes.push({ season_id: 6, week: i, player_id: 'P001', leader_id: 'L1' });
         }
-        const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes, awards: [] });
+        const db = createBadgeDb({ attendance: [], season_standings: [], match_results: [], votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'voter');
         assert.equal(b.value, 5);
@@ -583,7 +662,7 @@ describe('lib/badges computeBadges', () => {
         for (let i = 1; i <= 10; i++) {
           votes.push({ season_id: 6, week: i, player_id: 'P001', leader_id: 'L1' });
         }
-        const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes, awards: [] });
+        const db = createBadgeDb({ attendance: [], season_standings: [], match_results: [], votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'voter');
         assert.equal(b.value, 10);
@@ -595,7 +674,7 @@ describe('lib/badges computeBadges', () => {
         for (let i = 1; i <= 20; i++) {
           votes.push({ season_id: 6, week: i, player_id: 'P001', leader_id: 'L1' });
         }
-        const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes, awards: [] });
+        const db = createBadgeDb({ attendance: [], season_standings: [], match_results: [], votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'voter');
         assert.equal(b.value, 20);
@@ -603,7 +682,7 @@ describe('lib/badges computeBadges', () => {
       });
 
       it('not earned with 0 votes', async () => {
-        const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes: [], awards: [] });
+        const db = createBadgeDb({ attendance: [], season_standings: [], match_results: [], votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'voter');
         assert.equal(b.earned, false);
@@ -618,7 +697,7 @@ describe('lib/badges computeBadges', () => {
         for (let i = 1; i <= 3; i++) {
           votes.push({ season_id: 6, week: i, player_id: 'P001', leader_id: 'L2' });
         }
-        const db = createMockDb({ attendance: [], season_standings: [], match_results: [], votes, awards: [] });
+        const db = createBadgeDb({ attendance: [], season_standings: [], match_results: [], votes, awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'voter');
         assert.equal(b.value, 6);
@@ -646,7 +725,7 @@ describe('lib/badges computeBadges', () => {
 
     describe('Phase filtering', () => {
       it('attendance for cut/side events does not count toward First Night', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [{ season_id: 6, week: 12, player_id: 'P001' }],
           melee_tournaments: [
             { season_id: 6, round: 12, phase: 'cut' },
@@ -668,7 +747,7 @@ describe('lib/badges computeBadges', () => {
           attendance.push({ season_id: 6, week: w, player_id: 'P001' });
           melee_tournaments.push({ season_id: 6, round: w, phase: 'cut' });
         }
-        const db = createMockDb({ attendance, melee_tournaments, season_standings: [], match_results: [], votes: [], awards: [] });
+        const db = createBadgeDb({ attendance, melee_tournaments, season_standings: [], match_results: [], votes: [], awards: [] });
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'attendance');
         assert.equal(b.value, 0);
@@ -676,7 +755,7 @@ describe('lib/badges computeBadges', () => {
       });
 
       it('only regular-phase attendance counts toward Loyalist', async () => {
-        const db = createMockDb({
+        const db = createBadgeDb({
           attendance: [
             { season_id: 4, week: 1, player_id: 'P001' },
             { season_id: 5, week: 1, player_id: 'P001' },
@@ -695,6 +774,99 @@ describe('lib/badges computeBadges', () => {
         const badges = await computeBadges(db, 'P001');
         const b = badges.find(x => x.id === 'loyalist');
         assert.equal(b.earned, false, 'cut event in season 6 should not count as a regular season');
+      });
+
+      it('cut/side standings do not earn Conqueror, Night Wins, or Clean Sheet', async () => {
+        const db = createBadgeDb({
+          attendance: [],
+          melee_tournaments: [
+            { season_id: 6, round: 1, phase: 'regular' },
+            { season_id: 6, round: 12, phase: 'cut' },
+          ],
+          season_standings: [
+            standingsRow('P001', 2, 2, 0, 2, 6, 1),
+            standingsRow('P002', 2, 2, 0, 3, 6, 1),
+            standingsRow('P001', 4, 0, 0, 1, 6, 12),
+          ],
+          match_results: [],
+          votes: [],
+          awards: [],
+        });
+        const badges = await computeBadges(db, 'P001');
+        assert.equal(badges.find(b => b.id === 'nightChampion').earned, false, 'side/cut 1st place is not a Conqueror');
+        assert.equal(badges.find(b => b.id === 'nightWins').value, 2, 'only regular wins count');
+        assert.equal(badges.find(b => b.id === 'cleanSheet').value, 0, 'a cut clean sheet is not a badge night');
+      });
+
+      it('cut/side matches do not earn Sweep Master or Giant Slayer', async () => {
+        const cutWins = [];
+        for (let i = 2; i <= 6; i++) {
+          cutWins.push({
+            season_id: 6, round: 12, melee_match_id: i,
+            player1_id: 'P001', player2_id: `P00${i}`, winner_id: 'P001', result: '2-0', is_bye: 0,
+          });
+        }
+        const db = createBadgeDb({
+          attendance: [],
+          melee_tournaments: [
+            { season_id: 6, round: 1, phase: 'regular' },
+            { season_id: 6, round: 12, phase: 'side' },
+          ],
+          season_standings: [],
+          match_results: cutWins,
+          votes: [],
+          awards: [{ season_id: 5, award_name: 'Galactic Ruler', player_id: 'P002' }],
+        });
+        const badges = await computeBadges(db, 'P001');
+        assert.equal(badges.find(b => b.id === 'sweepMaster').value, 0, '2-0 wins on a side night are not sweeps');
+        assert.equal(badges.find(b => b.id === 'giantSlayer').earned, false, 'beating a Ruler on a side night does not count');
+      });
+
+      it('a night with no tournament row keeps its badge credit', async () => {
+        const db = createMockDb({
+          attendance: [],
+          melee_tournaments: [],
+          season_standings: [
+            standingsRow('P001', 4, 0, 0, 1, 6, 1),
+            standingsRow('P002', 2, 2, 0, 2, 6, 1),
+          ],
+          match_results: [],
+          votes: [],
+          awards: [],
+          sessions: [],
+          settings: [],
+        });
+        const badges = await computeBadges(db, 'P001');
+        assert.equal(badges.find(b => b.id === 'nightWins').value, 4, 'unclassified night defaults to regular');
+        assert.equal(badges.find(b => b.id === 'nightChampion').earned, true);
+        assert.equal(badges.find(b => b.id === 'cleanSheet').value, 1);
+      });
+
+      it('cut/side matches do not earn Deck Master', async () => {
+        const matches = [{ season_id: 6, round: 1, melee_match_id: 1, player1_id: 'P001', player2_id: 'P009', winner_id: 'P001', result: '2-1', is_bye: 0 }];
+        const votes = [{ season_id: 6, week: 1, player_id: 'P001', leader_id: 'L001' }];
+        for (let l = 1; l <= 5; l++) {
+          votes.push({ season_id: 6, week: 12, player_id: 'P001', leader_id: `L10${l}` });
+          for (let i = 0; i < 3; i++) {
+            matches.push({
+              season_id: 6, round: 12, melee_match_id: l * 10 + i,
+              player1_id: 'P001', player2_id: `P1${l}${i}`, winner_id: 'P001', result: '2-1', is_bye: 0,
+            });
+          }
+        }
+        const db = createBadgeDb({
+          attendance: [],
+          melee_tournaments: [
+            { season_id: 6, round: 1, phase: 'regular' },
+            { season_id: 6, round: 12, phase: 'cut' },
+          ],
+          season_standings: [],
+          match_results: matches,
+          votes,
+          awards: [],
+        });
+        const badges = await computeBadges(db, 'P001');
+        assert.equal(badges.find(b => b.id === 'deckMaster').earned, false, 'leader wins on a cut night do not count');
       });
     });
   });

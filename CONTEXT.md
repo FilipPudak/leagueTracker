@@ -137,7 +137,7 @@ ignored).
 |---|---|
 | **Night result** | A player's final standing in one regular tournament: match W/D/L (a "match" = one BO3 set), night points = 3W + D, rank. **A bye counts as a win** — this is how the league's official regular standings treat byes. |
 | **Scoring** | Win = 3 points, Draw = 1 point, Loss = 0 points. Night points = 3W + D. |
-| **Season table** | Derived, not stored: for each player, the **sum of their best `top_results` night results** (by night points; a tie at the boundary keeps the earlier night), then Played/Won/Drawn/Lost totals, Points = 3W + D. Ranks: points desc → undefeated-nights count → sum of night ranks (lower better) → **shared rank** if still tied. |
+| **Season table** | Derived, not stored: for each player, the **sum of their best `top_results` night results** (by night points; a tie at the boundary keeps the earlier night), then Played/Won/Drawn/Lost totals, Points = 3W + D. Ranks: points desc → undefeated-nights count → sum of night ranks (lower better) → **shared rank** if still tied. An undefeated night = played every round of that night and won them all (byes count as wins). |
 | **Match result** | One BO3 set between two players: winner = higher `GameWins`; equal game wins ⇒ **draw** (`winner_id` NULL, result string kept). Byes are recorded (`is_bye=1`) but are never a "win against a person". |
 | **Attendance** | A player **attended week N** iff they appear in week N's regular standings. Regular nights only — cut/side attendance is not tracked. |
 
@@ -176,7 +176,7 @@ actual award winner; the podium shows the full top 3 for context.
 
 | Award | Definition | Tie-break |
 |---|---|---|
-| **Galactic Ruler** | #1 on the season table after the final **regular** week. Podium displays top 3; only rank=1 is the award winner. | points → undefeated-night count → night-rank sum → shared |
+| **Galactic Ruler** | #1 on the season table after the final **regular** week. Podium displays top 3; only rank=1 is the award winner. | points → undefeated-night count (full night, all wins, byes count) → night-rank sum → shared |
 | **Galactic Champion** | Rank 1 of the chronologically last **cut** event of the season (the bracket winner — may differ from Ruler; e.g. S6: Champion ≠ Ruler) | impossible (bracket rank is strict); if a season has no cut data, no row |
 | **Galactic Schemer** | Most distinct leaders played (from votes) | share podium |
 | **Galactic Ambassador** | Most favorite-opponent votes received | share podium |
@@ -272,6 +272,13 @@ participation ranking.
   rank/points/W-D-L taken from the derived best-X row as-of the viewing point — never raw
   all-night sums, never cut/side rows. Cut results are browsable only in Night Results (labeled
   pills) and appear in the modal solely via the Galactic Champion award entry.
+- **Badges and the career record are regular-season only:** every night-scoped badge (Night Wins,
+  Conqueror, Clean Sheet, Sweep Master, Deck Master, Giant Slayer, Attendance, Loyalist, First
+  Night) reads regular tournaments; cut/side nights feed none. The career record (nights, W-D-L,
+  game diff, avg pts/night, undefeated nights) also excludes cut/side, so tiles reconcile with
+  badges. Cut/side history lives only in My Stats' **Finals & Side Events** card (nights, matches,
+  W-D-L, win %, best finish), which is hidden for players without finals nights and is not part
+  of the public profile payload.
 
 ## 12. Settings Glossary (D1 `settings`)
 

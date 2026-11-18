@@ -94,6 +94,13 @@ export async function getMaxSeasonId(db) {
   return row ? row.max_id || 0 : 0;
 }
 
+export async function getAllStandings(db) {
+  const result = await db.prepare(
+    'SELECT season_id, round, player_id, wins, losses, draws, rank FROM season_standings'
+  ).all();
+  return result.results || [];
+}
+
 // Award helpers
 export async function getAwardsForSeason(db, seasonId) {
   return db.prepare(

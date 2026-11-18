@@ -206,18 +206,26 @@ async function resolveNewHope(DB, awardsMap, ctx) {
 
   // Final: derived season table (best-X)
   const finalRound = resolveLiveRound(seasonEnded, seasonLength, votingOpen, currentWeek);
+  const regularRounds = await DB.prepare(
+    'SELECT DISTINCT round FROM melee_tournaments WHERE season_id = ? AND phase = ?'
+  ).bind(seasonId, PHASE.REGULAR).all();
+  const regularRoundSet = new Set((regularRounds.results || []).map(r => r.round));
+  const isRegularNight = s => regularRoundSet.size === 0 || regularRoundSet.has(s.round);
+
   const allStandings = await DB.prepare(
     'SELECT round, player_id, wins, losses, draws, match_points, rank FROM season_standings WHERE season_id = ? AND round <= ?'
   ).bind(seasonId, finalRound).all();
 
-  const nights = (allStandings.results || []).map(s => ({
-    playerId: s.player_id,
-    round: s.round,
-    wins: s.wins || 0,
-    draws: s.draws || 0,
-    losses: s.losses || 0,
-    rank: s.rank,
-  }));
+  const nights = (allStandings.results || [])
+    .filter(isRegularNight)
+    .map(s => ({
+      playerId: s.player_id,
+      round: s.round,
+      wins: s.wins || 0,
+      draws: s.draws || 0,
+      losses: s.losses || 0,
+      rank: s.rank,
+    }));
 
   const seasonTable = computeSeasonTable(nights, topResults);
   const finalRankMap = new Map(seasonTable.map(r => [r.playerId, r.rank]));
