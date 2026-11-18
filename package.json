@@ -8,7 +8,8 @@
     "lint:js": "eslint .",
     "lint:css": "stylelint \"docs/**/*.css\"",
     "lint:html": "html-validate docs",
-    "lint:fix": "eslint . --fix && stylelint \"docs/**/*.css\" --fix"
+    "lint:fix": "eslint . --fix && stylelint \"docs/**/*.css\" --fix",
+    "recap": "node tools/recap/build.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

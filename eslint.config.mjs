@@ -43,6 +43,15 @@ export default [
     rules: smellRules
   },
   {
+    files: ["tools/**/*.mjs"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: { ...globals.node }
+    },
+    rules: smellRules
+  },
+  {
     files: ["docs/app/**/*.js"],
     languageOptions: {
       ecmaVersion: "latest",
