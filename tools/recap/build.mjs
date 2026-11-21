@@ -7,7 +7,6 @@ import { fileURLToPath } from 'node:url';
 import { isVotingOpen, parseSeasonId } from '../../backend/src/db/queries.js';
 import { renderRecap } from './layout.mjs';
 import {
-  ASPECTS,
   aspectBreakdown,
   awardLeaders,
   buildSeasonTable,
@@ -99,7 +98,7 @@ function usage() {
     '  --out <dir>              output directory (default: .opencode/preview)',
     '  --no-shot                write HTML only, skip the PNG screenshot',
     '  --qr                     add the footer QR and its scan hint (off by default)',
-    '  --min-picks <n>          minimum leader picks for the win-rate card (default 4)',
+    '  --min-picks <n>          minimum votes for the win-rate card (default 4)',
     '  --top-leaders <n>        rows in the most-played card (default 5)',
     '  --championship-date <d>  championship night label, e.g. "Dec 9" (default: cut phase date)',
     '  --reveal-ambassador      show the real Ambassador name even while voting is live (internal only)',
@@ -145,6 +144,10 @@ function record(row) {
 
 function joinNames(playerIds, names) {
   return playerIds.map((id) => names.get(id) || id).join(' \u00b7 ');
+}
+
+function leaderLabel(row) {
+  return row.set ? `${row.name} - ${row.set}` : row.name;
 }
 
 function awardsBlock(awards, names, ruler, boardSize, championshipDate, liveMask) {
@@ -216,6 +219,11 @@ function buildModel(data, opts) {
   const table = buildSeasonTable(regular, players, season.top_results);
   const picks = leaderPicks(votes);
   const aspects = aspectBreakdown(picks);
+  if (aspects.unpaired.heroism || aspects.unpaired.villainy) {
+    console.warn(
+      `warning: ${aspects.unpaired.heroism} heroism and ${aspects.unpaired.villainy} villainy vote(s) have no second (sphere) aspect — they count in the alignment bar but not in its combo row`,
+    );
+  }
   const performance = leaderPerformance(votes, regular);
   const matchedVotes = performance.reduce((sum, row) => sum + row.picks, 0);
   if (votes.length && matchedVotes < votes.length) {
@@ -245,7 +253,7 @@ function buildModel(data, opts) {
   });
 
   const mostPlayed = picks.slice(0, opts.topLeaders).map((pick) => ({
-    name: pick.name,
+    name: leaderLabel(pick),
     aspects: pick.aspects,
     value: pick.count,
     display: pick.count,
@@ -254,17 +262,23 @@ function buildModel(data, opts) {
     .filter((row) => row.picks >= opts.minPicks)
     .slice(0, opts.topLeaders)
     .map((row, index) => ({
-      name: row.name,
+      name: leaderLabel(row),
       aspects: row.aspects,
-      value: Math.round(row.winRate * 100),
-      display: `${Math.round(row.winRate * 100)}%`,
+      value: Math.round(row.rate * 100),
+      display: `${Math.round(row.rate * 100)}%`,
       accent: index < 3 ? 'gold' : '',
     }));
 
-  const slotLine = ASPECTS.slice()
-    .sort((a, b) => aspects.slots[b] - aspects.slots[a])
-    .map((aspect) => `${aspect} ${aspects.slots[aspect]}`)
-    .join(' \u00b7 ');
+  const comboRows = [
+    { label: 'Heroism', total: aspects.heroism, counts: aspects.combos.heroism },
+    { label: 'Villainy', total: aspects.villainy, counts: aspects.combos.villainy },
+  ].map((row) => ({
+    label: row.label,
+    total: row.total,
+    segments: Object.entries(row.counts)
+      .map(([aspect, count]) => ({ aspect, count, share: row.total ? count / row.total : 0 }))
+      .sort((a, b) => b.count - a.count || a.aspect.localeCompare(b.aspect)),
+  }));
   const setLine = Object.entries(aspects.sets)
     .sort((a, b) => b[1] - a[1])
     .map(([set, count]) => `${set} ${count}`)
@@ -282,7 +296,7 @@ function buildModel(data, opts) {
       { value: matchTotal(regular), label: 'Matches' },
       { value: (appearances / Math.max(nightCounts.length, 1)).toFixed(1), label: 'Players / night' },
       { value: picks.length, label: 'Leaders' },
-      { value: aspects.total, label: 'Leader picks' },
+      { value: aspects.total, label: 'Votes' },
     ],
     finalHead: 'Championship Night',
     finalSub: `Top ${boardSize} final &amp; Best of the Rest \u00b7 ${championshipDate}`,
@@ -311,16 +325,18 @@ function buildModel(data, opts) {
     },
     bestPerforming: {
       head: 'Best-performing leaders',
-      note: `Win rate \u00b7 min ${opts.minPicks} picks`,
+      note: `Win rate \u00b7 min ${opts.minPicks} votes`,
       rows: bestPerforming,
     },
     aspects: {
-      head: 'Leader aspect split',
+      head: 'Aspects played',
+      note: 'bars by votes \u00b7 leaders by printings',
       heroism: aspects.heroism,
       villainy: aspects.villainy,
       neither: aspects.neither,
       total: aspects.total,
-      slotLine,
+      combos: comboRows,
+      leaderLine: `Heroism ${aspects.leaders.heroism} \u00b7 Villainy ${aspects.leaders.villainy} \u00b7 Neither ${aspects.leaders.neither}`,
       setLine,
     },
     foot: {

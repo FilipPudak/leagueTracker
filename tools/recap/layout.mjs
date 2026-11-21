@@ -84,25 +84,54 @@ function nightsChart(nights) {
       </div>`;
 }
 
-function aspectBars(aspects) {
+function comboRow(row, assets) {
+  const segments = row.segments
+    .filter((segment) => segment.count > 0)
+    .map((segment) => {
+      if (segment.share < 0.04) {
+        return `<div class="cseg tiny" data-aspect="${segment.aspect}" style="width:${pct(segment.count, row.total)}"></div>`;
+      }
+      const badge = `<img src="${assets}/img/swu/SWH_Aspects_${segment.aspect}.png" alt="${segment.aspect}">`;
+      return `<div class="cseg" data-aspect="${segment.aspect}" style="width:${pct(segment.count, row.total)}">${badge}<span>${segment.count}</span></div>`;
+    })
+    .join('');
+  return `<div class="crow ${row.label.toLowerCase()}">
+        <span class="clab">${esc(row.label)}</span>
+        <div class="cbar">${segments}</div>
+      </div>`;
+}
+
+function aspectBars(aspects, assets) {
   const heroismWidth = pct(aspects.heroism, aspects.total);
   const villainyWidth = pct(aspects.villainy, aspects.total);
-  const villainyLabel = `${Math.max(11, Math.min(89, parseFloat(heroismWidth) || 0))}%`;
+  const neitherWidth = pct(aspects.neither, aspects.total);
+  const heroismPct = aspects.total ? (aspects.heroism / aspects.total) * 100 : 0;
+  const neitherPct = aspects.total ? (aspects.neither / aspects.total) * 100 : 0;
   const neitherSeg = aspects.neither
-    ? `<div class="seg n0" style="width:${pct(aspects.neither, aspects.total)}">${aspects.neither}</div>`
+    ? `<div class="seg n0" style="width:${neitherWidth}">${aspects.neither}</div>`
     : '';
+  const villainyLabel =
+    aspects.villainy && heroismPct + neitherPct < 80
+      ? `<span class="b" style="left:${Math.max(11, Math.min(89, heroismPct))}%">Villainy</span>`
+      : '';
   const neitherLabel = aspects.neither ? '<span class="c">Neither</span>' : '';
-  return `<div class="split">
+  const bars = aspects.total
+    ? `<div class="split">
       <div class="seg h" style="width:${heroismWidth}">${aspects.heroism}</div>
       <div class="seg v" style="width:${villainyWidth}">${aspects.villainy}</div>
       ${neitherSeg}
     </div>
     <div class="legend">
-      <span class="a">Heroism</span><span class="b" style="left:${villainyLabel}">Villainy</span>${neitherLabel}
+      <span class="a">Heroism</span>${villainyLabel}${neitherLabel}
+    </div>`
+    : '';
+  return `${bars}
+    <div class="combos">
+      ${aspects.total ? aspects.combos.filter((row) => row.total > 0).map((row) => comboRow(row, assets)).join('\n      ') : ''}
     </div>
     <div class="lines">
-      <div>Aspect slots: <b>${aspects.slotLine}</b></div>
-      <div>Sets: <b>${aspects.setLine}</b></div>
+      <div>Leaders used: <b>${esc(aspects.leaderLine)}</b></div>
+      ${aspects.setLine ? `<div>Sets: <b>${esc(aspects.setLine)}</b></div>` : ''}
     </div>`;
 }
 
@@ -117,7 +146,7 @@ export function renderRecap(model, assets) {
 <meta charset="utf-8">
 <title>${esc(model.title)}</title>
 <style>
-${CSS}</style>
+${CSS.replaceAll('__ASSETS__', assets)}</style>
 </head>
 <body${model.foot.qr ? ' class="with-qr"' : ''}>
   <div class="layer">
@@ -172,8 +201,9 @@ ${CSS}</style>
   <div class="card aspects layer">
     <div class="head">
       <h3>${esc(model.aspects.head)}</h3>
+      <em>${esc(model.aspects.note)}</em>
     </div>
-    ${aspectBars(model.aspects)}
+    ${aspectBars(model.aspects, assets)}
   </div>
 
   <div class="foot layer">
@@ -182,7 +212,7 @@ ${CSS}</style>
       ${model.foot.qr ? `<span class="hint">Scan for the full results</span>` : ''}
       <span class="url">${esc(model.foot.url)}</span>
     </div>
-    ${model.foot.qr ? `<div class="qr">${qrSvg(model.foot.qr, { size: 168 })}</div>` : ''}
+    ${model.foot.qr ? `<div class="qr">${qrSvg(model.foot.qr, { size: 144 })}</div>` : ''}
   </div>
 </body>
 </html>

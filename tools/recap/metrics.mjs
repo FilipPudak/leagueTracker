@@ -1,6 +1,7 @@
 import { computeSeasonTable } from '../../backend/src/lib/seasonTable.js';
 
-export const ASPECTS = ['Aggression', 'Command', 'Cunning', 'Vigilance', 'Heroism', 'Villainy'];
+const ASPECTS = ['Aggression', 'Command', 'Cunning', 'Vigilance', 'Heroism', 'Villainy'];
+const SPHERES = ['Aggression', 'Command', 'Cunning', 'Vigilance'];
 
 export function parseAspects(raw) {
   const list = Array.isArray(raw) ? raw : String(raw || '').split(',');
@@ -38,32 +39,47 @@ export function leaderPicks(votes) {
 }
 
 export function aspectBreakdown(picks) {
-  const slots = Object.fromEntries(ASPECTS.map((a) => [a, 0]));
   const sets = {};
-  const outsiders = new Map();
   let heroism = 0;
   let villainy = 0;
   let neither = 0;
+  const leaders = { heroism: 0, villainy: 0, neither: 0 };
+  const combos = {
+    heroism: Object.fromEntries(SPHERES.map((a) => [a, 0])),
+    villainy: Object.fromEntries(SPHERES.map((a) => [a, 0])),
+  };
+  const unpaired = { heroism: 0, villainy: 0 };
   for (const pick of picks) {
-    for (const aspect of pick.aspects) slots[aspect] += pick.count;
     const hasHeroism = pick.aspects.includes('Heroism');
     const hasVillainy = pick.aspects.includes('Villainy');
-    if (hasHeroism) heroism += pick.count;
-    if (hasVillainy) villainy += pick.count;
+    const sphere = pick.aspects.find((a) => SPHERES.includes(a));
+    const paired = Boolean(sphere) && hasHeroism !== hasVillainy;
+    if (hasHeroism) {
+      heroism += pick.count;
+      leaders.heroism += 1;
+      if (paired) combos.heroism[sphere] += pick.count;
+      else unpaired.heroism += pick.count;
+    }
+    if (hasVillainy) {
+      villainy += pick.count;
+      leaders.villainy += 1;
+      if (paired) combos.villainy[sphere] += pick.count;
+      else unpaired.villainy += pick.count;
+    }
     if (!hasHeroism && !hasVillainy) {
-      const label = `${pick.name} (${pick.set})`;
       neither += pick.count;
-      outsiders.set(label, (outsiders.get(label) || 0) + pick.count);
+      leaders.neither += 1;
     }
     sets[pick.set] = (sets[pick.set] || 0) + pick.count;
   }
   return {
-    slots,
     sets,
     heroism,
     villainy,
     neither,
-    outsiders: [...outsiders.entries()].map(([label, count]) => ({ label, count })),
+    leaders,
+    combos,
+    unpaired,
     total: picks.reduce((sum, pick) => sum + pick.count, 0),
   };
 }
@@ -93,9 +109,10 @@ export function leaderPerformance(votes, standings) {
   return [...byLeader.values()]
     .map((agg) => {
       const matches = agg.won + agg.drawn + agg.lost;
-      return { ...agg, matches, winRate: matches ? agg.won / matches : 0 };
+      const points = 3 * agg.won + agg.drawn;
+      return { ...agg, matches, points, rate: matches ? points / (3 * matches) : 0 };
     })
-    .sort((a, b) => b.winRate - a.winRate || b.picks - a.picks || a.name.localeCompare(b.name));
+    .sort((a, b) => b.rate - a.rate || b.picks - a.picks || a.name.localeCompare(b.name));
 }
 
 export function awardLeaders(rows, name) {
