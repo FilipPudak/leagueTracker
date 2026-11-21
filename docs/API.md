@@ -52,7 +52,7 @@ No valid session → `401`.
 | `submitVote` | `voteData: { leaderId, opponentId }` | Submits this week's vote. Validates: voting open, not paused, no duplicate, no self-vote, opponent faced that week. Increments raffle ticket. |
 | `updateVote` | `voteData: { leaderId, opponentId }` | Replaces both choices for the current week. `404` if no prior vote (use `submitVote`). |
 | `unlinkAccount` | — | Deletes the session for this (player, device) pair only. Other devices untouched. |
-| `getMySeasonStats` | `seasonId?` | Linked player's private season stats: tickets, streaks, badges, leader win-rates, voting-milestone and 80%-rule progress, awards. |
+| `getMySeasonStats` | `seasonId?` | Linked player's private, per-season payload: voting milestones (4-vote bar, 80%-rule progress, raffle tickets, streaks) for the Vote tab plus a `season` section deep-equal to `getPlayerProfile`'s (rank, points, nights, W-D-L, leaders, awards) for My Stats. Career badges live only on `getMyCareerStats`; `awardsWon` stays `string[]` for old cached frontends. |
 | `getMyCareerStats` | — | Linked player's private career: regular-season record, rivalry, season progression, badges, and `finals` (`{ nights, matches: { played, wins, draws, losses }, winPct, bestFinish }` over cut/side nights only). |
 | `requestRename` | `newMeleeName` (required) | Declares a Melee username change. Validates format, rejects a name held by another email-bearing player. A second submission while one is pending **overwrites** that row (`updated: true`, fresh `requested_at`) so a typo never locks the member out. Stores the `pending` row (+ best-effort `melee_hint`) and notifies the admin webhook ("Rename request updated" on overwrite). Label follows the row until approved. |
 

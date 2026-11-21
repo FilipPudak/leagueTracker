@@ -7,10 +7,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Star Wars Unlimited League Stockholm</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="stylesheet" href="styles.css?v=4.22.0">
+  <link rel="stylesheet" href="styles.css?v=4.23.0">
 </head>
 <body>
-  <script src="boot.js?v=4.22.0"></script>
+  <script src="boot.js?v=4.23.0"></script>
   <div class="app-container">
     <div class="header">
       <div class="header-content">
@@ -91,6 +91,30 @@
 
       <div id="weekly-participation-card" class="card card-note" style="display: none; margin-top: 12px;">
         <span id="weekly-participation-text"></span>
+      </div>
+
+      <div id="vote-milestones-section" style="margin-top: 16px; display: none;">
+        <h3 class="section-heading">Voting Milestones</h3>
+        <div class="form-group">
+          <label for="vote-milestones-season-filter">Season</label>
+          <select id="vote-milestones-season-filter" data-season-sync="true"></select>
+        </div>
+        <div id="vote-milestones-context" style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 8px;"></div>
+        <div id="vote-milestone-container" class="card card-tight">
+          <div style="background: #1e293b; border-radius: 6px; height: 12px; overflow: hidden; margin-bottom: 10px;">
+            <div id="milestone-bar" style="background: linear-gradient(90deg, #38bdf8, #22d3ee); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 6px;"></div>
+          </div>
+          <div id="milestone-text" style="font-size: 0.9rem; color: #f8fafc; font-weight: 600;"></div>
+          <div id="milestone-reward" style="font-size: 0.8rem; color: #94a3b8; margin-top: 6px;"></div>
+        </div>
+        <div id="compliance-container" class="card card-tight" style="margin-top: 12px; display: none;">
+          <div style="background: #1e293b; border-radius: 6px; height: 12px; overflow: hidden; margin-bottom: 10px;">
+            <div id="compliance-bar" style="background: linear-gradient(90deg, #38bdf8, #22d3ee); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 6px;"></div>
+          </div>
+          <div id="compliance-text" style="font-size: 0.9rem; color: #f8fafc; font-weight: 600;"></div>
+          <div id="compliance-reward" style="font-size: 0.8rem; color: #94a3b8; margin-top: 6px;"></div>
+        </div>
+        <div id="vote-milestones-container" class="card" style="margin-top: 12px; padding: 12px; line-height: 1.7;"></div>
       </div>
     </div>
 
@@ -260,40 +284,7 @@
           <select id="myseason-season-filter" data-season-sync="true"></select>
         </div>
 
-        <div id="myseason-content" style="display: none;">
-          <div id="myseason-gamification-section" style="margin-top: 0; display: none;">
-            <h3 class="section-heading">Voting Milestones</h3>
-            <div id="myseason-milestone-container" class="card card-tight">
-              <div style="background: #1e293b; border-radius: 6px; height: 12px; overflow: hidden; margin-bottom: 10px;">
-                <div id="milestone-bar" style="background: linear-gradient(90deg, #38bdf8, #22d3ee); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 6px;"></div>
-              </div>
-              <div id="milestone-text" style="font-size: 0.9rem; color: #f8fafc; font-weight: 600;"></div>
-              <div id="milestone-reward" style="font-size: 0.8rem; color: #94a3b8; margin-top: 6px;"></div>
-            </div>
-
-            <div id="compliance-container" class="card card-tight" style="margin-top: 12px; display: none;">
-              <div style="background: #1e293b; border-radius: 6px; height: 12px; overflow: hidden; margin-bottom: 10px;">
-                <div id="compliance-bar" style="background: linear-gradient(90deg, #38bdf8, #22d3ee); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 6px;"></div>
-              </div>
-              <div id="compliance-text" style="font-size: 0.9rem; color: #f8fafc; font-weight: 600;"></div>
-              <div id="compliance-reward" style="font-size: 0.8rem; color: #94a3b8; margin-top: 6px;"></div>
-            </div>
-
-            <div style="margin-top: 12px;">
-              <div id="myseason-gamification-container" class="card" style="padding: 12px; line-height: 1.7;"></div>
-            </div>
-          </div>
-
-          <div id="myseason-awards-section" style="margin-top: 16px; display: none;">
-            <h3 class="section-heading">Awards Won</h3>
-            <div id="myseason-awards-container"></div>
-          </div>
-
-          <div style="margin-top: 16px;">
-            <h3 class="section-heading">Leaders Played</h3>
-            <div class="card card-tight"><div id="myseason-leaders-container"></div></div>
-          </div>
-        </div>
+        <div id="myseason-season-container"></div>
       </details>
     </div>
     </div><!-- /col-left -->
@@ -380,7 +371,7 @@
     </div>
   </div>
 
-  <script src="app-core.js?v=4.22.0"></script>
-<script src="app.js?v=4.22.0"></script>
+  <script src="app-core.js?v=4.23.0"></script>
+<script src="app.js?v=4.23.0"></script>
 </body>
 </html>

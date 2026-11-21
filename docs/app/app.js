@@ -18,7 +18,7 @@ const KEY_BROWSING_SEASON = 'lt_browsingSeason';
 
 // Semantic version of the client build. Bump at every deployment so the deployed
 // version is visible in the footer (avoids debugging a stale cache).
-const APP_VERSION = '4.22.0';
+const APP_VERSION = '4.23.0';
 
 const appState = {
   status: 'unlinked',
@@ -380,7 +380,7 @@ function applyBoot(boot) {
   const defaultSeasonId = String(seasonIds.includes(storedBrowsing) ? storedBrowsing : (boot.seasonId || ''));
   appState.browsingSeasonId = defaultSeasonId;
 
-  ['season-filter', 'myseason-season-filter', 'standings-season-filter'].forEach((id) => {
+  SEASON_SELECTORS.forEach((id) => {
     const sel = $(id);
     if (!sel) return;
     sel.innerHTML = '';
@@ -449,7 +449,7 @@ function applyBoot(boot) {
     }
 
     if (window.innerWidth >= 1024 && appState.linkedPlayer) {
-      loadMySeasonStats();
+      loadPrivateStats();
       loadCareerStats();
     }
 
@@ -499,7 +499,7 @@ function showTabs(show) {
   if (tabs) tabs.style.display = show ? 'flex' : 'none';
 }
 
-const SEASON_SELECTORS = ['season-filter', 'myseason-season-filter', 'standings-season-filter', 'profile-season-filter'];
+const SEASON_SELECTORS = Array.from(document.querySelectorAll('[data-season-sync]'), (sel) => sel.id);
 
 function seasonForBrowsing() {
   return appState.browsingSeasonId || appState.activeSeasonId || appState.seasonId;
@@ -527,6 +527,11 @@ function onSeasonFilterChange(sourceId) {
       other.value = appState.browsingSeasonId;
     }
   });
+  const voteView = $('vote-view');
+  const mySeasonView = $('myseason-view');
+  const privateVisible = (voteView && voteView.classList.contains('active'))
+    || (mySeasonView && mySeasonView.classList.contains('active'));
+  if (window.innerWidth >= 1024 || privateVisible) loadPrivateStats();
 }
 
 function showLinkedPresence(player) {
@@ -794,6 +799,7 @@ function switchTab(tabId) {
         showStatus('Voting is currently closed for this week.', false);
       }
       refreshVoteTab();
+      loadPrivateStats();
     } else {
       openSignIn();
     }
@@ -819,7 +825,7 @@ function switchTab(tabId) {
       showSpinner(false);
       setActiveView('myseason-view');
       appState.lastView = 'myseason-view';
-      loadMySeasonStats();
+      loadPrivateStats();
       loadCareerStats();
     } else {
       openSignIn();
@@ -1032,8 +1038,8 @@ function submitVotes(isRetry) {
           wpCard.style.display = 'block';
         }
       }
+      loadPrivateStats();
       if (window.innerWidth >= 1024) {
-        loadMySeasonStats();
         loadCareerStats();
       }
     })
@@ -1309,40 +1315,45 @@ function renderAwardsSection(sectionId, containerId, res, field) {
 
 /* --------------------------------------------------------------- my stats -- */
 
-function loadMySeasonStats() {
-  if (!appState.linkedPlayer) return;
-  const sel = $('myseason-season-filter');
-  const selectedSeasonId = sel ? sel.value : '';
-  if (isFreshCache(appState.mystatsCache, selectedSeasonId)) {
-    renderMySeasonStats(appState.mystatsCache[selectedSeasonId].data);
-    return;
-  }
+let mySeasonRendered = null;
 
-  if (appState.mystatsInFlight && appState.mystatsInFlightSeason === selectedSeasonId) {
-    showSpinner(true, 'mystats');
+function loadPrivateStats() {
+  if (!appState.linkedPlayer) return;
+  const seasonId = seasonForBrowsing();
+  if (isFreshCache(appState.mystatsCache, seasonId, LeagueCore.PRIVATE_CACHE_TTL_MS)) {
+    const res = appState.mystatsCache[seasonId].data;
+    renderVoteMilestones(res);
+    renderMySeasonStats(res);
     return;
   }
+  if (appState.mystatsInFlight && appState.mystatsInFlightSeason === seasonId) return;
 
   const token = ++appState.mystatsToken;
   appState.mystatsInFlight = true;
-  appState.mystatsInFlightSeason = selectedSeasonId;
-  showSpinner(true, 'mystats');
+  appState.mystatsInFlightSeason = seasonId;
 
-  callApi('getMySeasonStats', { seasonId: selectedSeasonId })
+  callApi('getMySeasonStats', { seasonId })
     .then((res) => {
       if (token !== appState.mystatsToken) return;
       appState.mystatsInFlight = false;
       appState.mystatsInFlightSeason = null;
-      showSpinner(false, 'mystats');
-      appState.mystatsCache[selectedSeasonId] = { data: res, ts: Date.now() };
+      appState.mystatsCache[seasonId] = { data: res, ts: Date.now() };
+      renderVoteMilestones(res);
       renderMySeasonStats(res);
     })
     .catch((err) => {
       if (token !== appState.mystatsToken) return;
       appState.mystatsInFlight = false;
       appState.mystatsInFlightSeason = null;
-      showSpinner(false, 'mystats');
-      showStatus(err.userMessage || err.message || 'Could not load your stats.', false);
+      console.warn('Private stats load failed:', err);
+      const section = $('vote-milestones-section');
+      if (section) section.style.display = 'block';
+      const milestone = $('vote-milestone-container');
+      if (milestone) milestone.style.display = 'none';
+      const compliance = $('compliance-container');
+      if (compliance) compliance.style.display = 'none';
+      const container = $('vote-milestones-container');
+      if (container) container.textContent = 'Could not load voting milestones.';
     });
 }
 
@@ -1387,14 +1398,32 @@ function milestoneCountLabel(milestone) {
   return votes + ' of ' + milestone.target + ' votes' + (milestone.complete ? ' — Prize earned!' : '') + cast;
 }
 
-function renderMySeasonStats(res) {
-  const gamSection = $('myseason-gamification-section');
-  const gamContainer = $('myseason-gamification-container');
+function gamificationHtml(res, view, streaks, raffle) {
+  let html = '';
+  html += `<div><span style="color:#94a3b8;">Raffle tickets:</span> <strong style="color:#fbbf24;">${escapeHtml(raffle)}</strong> <span style="font-size:0.8rem; color:#64748b;">— every vote earns one ticket for the end-of-season raffle</span></div>`;
+  if (view === 'full' && (streaks.currentStreak > 0 || streaks.bestStreak > 0)) {
+    html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Streak:</span> <span style="font-size:0.85rem;">${escapeHtml(streaks.currentStreak)} current &bull; ${escapeHtml(streaks.bestStreak)} best</span></div>`;
+  } else if (view === 'summary' && streaks.bestStreak > 0) {
+    html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Streak:</span> <span style="font-size:0.85rem;">${escapeHtml(streaks.bestStreak)} best (season record)</span></div>`;
+  }
+  if (view === 'summary' && res.milestone) {
+    html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Milestone:</span> <span style="font-size:0.85rem;">${escapeHtml(milestoneCountLabel(res.milestone))}</span></div>`;
+  }
+  if (view === 'summary') html += complianceSummaryHtml(res);
+  return html;
+}
+
+function renderVoteMilestones(res) {
+  const section = $('vote-milestones-section');
+  if (!section) return;
+  const context = $('vote-milestones-context');
+  if (context) context.textContent = seasonContextLabel(seasonForBrowsing());
+  const container = $('vote-milestones-container');
   const streaks = res.streaks || {};
   const raffle = res.raffleTickets || 0;
   const view = LeagueCore.gamificationViewFor(res.isCurrentSeason !== false, res.hasVoteData !== false);
 
-  const milestoneContainer = $('myseason-milestone-container');
+  const milestoneContainer = $('vote-milestone-container');
   const milestoneBar = $('milestone-bar');
   const milestoneText = $('milestone-text');
   if (milestoneContainer) {
@@ -1416,51 +1445,25 @@ function renderMySeasonStats(res) {
 
   renderComplianceCard(res, view);
 
-  if (gamSection && gamContainer) {
+  if (container) {
     if (view === 'hidden') {
-      gamSection.style.display = 'none';
+      container.textContent = 'Voting started in Season 7 — nothing to show here';
     } else {
-      let html = '';
-      html += `<div><span style="color:#94a3b8;">Raffle tickets:</span> <strong style="color:#fbbf24;">${escapeHtml(raffle)}</strong> <span style="font-size:0.8rem; color:#64748b;">— every vote earns one ticket for the end-of-season raffle</span></div>`;
-      if (view === 'full' && (streaks.currentStreak > 0 || streaks.bestStreak > 0)) {
-        html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Streak:</span> <span style="font-size:0.85rem;">${escapeHtml(streaks.currentStreak)} current &bull; ${escapeHtml(streaks.bestStreak)} best</span></div>`;
-      } else if (view === 'summary' && streaks.bestStreak > 0) {
-        html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Streak:</span> <span style="font-size:0.85rem;">${escapeHtml(streaks.bestStreak)} best (season record)</span></div>`;
-      }
-      if (view === 'summary' && res.milestone) {
-        html += `<div style="margin-top:6px;"><span style="color:#94a3b8; font-size:0.8rem;">Milestone:</span> <span style="font-size:0.85rem;">${escapeHtml(milestoneCountLabel(res.milestone))}</span></div>`;
-      }
-      if (view === 'summary') html += complianceSummaryHtml(res);
-      gamContainer.innerHTML = html;
-      gamSection.style.display = 'block';
+      container.innerHTML = gamificationHtml(res, view, streaks, raffle);
     }
   }
+  section.style.display = 'block';
+}
 
-  const awardsContainer = $('myseason-awards-container');
-  const awardsSection = $('myseason-awards-section');
-  const awards = res.awardsWon || [];
-  if (awardsContainer && awardsSection) {
-    if (awards.length > 0) {
-      awardsContainer.innerHTML = awards
-        .map((a) => `<div class="card card-tight">
-                       <span style="font-weight:700; color:#fbbf24;">Award:</span>
-                       <span style="font-weight:700; color:#f8fafc;">${escapeHtml(a)}</span>
-                     </div>`)
-        .join('');
-      awardsSection.style.display = 'block';
-    } else {
-      awardsContainer.innerHTML = '';
-      awardsSection.style.display = 'none';
-    }
-  }
-
-  renderStatsList('myseason-leaders-container', res.leaders || [], {
-    getRowHtml: (item) => leaderRowHtml(item),
-    limit: Infinity
-  });
-
-  const content = $('myseason-content');
-  if (content) content.style.display = 'block';
+function renderMySeasonStats(res) {
+  if (!res || !res.season) return;
+  mySeasonRendered = res;
+  const container = $('myseason-season-container');
+  if (!container) return;
+  container.innerHTML = '<div class="card card-tight">' + playerSeasonHtml(res.season, {
+    surface: 'myseason',
+    playerId: appState.linkedPlayer && appState.linkedPlayer.id,
+  }) + '</div>';
 }
 
 function loadCareerStats() {
@@ -1645,8 +1648,8 @@ function formatNightDate(iso) {
   } catch { return null; }
 }
 
-function isFreshCache(viewCache, seasonId) {
-  return LeagueCore.isFreshCache(viewCache, seasonId, Date.now());
+function isFreshCache(viewCache, seasonId, ttl) {
+  return LeagueCore.isFreshCache(viewCache, seasonId, Date.now(), ttl);
 }
 
 function escapeHtml(value) {
@@ -1825,7 +1828,8 @@ function wireEvents() {
     'standings-season-filter': loadStandingsData,
     'season-filter': loadAwardsData,
     'profile-season-filter': loadProfileSeason,
-    'myseason-season-filter': loadMySeasonStats,
+    'myseason-season-filter': loadPrivateStats,
+    'vote-milestones-season-filter': loadPrivateStats,
   };
   document.querySelectorAll('[data-season-sync]').forEach((sel) => {
     sel.addEventListener('change', () => {
@@ -1833,6 +1837,18 @@ function wireEvents() {
       (seasonReload[sel.id] || (() => {}))();
     });
   });
+  const rerenderNights = (rerender) => (e) => {
+    const toggle = e.target.closest('[data-nights-toggle]');
+    if (!toggle || !toggle.dataset.nightsKey) return;
+    const key = toggle.dataset.nightsKey;
+    listExpanded[key] = !listExpanded[key];
+    rerender();
+  };
+  on('player-modal-content', 'click', rerenderNights(() => renderPlayerModal(playerModalData)));
+  on('profile-season-content', 'click', rerenderNights(() => renderProfileSeason(profileData)));
+  on('myseason-season-container', 'click', rerenderNights(() => {
+    if (mySeasonRendered) renderMySeasonStats(mySeasonRendered);
+  }));
   on('standings-round-filter', 'change', () => loadStandingsData());
 
   on('standings-table-body', 'click', (e) => {
@@ -1881,7 +1897,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const desktopQuery = window.matchMedia('(min-width: 1024px)');
   desktopQuery.addEventListener('change', (e) => {
     if (e.matches && appState.linkedPlayer) {
-      loadMySeasonStats();
+      loadPrivateStats();
       loadCareerStats();
     }
     if (e.matches && appState.lastView === 'myseason-view') {
@@ -2219,9 +2235,13 @@ function closePlayerModal(event) {
   closeOverlay('player-modal-overlay');
 }
 
-function renderSeasonContent(s, opts = {}) {
+function playerSeasonHtml(s, opts = {}) {
   const headingTag = opts.headingTag === 'h3' ? 'h3' : 'div';
   const head = (text) => `<${headingTag} class="section-heading">${text}</${headingTag}>`;
+  const surface = opts.surface || 'modal';
+  const playerId = opts.playerId || '';
+  const key = surface + ':' + playerId;
+  const expanded = Boolean(listExpanded[key]);
 
   const statsHtml = (s.rank != null || s.nightsAttended > 0 || (s.nights && s.nights.length > 0))
     ? `
@@ -2247,15 +2267,20 @@ function renderSeasonContent(s, opts = {}) {
 
   let nightsHtml = '';
   if (s.nights && s.nights.length > 0) {
+    const sorted = LeagueCore.nightsNewestFirst(s.nights);
+    const shown = LeagueCore.visibleListSlice(sorted, 3, expanded);
     nightsHtml = head('Night-by-night') +
       '<div class="player-modal-items">' +
-      s.nights.sort((a, b) => a.round - b.round).map(n =>
+      shown.map(n =>
         `<div class="player-modal-item">
           <span>Night ${escapeHtml(n.round)}</span>
           <span>${escapeHtml(n.wins)}W ${escapeHtml(n.draws)}D ${escapeHtml(n.losses)}L · ${escapeHtml(n.points)} pts · #${escapeHtml(n.rank)}</span>
         </div>`
       ).join('') +
       '</div>';
+    if (sorted.length > 3) {
+      nightsHtml += `<button type="button" class="btn-ghost" style="margin-top:8px;" data-nights-toggle data-nights-key="${escapeHtml(key)}">${escapeHtml(LeagueCore.listToggleLabel(sorted.length, 3, expanded, 'nights'))}</button>`;
+    }
   }
 
   let leadersHtml = '';
@@ -2299,7 +2324,7 @@ function renderPlayerModal(data) {
   nameEl.innerHTML = escapeHtml(data.playerName || data.playerId)
     + awardBadge('ruler', data.career && data.career.rulerCount)
     + awardBadge('champion', data.career && data.career.championCount);
-  content.innerHTML = renderSeasonContent(data.season);
+  content.innerHTML = playerSeasonHtml(data.season, { surface: 'modal', playerId: data.playerId });
 }
 
 function openPlayerProfile(event) {
@@ -2386,7 +2411,7 @@ async function loadProfileSeason() {
 function renderProfileSeason(data) {
   const container = $('profile-season-content');
   if (!container) return;
-  const raw = renderSeasonContent(data.season, { headingTag: 'h3' });
+  const raw = playerSeasonHtml(data.season, { headingTag: 'h3', surface: 'profile', playerId: data.playerId });
   container.innerHTML = '<div class="card card-tight">' + raw + '</div>';
 }
 

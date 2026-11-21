@@ -2,8 +2,8 @@ import { getSetting, getAwardsForSeason, parseSeasonId, parseWeek } from '../db/
 import { getStreaks, getRaffleTickets, getVotingCompliance } from '../lib/participation.js';
 import { MILESTONE_VOTE_TARGET } from '../lib/constants.js';
 import { badRequest } from '../lib/errors.js';
-import { computeBadges } from '../lib/badges.js';
 import { computeLeaderWinRates } from '../lib/careerStats.js';
+import { loadPlayerSeasonSection } from '../lib/playerSeason.js';
 
 export async function handleGetMySeasonStats(body, env, session) {
   const { DB } = env;
@@ -41,18 +41,19 @@ export async function handleGetMySeasonStats(body, env, session) {
   // Awards are declared at season close: mid-season podium rows exist (sync
   // refreshes them weekly) but must never be listed as won in the active season.
   let awardsWon = [];
+  let seasonAwards = [];
   if (!isCurrentSeason) {
     const awards = await getAwardsForSeason(DB, sid);
     const allAwards = awards.results || [];
-    awardsWon = allAwards
-      .filter(a => {
-        if (a.player_id !== playerId) return false;
-        const maxScore = Math.max(...allAwards
-          .filter(x => x.award_name === a.award_name)
-          .map(x => x.score ?? 0));
-        return (a.score ?? 0) === maxScore;
-      })
-      .map(a => a.award_name);
+    const wonAwards = allAwards.filter(a => {
+      if (a.player_id !== playerId) return false;
+      const maxScore = Math.max(...allAwards
+        .filter(x => x.award_name === a.award_name)
+        .map(x => x.score ?? 0));
+      return (a.score ?? 0) === maxScore;
+    });
+    awardsWon = wonAwards.map(a => a.award_name);
+    seasonAwards = wonAwards.map(a => ({ award_name: a.award_name, score: a.score }));
   }
 
   // Get leaders played (per-leader play counts from votes)
@@ -73,9 +74,8 @@ export async function handleGetMySeasonStats(body, env, session) {
     plays: r.play_count,
   }));
 
-  const [raffleTickets, badges, deckWinRates, compliance] = await Promise.all([
+  const [raffleTickets, deckWinRates, compliance] = await Promise.all([
     getRaffleTickets(DB, sid, playerId),
-    computeBadges(DB, playerId, activeSeasonId, isCurrentSeason),
     computeLeaderWinRates(DB, playerId, sid),
     getVotingCompliance(DB, sid, playerId, cutoffWeek),
   ]);
@@ -94,23 +94,28 @@ export async function handleGetMySeasonStats(body, env, session) {
     };
   }
 
+  const leaderRows = leaders.map(l => {
+    const deck = deckWinRates.find(d => d.leaderId === l.id);
+    return {
+      ...l,
+      wins: deck ? deck.wins : 0,
+      losses: deck ? deck.losses : 0,
+      draws: deck ? deck.draws : 0,
+      winPct: deck ? deck.winPct : null,
+    };
+  });
+  const season = await loadPlayerSeasonSection(DB, playerId, sid);
+  season.leaders = leaderRows;
+  season.awards = seasonAwards;
+
   return {
     awardsWon,
-    leaders: leaders.map(l => {
-      const deck = deckWinRates.find(d => d.leaderId === l.id);
-      return {
-        ...l,
-        wins: deck ? deck.wins : 0,
-        losses: deck ? deck.losses : 0,
-        draws: deck ? deck.draws : 0,
-        winPct: deck ? deck.winPct : null,
-      };
-    }),
+    leaders: leaderRows,
+    season,
     streaks,
     raffleTickets,
     milestone,
     compliance,
-    badges,
     isCurrentSeason,
     hasVoteData,
   };

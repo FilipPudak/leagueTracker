@@ -149,7 +149,7 @@ describe('Boot: flow', () => {
   it('desktop boot loads My Stats data (persistent panel)', () => {
     const js = readJS();
     assert.ok(
-      js.includes('innerWidth >= 1024') && js.includes('loadMySeasonStats()') && js.includes('loadCareerStats()'),
+      js.includes('innerWidth >= 1024') && js.includes('loadPrivateStats()') && js.includes('loadCareerStats()'),
       'applyBoot must load season + career stats on desktop where the panel is always visible'
     );
   });
@@ -412,7 +412,7 @@ describe('Flow & accessibility: guards', () => {
   it('season selectors share one browsing state', () => {
     const html = readHTML();
     const js = readJS();
-    assert.equal((html.match(/data-season-sync=/g) || []).length, 4, 'all four season selects must sync');
+    assert.equal((html.match(/data-season-sync=/g) || []).length, 5, 'all five season selects must sync');
     assert.ok(js.includes("localStorage.setItem(KEY_BROWSING_SEASON"), 'browsing season must persist');
     assert.ok(js.includes('function seasonForBrowsing'), 'shared season getter must exist');
   });

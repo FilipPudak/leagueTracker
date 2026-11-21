@@ -11,8 +11,9 @@ front end on GitHub Pages backed by a Cloudflare Worker + D1 database backend.
 - A Cloudflare Worker backend tracks votes, compiles leaderboards, advances weeks, and
   calculates end-of-season awards. Data is stored in a D1 (SQLite) database.
 - Player data is synced from the Melee.gg API on a weekly cron trigger (dual-cron for DST handling).
-- Gamification features: raffle tickets (1 per vote), streak tracking, and voting milestones.
-- 4 tabs: Vote | Standings | Awards | My Stats
+- Gamification features: raffle tickets (1 per vote), streak tracking, and voting milestones on
+  the Vote tab, with a synced season selector.
+- 4 tabs: Vote | Standings | Awards | My Stats (season results on My Stats, private to the player).
 
 ## Architecture
 
@@ -71,15 +72,15 @@ cd backend && node --test "test/**/*.test.js"
 
 | Category | Files | Tests |
 |----------|-------|-------|
-| Library (`test/lib` — awards, auth, badges, careerStats, nights, deckStats, leagueSync, melee, participation, seasonTable, tables, voteAudit …) | 15 | 373 |
-| Handlers (`test/handlers` — getAppData, vote actions, accounts, standings, awards, my-season, career, profile, bootstrap, season, admin, backfill) | 16 | 319 |
+| Library (`test/lib` — awards, auth, badges, careerStats, nights, deckStats, leagueSync, melee, participation, playerSeason, seasonTable, tables, voteAudit …) | 16 | 381 |
+| Handlers (`test/handlers` — getAppData, vote actions, accounts, standings, awards, my-season, career, profile, season parity, bootstrap, season, admin, backfill) | 17 | 323 |
 | Database (`test/db` — queries, schema) | 4 | 83 |
 | Triggers (`test/triggers` — syncFromMelee, backfillFromMelee) | 2 | 80 |
 | Router & rate limiter | 3 | 52 |
-| Frontend (`test/frontend` — app-core, responsive redesign, vote state, milestones, CSP, finals card) | 16 | 270 |
+| Frontend (`test/frontend` — app-core, responsive redesign, vote state, milestones, CSP, finals card) | 16 | 290 |
 | Privacy guard | 1 | 3 |
 | Test helpers (mock-db behavior) | 1 | 10 |
-| **Total** | **58** | **1190** |
+| **Total** | **60** | **1222** |
 
 Test infrastructure: `backend/test/helpers/mock-db.js` (D1 mock), `mock-fetch.js`,
 `mock-crypto.js`, `fixtures.js`, `test-utils.js`, `read-source.js` (EOL-normalized source reader).

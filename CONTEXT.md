@@ -203,27 +203,30 @@ competition ranking.
 
 **Mid-season refresh:** from S7 the weekly sync also refreshes the computed podiums in the
 `awards` table every run (so the leaderboard can show live races, subject to the reveal
-gating above); `awardsWon` in My Stats lists awards only after the season has closed — a
+gating above); awards in the season section list awards only after the season has closed — a
 mid-season leader is "in the lead", never a "winner".
 
 ## 10. Gamification (private motivation layer)
 
 | Term | Definition |
 |---|---|
-| **Voting Milestones** | The My Stats block grouping the four voting rewards: the 4-vote milestone, the **80% rule**, raffle tickets, and streak. |
+| **Voting Milestones** | The last block in the **Vote tab** (after the weekly participation card) grouping the four voting rewards: the 4-vote milestone, the **80% rule**, raffle tickets, and streak. It has its own season selector, synced with the other season pickers; the subtitle shows the browsed season so a stale persisted choice is unambiguous. |
 | **Milestone** | A personal **progress bar 0 → 4 votes** for the current season (resets each season; the bar shows only while the season is active, but a closed season's summary lists its final status whenever the player voted at all). Filling it earns a small offline reward chosen by the organizer. It is a completion bar, **not** a points system, and **not** the raffle. |
-| **80% rule** | Season-end prize eligibility, private to the player's My Stats: a player **qualifies** when they voted in **≥80% of the regular nights they attended**, with **at least 4 votes** (the 4-vote floor is absolute: with ≥5 attended nights the ratio already implies it, so it only binds in the opening weeks or for partial attendance — the reward line beside the bar states it as "min. N votes"). Numerator = intersection (votes in attended weeks only — grace-rule votes in missed weeks never count). **The current open week counts from the moment its night is attended**: the ratio dips the moment you play without voting and recovers the moment you vote — a live nudge, on the same clock as raffle tickets and streaks; a week would enter the denominator at the next sync regardless, so the final prize math at close is unchanged (mid-season status is provisional "on track", final "Prize earned!" at close). Derived on read — nothing stored, no podium, no public surface. Pre-voting seasons (S1–S6) show nothing. |
+| **80% rule** | Season-end prize eligibility, private to the player's Vote tab milestones: a player **qualifies** when they voted in **≥80% of the regular nights they attended**, with **at least 4 votes** (the 4-vote floor is absolute: with ≥5 attended nights the ratio already implies it, so it only binds in the opening weeks or for partial attendance — the reward line beside the bar states it as "min. N votes"). Numerator = intersection (votes in attended weeks only — grace-rule votes in missed weeks never count). **The current open week counts from the moment its night is attended**: the ratio dips the moment you play without voting and recovers the moment you vote — a live nudge, on the same clock as raffle tickets and streaks; a week would enter the denominator at the next sync regardless, so the final prize math at close is unchanged (mid-season status is provisional "on track", final "Prize earned!" at close). Derived on read — nothing stored, no podium, no public surface. Pre-voting seasons (S1–S6) show nothing. |
 | **Raffle Tickets** | A separate, plainly displayed count: **1 ticket per vote submitted**, accumulating within the season, **no bonuses, no gates**. The end-of-season raffle is drawn **manually, off-system**, using these stored per-player counts. The UI states next to the count that tickets are used in the season-end raffle. |
 | **Streak** | Consecutive **attended** weeks that were also voted; a missed *attendance* does not break the streak (only attended weeks form the sequence). The open week is **pending**: an attended, not-yet-voted open week never breaks the streak — its verdict lands when the window closes; a vote cast there extends it immediately (reward-on-action, like tickets). A *current* streak is meaningful only in the active season; closed seasons show the best streak as a season record. |
 
-**Historical view (My Stats):** the active season shows the full gamification block. A closed
-season with vote data shows a summary (tickets, best streak, milestone final status, final 80%
-rule status — no current streak). Pre-voting seasons (S1–S6: voting did not exist) show no
-gamification at all — zeros there would misrepresent absence of the feature as absence of effort.
+**Historical view (Vote tab milestones):** the active season shows the full gamification block. A
+closed season with vote data shows a summary (tickets, best streak, milestone final status, final
+80% rule status — no current streak). Pre-voting seasons (S1–S6: voting did not exist) keep the
+heading visible and say "Voting started in Season 7 — nothing to show here", rather than showing
+zeros that would misrepresent absence of the feature as absence of effort.
 **Hard rule (public vs private):** individual participation metrics — tickets,
-streaks, badges, 80% rule status — appear **only in that player's own My Stats**. Public surfaces
-(Vote tab, Leaderboard/Awards) show **aggregates only** ("X of Y voters attended last night have
-voted"), never per-player rankings. The single whole-roster view is the **admin-only**
+streaks, badges, 80% rule status — appear **only in that player's own Vote tab milestones**; the
+**My Stats** season section shows their Melee-derived results (rank, points, nights, W-D-L,
+night-by-night, awards, leaders). Public surfaces (Standings/Awards) show **aggregates only**
+("X of Y voters attended last night have voted"), never per-player rankings. The single
+whole-roster view is the **admin-only**
 `getSeasonRewards` season extract used on finals night (one row per player who voted that season:
 tickets, milestone, 80% compliance, best streak); it requires `adminToken`, is never linked from
 the frontend, and is scoped to the requested season so it cannot accumulate into a cross-season
@@ -245,6 +248,11 @@ participation ranking.
 - **Weekly participation card:** X voted ÷ Y where Y = players **who attended the current
   voting week's night** (not the whole roster — 77 historical names make "3 of 77" read like
   failure). Denominator 0 → hide the card.
+- **Private payload on the Vote tab:** opening Vote fetches the same per-season private payload
+  that renders My Stats; milestones and the season section come from one response, cached 30s
+  (public payloads stay 15s). A failed private fetch is logged and shown as an inline notice in
+  the milestones block — it never raises the global red status box. The read budget stays 90/min
+  per venue IP.
 - **Season participation stat:** denominators are attendance-based (players with ≥1 attended
   night that season).
 - **Standings tab:** the derived **season table** (default, as-of the latest regular round, with

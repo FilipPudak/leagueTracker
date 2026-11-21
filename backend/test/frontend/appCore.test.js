@@ -194,6 +194,52 @@ describe('frontend/app-core', () => {
       assert.equal(core.isFreshCache({}, 's6', Date.now()), false);
       assert.equal(core.isFreshCache(null, 's6', Date.now()), false);
     });
+
+    it('honours a custom TTL (private stats cache runs longer than the public 15s)', () => {
+      const cache = { s6: { ts: 1000, data: {} } };
+      assert.equal(core.isFreshCache(cache, 's6', 1000 + 20_000, 30_000), true);
+      assert.equal(core.isFreshCache(cache, 's6', 1000 + 30_000, 30_000), false);
+      assert.equal(core.isFreshCache(cache, 's6', 1000 + 20_000), false, 'default stays 15s');
+    });
+  });
+
+  describe('cache TTL constants', () => {
+    it('public cache is 15s and the private payload cache is 30s', () => {
+      assert.equal(core.CACHE_TTL_MS, 15_000);
+      assert.equal(core.PRIVATE_CACHE_TTL_MS, 30_000);
+      assert.ok(core.PRIVATE_CACHE_TTL_MS > core.CACHE_TTL_MS,
+        'private stats are fetched more often per view, so their cache lives twice as long');
+    });
+  });
+
+  describe('nightsNewestFirst (shared night-by-night display order)', () => {
+    it('empty and null input yields an empty array', () => {
+      assert.deepEqual(core.nightsNewestFirst([]), []);
+      assert.deepEqual(core.nightsNewestFirst(null), []);
+      assert.deepEqual(core.nightsNewestFirst(undefined), []);
+    });
+
+    it('a single night is returned as-is', () => {
+      const one = [{ round: 3, wins: 1 }];
+      assert.deepEqual(core.nightsNewestFirst(one), one);
+    });
+
+    it('sorts descending by round, newest first', () => {
+      const nights = [{ round: 1 }, { round: 3 }, { round: 2 }];
+      assert.deepEqual(core.nightsNewestFirst(nights).map(n => n.round), [3, 2, 1]);
+    });
+
+    it('does not mutate the input array', () => {
+      const nights = [{ round: 1 }, { round: 3 }, { round: 2 }];
+      const sorted = core.nightsNewestFirst(nights);
+      assert.notEqual(sorted, nights, 'must be a new array');
+      assert.deepEqual(nights.map(n => n.round), [1, 3, 2], 'original order untouched');
+    });
+
+    it('tolerates string round numbers from D1', () => {
+      const nights = [{ round: '2' }, { round: '10' }, { round: '1' }];
+      assert.deepEqual(core.nightsNewestFirst(nights).map(n => n.round), ['10', '2', '1']);
+    });
   });
 
   describe('resolvePlayerChoices (link picker shows full roster)', () => {
@@ -321,13 +367,14 @@ describe('frontend wiring', () => {
     assert.match(app, /LeagueCore\.mapSettings/);
   });
 
-  it('80% compliance rule is scoped to My Stats and view mode is wired', () => {
-    assert.match(app, /res\.compliance/, 'My Stats renders the compliance payload');
+  it('80% compliance rule is scoped to the Vote tab and view mode is wired', () => {
+    assert.match(app, /res\.compliance/, 'Vote tab renders the compliance payload');
     assert.equal((app.match(/renderComplianceCard\(/g) || []).length, 2,
       'compliance card helper is defined once and called once');
     assert.match(html, /id="compliance-container"/, 'compliance card exists');
-    assert.ok(html.indexOf('id="myseason-view"') < html.indexOf('id="compliance-container"'),
-      'compliance card lives inside My Stats only');
+    assert.ok(html.indexOf('id="vote-view"') < html.indexOf('id="compliance-container"')
+      && html.indexOf('id="compliance-container"') < html.indexOf('id="standings-view"'),
+    'compliance card lives inside the Vote tab only');
     assert.match(app, /LeagueCore\.gamificationViewFor/);
   });
 
@@ -354,8 +401,9 @@ describe('frontend wiring', () => {
 
   it('every leader list renders through one shared leader row builder', () => {
     assert.equal((app.match(/function leaderRowHtml\(/g) || []).length, 1, 'exactly one leader-row template');
-    assert.ok(app.includes('getRowHtml: (item) => leaderRowHtml(item)'), 'My Stats routes through it');
-    assert.ok(app.includes('s.leaders.map(l => leaderRowHtml(l))'), 'modal + profile route through it');
+    assert.ok(app.includes('s.leaders.map(l => leaderRowHtml(l))'), 'the shared season builder renders every leader list');
+    assert.equal((app.match(/s\.leaders\.map\(l => leaderRowHtml\(l\)\)/g) || []).length, 1,
+      'one call site now serves modal, profile and My Stats');
   });
 
   it('award podiums expand per-container with a players label', () => {

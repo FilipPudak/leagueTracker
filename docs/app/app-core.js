@@ -1,5 +1,6 @@
 const LeagueCore = (() => {
   const CACHE_TTL_MS = 15 * 1000;
+  const PRIVATE_CACHE_TTL_MS = 30 * 1000;
 
   // Canonical guest onboarding sentence — rendered verbatim into the desktop
   // pitch card and the mobile guest banner so the wording can never drift.
@@ -24,10 +25,15 @@ const LeagueCore = (() => {
     return seasonName + ' • Night ' + week + (seasonLength > 0 ? ' / ' + seasonLength : '');
   }
 
-  function isFreshCache(viewCache, key, now) {
+  function isFreshCache(viewCache, key, now, ttl) {
     const entry = viewCache ? viewCache[key] : null;
     if (!entry) return false;
-    return (now - entry.ts) < CACHE_TTL_MS;
+    return (now - entry.ts) < (ttl || CACHE_TTL_MS);
+  }
+
+  function nightsNewestFirst(nights) {
+    if (!Array.isArray(nights)) return [];
+    return [...nights].sort((a, b) => Number(b.round) - Number(a.round));
   }
 
   function resolvePlayerChoices(boot) {
@@ -130,7 +136,7 @@ const LeagueCore = (() => {
     return '';
   }
 
-  return { mapSettings, computeSubtitle, isFreshCache, resolvePlayerChoices, gamificationViewFor, leaderOptionLabel, aspectIconMarkup, visibleListSlice, listToggleLabel, voteSubmitAction, shouldShowVoteCta, shouldRetryAsNewVote, shouldSkipVoteStamp, resolveHasVoted, resolveServerVote, resolveStandingsAsOf, awardBadgeMarkup, awardBadgeTitle, GUEST_PITCH, CACHE_TTL_MS };
+  return { mapSettings, computeSubtitle, isFreshCache, nightsNewestFirst, resolvePlayerChoices, gamificationViewFor, leaderOptionLabel, aspectIconMarkup, visibleListSlice, listToggleLabel, voteSubmitAction, shouldShowVoteCta, shouldRetryAsNewVote, shouldSkipVoteStamp, resolveHasVoted, resolveServerVote, resolveStandingsAsOf, awardBadgeMarkup, awardBadgeTitle, GUEST_PITCH, CACHE_TTL_MS, PRIVATE_CACHE_TTL_MS };
 })();
 
 if (typeof globalThis !== 'undefined') globalThis.LeagueCore = LeagueCore;

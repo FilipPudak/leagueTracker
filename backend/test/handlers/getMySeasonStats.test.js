@@ -37,6 +37,21 @@ describe('handleGetMySeasonStats', () => {
     assert.ok(result.leaders);
   });
 
+  it('exposes a season section shaped like the public player profile', async () => {
+    const result = await handleGetMySeasonStats({ seasonId: 6 }, env, aliceSession);
+    assert.ok(result.season, 'season must be present for the shared My Stats renderer');
+    assert.equal(result.season.nightsAttended, 2);
+    assert.equal(result.season.totalNights, 2);
+    assert.ok(Array.isArray(result.season.nights));
+    assert.ok(Array.isArray(result.season.leaders));
+    assert.ok(Array.isArray(result.season.awards));
+  });
+
+  it('no longer returns badges (career badges come from getMyCareerStats)', async () => {
+    const result = await handleGetMySeasonStats({ seasonId: 6 }, env, aliceSession);
+    assert.ok(!('badges' in result), 'the redundant, disagreeing season badge copy must be gone');
+  });
+
   it('returns correct leader play counts', async () => {
     const result = await handleGetMySeasonStats(
       { seasonId: 6 },

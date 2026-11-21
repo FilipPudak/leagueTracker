@@ -47,7 +47,7 @@ describe('CSP hardening Phase A: no inline event handlers', () => {
     const js = readSource(JS);
     assert.equal((html.match(/data-view=/g) || []).length, 4, 'four nav tabs carry data-view');
     assert.equal((html.match(/data-tab=/g) || []).length, 5, 'two profile + three career tabs carry data-tab');
-    assert.equal((html.match(/data-season-sync=/g) || []).length, 4, 'four season selects carry data-season-sync');
+    assert.equal((html.match(/data-season-sync=/g) || []).length, 5, 'five season selects carry data-season-sync');
     assert.ok(js.includes("on('vote-form', 'submit'") && js.includes("on('link-form', 'submit'"), 'forms must be wired via listeners');
     assert.ok(/wireBackdrop\(\$\('link-modal-overlay'\)/.test(js), 'sign-in backdrop tap closes sign-in');
     assert.ok(/wireBackdrop\(\$\('player-modal-overlay'\)/.test(js), 'player backdrop tap closes modal');
@@ -95,6 +95,15 @@ describe('CSP hardening Phase A: no inline event handlers', () => {
     assert.ok(meta.includes("base-uri 'none'") && meta.includes("form-action 'none'") && meta.includes("object-src 'none'"), 'navigation/embed hardening present');
     assert.ok(metaIdx < html.indexOf('<link rel="stylesheet"'), 'policy must precede every resource it should govern');
     assert.ok(html.indexOf('<meta charset') < metaIdx && metaIdx - html.indexOf('<meta charset') < 120, 'placed immediately after charset');
+  });
+
+  it('select chevron is a same-origin asset (data: images are blocked by img-src self)', () => {
+    const css = readSource(CSS);
+    assert.ok(!/url\(\s*["']?data:image\//i.test(css), 'no data: image URLs — CSP img-src self blocks them');
+    assert.ok(css.includes("background-image: url('img/chevron.svg')"), 'chevron must load from the same origin');
+    assert.ok(existsSync(join(APP, 'img', 'chevron.svg')), 'img/chevron.svg must be shipped');
+    const svg = readSource(join(APP, 'img', 'chevron.svg'));
+    assert.ok(svg.includes('polyline') && svg.includes('#38bdf8'), 'chevron keeps its shape and accent colour');
   });
 });
 
@@ -182,8 +191,8 @@ describe('CSP hardening Phase D: aspect icons are same-origin only (v4.18.0)', (
     assert.equal((js.match(/getIcons:/g) || []).length, 1, 'only the most-played config still uses the default row template');
     const builder = js.slice(js.indexOf('function leaderRowHtml'), js.indexOf('function renderPlayerModal'));
     assert.ok(builder.includes('LeagueCore.aspectIconMarkup'), 'shared leader row renders icons');
-    assert.ok(js.includes('getRowHtml: (item) => leaderRowHtml(item)'), 'My Stats renders through the shared leader row');
-    assert.ok(js.includes('s.leaders.map(l => leaderRowHtml(l))'), 'profile/modal leader rows render through the shared leader row');
+    assert.ok(js.includes('playerSeasonHtml(res.season'), 'My Stats renders through the shared season builder');
+    assert.ok(js.includes('s.leaders.map(l => leaderRowHtml(l))'), 'all leader rows render through the shared leader row');
   });
 
   it('index.html ships no external img sources', () => {
